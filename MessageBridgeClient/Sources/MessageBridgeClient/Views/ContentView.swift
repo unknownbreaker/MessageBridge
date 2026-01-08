@@ -1,4 +1,5 @@
 import SwiftUI
+import MessageBridgeClientCore
 
 struct ContentView: View {
     @EnvironmentObject var viewModel: MessagesViewModel
@@ -44,11 +45,7 @@ struct ConnectionStatusView: View {
     }
 }
 
-enum ConnectionStatus {
-    case connected
-    case connecting
-    case disconnected
-
+extension ConnectionStatus {
     var color: Color {
         switch self {
         case .connected: return .green

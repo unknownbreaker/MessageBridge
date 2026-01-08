@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import MessageBridgeCore
 
 @main
 struct MessageBridgeServer: AsyncParsableCommand {

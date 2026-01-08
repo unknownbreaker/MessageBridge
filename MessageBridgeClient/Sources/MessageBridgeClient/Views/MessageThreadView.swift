@@ -1,4 +1,5 @@
 import SwiftUI
+import MessageBridgeClientCore
 
 struct MessageThreadView: View {
     let conversation: Conversation

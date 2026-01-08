@@ -12,16 +12,27 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
-        .executableTarget(
-            name: "MessageBridgeServer",
+        .target(
+            name: "MessageBridgeCore",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "GRDB", package: "GRDB.swift"),
+            ],
+            path: "Sources/MessageBridgeCore"
+        ),
+        .executableTarget(
+            name: "MessageBridgeServer",
+            dependencies: [
+                "MessageBridgeCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"])
             ]
+        ),
+        .testTarget(
+            name: "MessageBridgeCoreTests",
+            dependencies: ["MessageBridgeCore"]
         ),
     ]
 )

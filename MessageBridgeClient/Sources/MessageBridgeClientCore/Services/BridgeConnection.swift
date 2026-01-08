@@ -1,18 +1,26 @@
 import Foundation
 
+/// Protocol defining the bridge service interface for testability
+public protocol BridgeServiceProtocol: Sendable {
+    func connect(to url: URL, apiKey: String) async throws
+    func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation]
+    func fetchMessages(conversationId: String, limit: Int, offset: Int) async throws -> [Message]
+    func sendMessage(text: String, to conversationId: String) async throws -> Message
+}
+
 /// Handles communication with the MessageBridge server
-actor BridgeConnection {
+public actor BridgeConnection: BridgeServiceProtocol {
     private var serverURL: URL?
     private var apiKey: String?
     private var urlSession: URLSession
 
-    init() {
+    public init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         self.urlSession = URLSession(configuration: config)
     }
 
-    func connect(to url: URL, apiKey: String) async throws {
+    public func connect(to url: URL, apiKey: String) async throws {
         self.serverURL = url
         self.apiKey = apiKey
 
@@ -29,7 +37,7 @@ actor BridgeConnection {
         }
     }
 
-    func fetchConversations(limit: Int = 50, offset: Int = 0) async throws -> [Conversation] {
+    public func fetchConversations(limit: Int = 50, offset: Int = 0) async throws -> [Conversation] {
         guard let serverURL, let apiKey else {
             throw BridgeError.notConnected
         }
@@ -55,7 +63,7 @@ actor BridgeConnection {
         return try decoder.decode([Conversation].self, from: data)
     }
 
-    func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) async throws -> [Message] {
+    public func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) async throws -> [Message] {
         guard let serverURL, let apiKey else {
             throw BridgeError.notConnected
         }
@@ -84,7 +92,7 @@ actor BridgeConnection {
         return try decoder.decode([Message].self, from: data)
     }
 
-    func sendMessage(text: String, to conversationId: String) async throws -> Message {
+    public func sendMessage(text: String, to conversationId: String) async throws -> Message {
         guard let serverURL, let apiKey else {
             throw BridgeError.notConnected
         }
@@ -110,13 +118,13 @@ actor BridgeConnection {
     }
 }
 
-enum BridgeError: LocalizedError {
+public enum BridgeError: LocalizedError {
     case notConnected
     case connectionFailed
     case requestFailed
     case sendFailed
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .notConnected:
             return "Not connected to server"

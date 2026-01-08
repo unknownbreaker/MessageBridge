@@ -1,4 +1,5 @@
 import SwiftUI
+import MessageBridgeClientCore
 
 @main
 struct MessageBridgeApp: App {

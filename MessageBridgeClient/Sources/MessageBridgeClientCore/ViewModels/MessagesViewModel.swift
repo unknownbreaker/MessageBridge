@@ -1,20 +1,27 @@
 import Foundation
 import SwiftUI
 
+public enum ConnectionStatus: Sendable {
+    case connected
+    case connecting
+    case disconnected
+}
+
 @MainActor
-class MessagesViewModel: ObservableObject {
-    @Published var conversations: [Conversation] = []
-    @Published var messages: [String: [Message]] = [:]
-    @Published var connectionStatus: ConnectionStatus = .disconnected
+public class MessagesViewModel: ObservableObject {
+    @Published public var conversations: [Conversation] = []
+    @Published public var messages: [String: [Message]] = [:]
+    @Published public var connectionStatus: ConnectionStatus = .disconnected
 
-    private let bridgeService = BridgeConnection()
+    private let bridgeService: any BridgeServiceProtocol
 
-    init() {
+    public init(bridgeService: any BridgeServiceProtocol = BridgeConnection()) {
+        self.bridgeService = bridgeService
         // Load placeholder data for now
         loadPlaceholderData()
     }
 
-    func connect(to serverURL: URL, apiKey: String) async {
+    public func connect(to serverURL: URL, apiKey: String) async {
         connectionStatus = .connecting
         do {
             try await bridgeService.connect(to: serverURL, apiKey: apiKey)
@@ -26,24 +33,24 @@ class MessagesViewModel: ObservableObject {
         }
     }
 
-    func loadConversations() async {
+    public func loadConversations() async {
         do {
-            conversations = try await bridgeService.fetchConversations()
+            conversations = try await bridgeService.fetchConversations(limit: 50, offset: 0)
         } catch {
             print("Failed to load conversations: \(error)")
         }
     }
 
-    func loadMessages(for conversationId: String) async {
+    public func loadMessages(for conversationId: String) async {
         do {
-            let msgs = try await bridgeService.fetchMessages(conversationId: conversationId)
+            let msgs = try await bridgeService.fetchMessages(conversationId: conversationId, limit: 50, offset: 0)
             messages[conversationId] = msgs
         } catch {
             print("Failed to load messages: \(error)")
         }
     }
 
-    func sendMessage(_ text: String, to conversationId: String) async {
+    public func sendMessage(_ text: String, to conversationId: String) async {
         do {
             let message = try await bridgeService.sendMessage(text: text, to: conversationId)
             messages[conversationId, default: []].insert(message, at: 0)

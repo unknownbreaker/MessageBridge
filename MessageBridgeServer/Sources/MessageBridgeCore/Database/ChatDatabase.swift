@@ -2,16 +2,16 @@ import Foundation
 import GRDB
 
 /// Provides read-only access to the macOS Messages database (chat.db)
-actor ChatDatabase {
+public actor ChatDatabase {
     private let dbPool: DatabasePool
 
-    struct Stats {
-        let conversationCount: Int
-        let messageCount: Int
-        let handleCount: Int
+    public struct Stats {
+        public let conversationCount: Int
+        public let messageCount: Int
+        public let handleCount: Int
     }
 
-    init(path: String) throws {
+    public init(path: String) throws {
         // Open in read-only mode - we never write to chat.db
         var config = Configuration()
         config.readonly = true
@@ -23,7 +23,7 @@ actor ChatDatabase {
 
     // MARK: - Stats
 
-    func getStats() throws -> Stats {
+    public func getStats() throws -> Stats {
         try dbPool.read { db in
             let conversationCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM chat") ?? 0
             let messageCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM message") ?? 0
@@ -38,7 +38,7 @@ actor ChatDatabase {
 
     // MARK: - Conversations
 
-    func fetchRecentConversations(limit: Int = 50, offset: Int = 0) throws -> [Conversation] {
+    public func fetchRecentConversations(limit: Int = 50, offset: Int = 0) throws -> [Conversation] {
         try dbPool.read { db in
             // Get chats with their most recent message
             let sql = """
@@ -69,51 +69,15 @@ actor ChatDatabase {
 
             let rows = try Row.fetchAll(db, sql: sql, arguments: [limit, offset])
 
-            var conversations: [Conversation] = []
-            for row in rows {
-                let chatId: Int64 = row["chat_id"]
-                let chatIdentifier: String = row["chat_identifier"]
-
-                // Fetch participants for this chat
-                let participants = try fetchHandlesForChat(db: db, chatId: chatId)
-
-                // Build last message if exists
-                var lastMessage: Message? = nil
-                if let messageId: Int64 = row["message_id"],
-                   let messageGuid: String = row["message_guid"],
-                   let messageDate: Int64 = row["message_date"] {
-                    lastMessage = Message(
-                        id: messageId,
-                        guid: messageGuid,
-                        text: row["text"],
-                        date: Message.dateFromAppleTimestamp(messageDate),
-                        isFromMe: (row["is_from_me"] as Int?) == 1,
-                        handleId: row["handle_id"],
-                        conversationId: chatIdentifier
-                    )
-                }
-
-                let chatStyle: Int? = row["chat_style"]
-                let isGroup = chatStyle == 43 // Group chat style
-
-                let conversation = Conversation(
-                    id: chatIdentifier,
-                    guid: row["chat_guid"],
-                    displayName: row["display_name"],
-                    participants: participants,
-                    lastMessage: lastMessage,
-                    isGroup: isGroup
-                )
-                conversations.append(conversation)
+            return try rows.map { row in
+                try conversationFromRow(row, db: db)
             }
-
-            return conversations
         }
     }
 
     // MARK: - Messages
 
-    func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) throws -> [Message] {
+    public func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) throws -> [Message] {
         try dbPool.read { db in
             let sql = """
                 SELECT
@@ -149,7 +113,7 @@ actor ChatDatabase {
 
     // MARK: - Handles
 
-    func fetchAllHandles() throws -> [Handle] {
+    public func fetchAllHandles() throws -> [Handle] {
         try dbPool.read { db in
             let sql = """
                 SELECT ROWID as id, id as address, service
@@ -169,6 +133,44 @@ actor ChatDatabase {
     }
 
     // MARK: - Private Helpers
+
+    private func conversationFromRow(_ row: Row, db: Database) throws -> Conversation {
+        let chatId: Int64 = row["chat_id"]
+        let chatIdentifier: String = row["chat_identifier"]
+
+        let participants = try fetchHandlesForChat(db: db, chatId: chatId)
+        let lastMessage = messageFromRow(row, conversationId: chatIdentifier)
+
+        let chatStyle: Int? = row["chat_style"]
+        let isGroup = chatStyle == 43
+
+        return Conversation(
+            id: chatIdentifier,
+            guid: row["chat_guid"],
+            displayName: row["display_name"],
+            participants: participants,
+            lastMessage: lastMessage,
+            isGroup: isGroup
+        )
+    }
+
+    private func messageFromRow(_ row: Row, conversationId: String) -> Message? {
+        guard let messageId: Int64 = row["message_id"],
+              let messageGuid: String = row["message_guid"],
+              let messageDate: Int64 = row["message_date"] else {
+            return nil
+        }
+
+        return Message(
+            id: messageId,
+            guid: messageGuid,
+            text: row["text"],
+            date: Message.dateFromAppleTimestamp(messageDate),
+            isFromMe: (row["is_from_me"] as Int?) == 1,
+            handleId: row["handle_id"],
+            conversationId: conversationId
+        )
+    }
 
     private func fetchHandlesForChat(db: Database, chatId: Int64) throws -> [Handle] {
         let sql = """
