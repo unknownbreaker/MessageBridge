@@ -6,28 +6,57 @@ A self-hosted system for accessing iMessages/SMS on a work Mac (without iCloud) 
 
 ---
 
-## Milestone 1: Project Setup & Database Reading
+## Coding Guidelines
+
+### General Principles
+- **Avoid deeply nested logic** - Extract nested conditions into early returns or separate functions. Prefer guard statements over nested if-else.
+- **No global variables** - Functions should only receive data through arguments passed into them. Use dependency injection.
+- **Immutability** - Avoid mutating variables passed into a function. Return new values instead of modifying inputs.
+- **Modular design** - Features should be self-contained and swappable without causing cascading changes elsewhere. Use protocols to define boundaries.
+- **Thorough testing** - Create tests for each feature covering success cases, edge cases, and error conditions.
+
+### Swift Conventions
+- Use `actor` for thread-safe classes (e.g., `ChatDatabase`, `BridgeConnection`)
+- Use `@MainActor` for ViewModels that update UI state
+- Prefer `async/await` over callbacks
+- Models should be `Codable`, `Identifiable`, and `Sendable` where applicable
+
+### Testing Requirements
+- All new features must include unit tests
+- Use protocol-based dependency injection for testability
+- Mock external dependencies (network, database) in tests
+- Test success cases, edge cases, and error conditions
+
+---
+
+## Milestone 1: Project Setup & Database Reading ✅
 
 **Goal:** Establish project structure and prove we can read from the Messages database.
 
 ### Deliverables
-- [ ] Create `MessageBridgeServer` Swift Package with Vapor
-- [ ] Create `MessageBridgeClient` Xcode project with SwiftUI
-- [ ] Define shared data models (`Message`, `Conversation`, `Handle`)
-- [ ] Implement `ChatDatabase.swift` to query `chat.db`
-- [ ] CLI tool that prints recent conversations and messages
+- [x] Create `MessageBridgeServer` Swift Package with Vapor
+- [x] Create `MessageBridgeClient` Swift Package with SwiftUI
+- [x] Define shared data models (`Message`, `Conversation`, `Handle`)
+- [x] Implement `ChatDatabase.swift` to query `chat.db`
+- [x] CLI tool that prints recent conversations and messages
+- [x] Add test targets with unit tests (17 server tests, 4 client tests)
 
 ### Success Criteria
 ```bash
 # Running on home Mac:
 swift run MessageBridgeServer --test-db
 # Output: Lists 10 most recent conversations with last message preview
+
+# Run tests:
+cd MessageBridgeServer && swift test  # 17 tests pass
+cd MessageBridgeClient && swift test  # 4 tests pass
 ```
 
 ### Key Technical Decisions
 - Use Vapor for HTTP/WebSocket server
-- Use SQLite.swift or GRDB for database access
+- Use GRDB for database access
 - Full Disk Access permission required
+- Separate Core libraries for testability
 
 ---
 
@@ -41,6 +70,7 @@ swift run MessageBridgeServer --test-db
 - [ ] `GET /conversations/:id/messages` - Messages for a conversation (paginated)
 - [ ] `GET /search?q=` - Search messages by content
 - [ ] API key authentication middleware
+- [ ] Unit tests for all endpoints
 
 ### Success Criteria
 ```bash
@@ -76,10 +106,11 @@ curl -H "X-API-Key: $KEY" http://localhost:8080/conversations/123/messages
 **Goal:** Send messages via AppleScript integration.
 
 ### Deliverables
-- [ ] `MessageSender.swift` - AppleScript bridge
+- [ ] `MessageSender.swift` - AppleScript bridge (use protocol for testability)
 - [ ] `POST /send` endpoint
 - [ ] Handle iMessage vs SMS routing
 - [ ] Return delivery status
+- [ ] Unit tests with mock AppleScript executor
 
 ### Success Criteria
 ```bash
@@ -91,15 +122,21 @@ curl -X POST -H "X-API-Key: $KEY" \
 
 ### AppleScript Integration
 ```swift
-func sendMessage(to recipient: String, text: String) async throws {
-    let script = """
-    tell application "Messages"
-        set targetService to 1st account whose service type = iMessage
-        set targetBuddy to participant "\(recipient)" of targetService
-        send "\(text)" to targetBuddy
-    end tell
-    """
-    // Execute via NSAppleScript
+protocol MessageSending {
+    func sendMessage(to recipient: String, text: String) async throws
+}
+
+actor AppleScriptMessageSender: MessageSending {
+    func sendMessage(to recipient: String, text: String) async throws {
+        let script = """
+        tell application "Messages"
+            set targetService to 1st account whose service type = iMessage
+            set targetBuddy to participant "\(recipient)" of targetService
+            send "\(text)" to targetBuddy
+        end tell
+        """
+        // Execute via NSAppleScript
+    }
 }
 ```
 
@@ -110,10 +147,11 @@ func sendMessage(to recipient: String, text: String) async throws {
 **Goal:** Push new messages to connected clients via WebSocket.
 
 ### Deliverables
-- [ ] `FileWatcher.swift` - FSEvents monitor for chat.db changes
+- [ ] `FileWatcher.swift` - FSEvents monitor for chat.db changes (use protocol)
 - [ ] WebSocket endpoint at `/ws`
 - [ ] Push new messages to all connected clients
 - [ ] Handle reconnection gracefully
+- [ ] Unit tests with mock file watcher
 
 ### Success Criteria
 1. Client connects to WebSocket
@@ -145,11 +183,13 @@ func sendMessage(to recipient: String, text: String) async throws {
 **Goal:** Build the native SwiftUI client with conversation list and message display.
 
 ### Deliverables
-- [ ] `ContentView.swift` - NavigationSplitView layout
-- [ ] `ConversationListView.swift` - Sidebar with conversations
-- [ ] `MessageThreadView.swift` - Message bubbles display
-- [ ] `BridgeConnection.swift` - REST + WebSocket client
-- [ ] Connection status indicator in toolbar
+- [x] `ContentView.swift` - NavigationSplitView layout
+- [x] `ConversationListView.swift` - Sidebar with conversations
+- [x] `MessageThreadView.swift` - Message bubbles display
+- [x] `BridgeConnection.swift` - REST + WebSocket client (with protocol)
+- [x] Connection status indicator in toolbar
+- [x] `MessagesViewModel` with dependency injection
+- [x] Unit tests for ViewModel
 
 ### Success Criteria
 - App launches and connects to server
@@ -207,7 +247,7 @@ func sendMessage(to recipient: String, text: String) async throws {
 **Goal:** Native notifications and UX polish.
 
 ### Deliverables
-- [ ] `NotificationManager.swift` - UserNotifications integration
+- [ ] `NotificationManager.swift` - UserNotifications integration (with protocol)
 - [ ] Show notification for new messages (when app not focused)
 - [ ] Click notification to open conversation
 - [ ] Keyboard shortcuts (Cmd+N new message, Cmd+F search)
@@ -283,10 +323,11 @@ These are not part of the initial implementation:
 |-----------|------------|
 | Server Runtime | Swift 5.9+ |
 | Server Framework | Vapor 4 |
-| Database Access | GRDB or SQLite.swift |
+| Database Access | GRDB |
 | Client UI | SwiftUI (macOS 13+) |
 | Networking | URLSession + WebSocket |
 | Security | Keychain, Tailscale |
+| Testing | XCTest, Protocol Mocks |
 
 ---
 
@@ -294,25 +335,49 @@ These are not part of the initial implementation:
 
 ```
 MessageBridge/
+├── CLAUDE.md                    # Claude Code guidance
 ├── spec.md                      # This file
+├── milestones/                  # Detailed milestone checklists
+│
 ├── MessageBridgeServer/
 │   ├── Package.swift
-│   └── Sources/
-│       └── MessageBridgeServer/
-│           ├── main.swift
-│           ├── Models/
-│           ├── Database/
-│           ├── Messaging/
-│           ├── Server/
-│           └── Auth/
+│   ├── Sources/
+│   │   ├── MessageBridgeCore/   # Testable library
+│   │   │   ├── Models/
+│   │   │   │   ├── Handle.swift
+│   │   │   │   ├── Message.swift
+│   │   │   │   └── Conversation.swift
+│   │   │   └── Database/
+│   │   │       └── ChatDatabase.swift
+│   │   └── MessageBridgeServer/ # Executable
+│   │       └── main.swift
+│   └── Tests/
+│       └── MessageBridgeCoreTests/
+│           ├── HandleTests.swift
+│           ├── MessageTests.swift
+│           └── ConversationTests.swift
+│
 ├── MessageBridgeClient/
-│   ├── MessageBridgeClient.xcodeproj
-│   └── MessageBridgeClient/
-│       ├── App/
-│       ├── Views/
-│       ├── ViewModels/
-│       ├── Services/
-│       └── Models/
+│   ├── Package.swift
+│   ├── Sources/
+│   │   ├── MessageBridgeClientCore/  # Testable library
+│   │   │   ├── Models/
+│   │   │   │   └── Models.swift
+│   │   │   ├── Services/
+│   │   │   │   └── BridgeConnection.swift
+│   │   │   └── ViewModels/
+│   │   │       └── MessagesViewModel.swift
+│   │   └── MessageBridgeClient/      # Executable (SwiftUI)
+│   │       ├── App/
+│   │       │   └── MessageBridgeApp.swift
+│   │       └── Views/
+│   │           ├── ContentView.swift
+│   │           ├── ConversationListView.swift
+│   │           └── MessageThreadView.swift
+│   └── Tests/
+│       └── MessageBridgeClientCoreTests/
+│           └── MessagesViewModelTests.swift
+│
 └── Scripts/
     ├── install-server.sh
     └── setup-tailscale.md
