@@ -21,11 +21,13 @@ A self-hosted system for accessing iMessages/SMS on a work Mac (without iCloud) 
 - Prefer `async/await` over callbacks
 - Models should be `Codable`, `Identifiable`, and `Sendable` where applicable
 
-### Testing Requirements
-- All new features must include unit tests
+### Testing Workflow (TDD)
+- **Write tests first** - Always write failing tests before implementing features. Tests act as user stories that define expected behavior.
+- **Tests as specifications** - Each test describes a specific behavior (e.g., `testConnect_success_setsStatusToConnected`).
+- **Cover all cases** - Write tests for success cases, edge cases, and error conditions before implementing.
+- **Implement to pass** - Write the minimum code necessary to make all tests pass.
 - Use protocol-based dependency injection for testability
 - Mock external dependencies (network, database) in tests
-- Test success cases, edge cases, and error conditions
 
 ---
 

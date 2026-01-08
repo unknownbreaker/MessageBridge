@@ -88,7 +88,14 @@ All endpoints require `X-API-Key` header.
 - **No global variables** - Functions should only receive data through arguments passed into them. Use dependency injection.
 - **Immutability** - Avoid mutating variables passed into a function. Return new values instead of modifying inputs.
 - **Modular design** - Features should be self-contained and swappable without causing cascading changes elsewhere. Use protocols to define boundaries.
-- **Thorough testing** - Create tests for each feature covering success cases, edge cases, and error conditions.
+- **Test-driven development** - Always write tests first, then implement code to make them pass. Tests act as user stories that define expected behavior.
+
+### Testing Workflow
+1. **Write failing tests first** - Define what the feature should do through test cases before writing any implementation code.
+2. **Tests as user stories** - Each test should describe a specific behavior or use case (e.g., `testConnect_success_setsStatusToConnected`).
+3. **Cover all cases** - Write tests for success cases, edge cases, and error conditions before implementing.
+4. **Implement to pass** - Write the minimum code necessary to make all tests pass.
+5. **Refactor with confidence** - Once tests pass, refactor the implementation knowing tests will catch regressions.
 
 ### Swift Conventions
 - Use `actor` for thread-safe classes (e.g., `ChatDatabase`, `BridgeConnection`)
