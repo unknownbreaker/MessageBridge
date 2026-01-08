@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Provides read-only access to the macOS Messages database (chat.db)
-public actor ChatDatabase {
+public actor ChatDatabase: ChatDatabaseProtocol {
     private let dbPool: DatabasePool
 
     public struct Stats {
@@ -99,6 +99,46 @@ public actor ChatDatabase {
 
             return rows.map { row in
                 Message(
+                    id: row["id"],
+                    guid: row["guid"],
+                    text: row["text"],
+                    date: Message.dateFromAppleTimestamp(row["date"]),
+                    isFromMe: (row["is_from_me"] as Int?) == 1,
+                    handleId: row["handle_id"],
+                    conversationId: conversationId
+                )
+            }
+        }
+    }
+
+    // MARK: - Search
+
+    public func searchMessages(query: String, limit: Int = 50) throws -> [Message] {
+        try dbPool.read { db in
+            let sql = """
+                SELECT
+                    m.ROWID as id,
+                    m.guid,
+                    m.text,
+                    m.date,
+                    m.is_from_me,
+                    m.handle_id,
+                    c.chat_identifier as conversation_id
+                FROM message m
+                JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
+                JOIN chat c ON cmj.chat_id = c.ROWID
+                WHERE m.text LIKE '%' || ? || '%'
+                ORDER BY m.date DESC
+                LIMIT ?
+                """
+
+            let rows = try Row.fetchAll(db, sql: sql, arguments: [query, limit])
+
+            return rows.compactMap { row -> Message? in
+                guard let conversationId: String = row["conversation_id"] else {
+                    return nil
+                }
+                return Message(
                     id: row["id"],
                     guid: row["guid"],
                     text: row["text"],

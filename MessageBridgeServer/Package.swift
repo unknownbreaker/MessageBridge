@@ -32,7 +32,10 @@ let package = Package(
         ),
         .testTarget(
             name: "MessageBridgeCoreTests",
-            dependencies: ["MessageBridgeCore"]
+            dependencies: [
+                "MessageBridgeCore",
+                .product(name: "XCTVapor", package: "vapor"),
+            ]
         ),
     ]
 )

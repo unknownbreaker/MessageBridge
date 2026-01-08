@@ -1,7 +1,8 @@
 import Foundation
+import Vapor
 
 /// Represents a single message in a conversation
-public struct Message: Codable, Identifiable, Sendable {
+public struct Message: Content, Identifiable, Sendable {
     public let id: Int64
     public let guid: String
     public let text: String?

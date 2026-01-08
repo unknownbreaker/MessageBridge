@@ -1,7 +1,8 @@
 import Foundation
+import Vapor
 
 /// Represents a chat conversation (1:1 or group)
-public struct Conversation: Codable, Identifiable, Sendable {
+public struct Conversation: Content, Identifiable, Sendable {
     public let id: String               // chat_identifier from database
     public let guid: String             // Unique GUID
     public let displayName: String?     // User-set name for group chats

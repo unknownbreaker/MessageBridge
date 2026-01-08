@@ -1,7 +1,8 @@
 import Foundation
+import Vapor
 
 /// Represents a contact (phone number or email) in the Messages database
-public struct Handle: Codable, Identifiable, Sendable {
+public struct Handle: Content, Identifiable, Sendable {
     public let id: Int64
     public let address: String      // Phone number or email
     public let service: String      // "iMessage" or "SMS"

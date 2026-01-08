@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import MessageBridgeCore
+import Vapor
 
 @main
 struct MessageBridgeServer: AsyncParsableCommand {
@@ -9,11 +10,14 @@ struct MessageBridgeServer: AsyncParsableCommand {
         abstract: "A bridge server for accessing iMessages remotely"
     )
 
-    @Flag(name: .long, help: "Test database connectivity and print recent conversations")
+    @ArgumentParser.Flag(name: .long, help: "Test database connectivity and print recent conversations")
     var testDb = false
 
-    @Option(name: .shortAndLong, help: "Port to run the server on")
+    @ArgumentParser.Option(name: .shortAndLong, help: "Port to run the server on")
     var port: Int = 8080
+
+    @ArgumentParser.Option(name: .long, help: "API key for authentication (required for server mode)")
+    var apiKey: String?
 
     mutating func run() async throws {
         if testDb {
@@ -80,8 +84,45 @@ struct MessageBridgeServer: AsyncParsableCommand {
     }
 
     private func startServer() async throws {
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            print("✗ API key is required. Use --api-key <key> to specify.")
+            throw ExitCode.failure
+        }
+
+        let dbPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Messages/chat.db")
+            .path
+
+        guard FileManager.default.fileExists(atPath: dbPath) else {
+            print("✗ Database not found at: \(dbPath)")
+            throw ExitCode.failure
+        }
+
+        let database: ChatDatabase
+        do {
+            database = try ChatDatabase(path: dbPath)
+        } catch {
+            print("✗ Failed to open database: \(error.localizedDescription)")
+            throw ExitCode.failure
+        }
+
         print("Starting MessageBridge server on port \(port)...")
-        print("Server implementation coming in Milestone 2")
-        // TODO: Implement Vapor server in Milestone 2
+
+        let app = try await Application.make(.production)
+        app.http.server.configuration.port = port
+        app.http.server.configuration.hostname = "0.0.0.0"
+
+        try configureRoutes(app, database: database, apiKey: apiKey)
+
+        print("✓ Server running at http://0.0.0.0:\(port)")
+        print("✓ API endpoints:")
+        print("  GET  /health                      - Server status (no auth)")
+        print("  GET  /conversations               - List conversations")
+        print("  GET  /conversations/:id/messages  - Messages for conversation")
+        print("  GET  /search?q=<query>            - Search messages")
+        print("")
+        print("All endpoints except /health require X-API-Key header.")
+
+        try await app.execute()
     }
 }

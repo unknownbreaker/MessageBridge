@@ -62,17 +62,17 @@ cd MessageBridgeClient && swift test  # 4 tests pass
 
 ---
 
-## Milestone 2: REST API
+## Milestone 2: REST API ✅
 
 **Goal:** Expose message data via HTTP endpoints.
 
 ### Deliverables
-- [ ] `GET /health` - Server status check
-- [ ] `GET /conversations` - List all conversations (paginated)
-- [ ] `GET /conversations/:id/messages` - Messages for a conversation (paginated)
-- [ ] `GET /search?q=` - Search messages by content
-- [ ] API key authentication middleware
-- [ ] Unit tests for all endpoints
+- [x] `GET /health` - Server status check
+- [x] `GET /conversations` - List all conversations (paginated)
+- [x] `GET /conversations/:id/messages` - Messages for a conversation (paginated)
+- [x] `GET /search?q=` - Search messages by content
+- [x] API key authentication middleware
+- [x] Unit tests for all endpoints (12 API tests)
 
 ### Success Criteria
 ```bash
