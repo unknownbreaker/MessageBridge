@@ -54,3 +54,38 @@ public struct ErrorResponse: Content {
         self.reason = reason
     }
 }
+
+/// Request body for POST /send
+public struct SendMessageRequest: Content {
+    public let to: String
+    public let text: String
+    public let service: String?
+
+    public init(to: String, text: String, service: String? = nil) {
+        self.to = to
+        self.text = text
+        self.service = service
+    }
+}
+
+/// Response for POST /send
+public struct SendResponse: Content {
+    public let success: Bool
+    public let recipient: String
+    public let service: String
+    public let timestamp: Date
+
+    public init(success: Bool, recipient: String, service: String, timestamp: Date = Date()) {
+        self.success = success
+        self.recipient = recipient
+        self.service = service
+        self.timestamp = timestamp
+    }
+
+    public init(from result: SendResult) {
+        self.success = result.success
+        self.recipient = result.recipient
+        self.service = result.service
+        self.timestamp = result.timestamp
+    }
+}

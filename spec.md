@@ -103,16 +103,16 @@ curl -H "X-API-Key: $KEY" http://localhost:8080/conversations/123/messages
 
 ---
 
-## Milestone 3: Message Sending
+## Milestone 3: Message Sending ✅
 
 **Goal:** Send messages via AppleScript integration.
 
 ### Deliverables
-- [ ] `MessageSender.swift` - AppleScript bridge (use protocol for testability)
-- [ ] `POST /send` endpoint
-- [ ] Handle iMessage vs SMS routing
-- [ ] Return delivery status
-- [ ] Unit tests with mock AppleScript executor
+- [x] `MessageSender.swift` - AppleScript bridge (use protocol for testability)
+- [x] `POST /send` endpoint
+- [x] Handle iMessage vs SMS routing (via `service` parameter)
+- [x] Return delivery status
+- [x] Unit tests with mock AppleScript executor (7 tests)
 
 ### Success Criteria
 ```bash

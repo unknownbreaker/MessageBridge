@@ -108,11 +108,13 @@ struct MessageBridgeServer: AsyncParsableCommand {
 
         print("Starting MessageBridge server on port \(port)...")
 
+        let messageSender = AppleScriptMessageSender()
+
         let app = try await Application.make(.production)
         app.http.server.configuration.port = port
         app.http.server.configuration.hostname = "0.0.0.0"
 
-        try configureRoutes(app, database: database, apiKey: apiKey)
+        try configureRoutes(app, database: database, messageSender: messageSender, apiKey: apiKey)
 
         print("✓ Server running at http://0.0.0.0:\(port)")
         print("✓ API endpoints:")
@@ -120,6 +122,7 @@ struct MessageBridgeServer: AsyncParsableCommand {
         print("  GET  /conversations               - List conversations")
         print("  GET  /conversations/:id/messages  - Messages for conversation")
         print("  GET  /search?q=<query>            - Search messages")
+        print("  POST /send                        - Send a message")
         print("")
         print("All endpoints except /health require X-API-Key header.")
 

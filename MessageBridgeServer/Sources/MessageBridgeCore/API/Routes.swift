@@ -1,7 +1,7 @@
 import Vapor
 
 /// Configures all API routes for the application
-public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, apiKey: String) throws {
+public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, messageSender: MessageSenderProtocol, apiKey: String) throws {
     // Health check - no authentication required
     app.get("health") { _ in
         HealthResponse()
@@ -55,6 +55,35 @@ public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, 
             return SearchResponse(messages: messages, query: query)
         } catch {
             throw Abort(.internalServerError, reason: "Failed to search messages")
+        }
+    }
+
+    // POST /send - Send a message
+    protected.post("send") { req async throws -> SendResponse in
+        let sendRequest: SendMessageRequest
+        do {
+            sendRequest = try req.content.decode(SendMessageRequest.self)
+        } catch {
+            throw Abort(.badRequest, reason: "Invalid request body")
+        }
+
+        guard !sendRequest.to.isEmpty else {
+            throw Abort(.badRequest, reason: "Recipient cannot be empty")
+        }
+
+        guard !sendRequest.text.isEmpty else {
+            throw Abort(.badRequest, reason: "Message text cannot be empty")
+        }
+
+        do {
+            let result = try await messageSender.sendMessage(
+                to: sendRequest.to,
+                text: sendRequest.text,
+                service: sendRequest.service
+            )
+            return SendResponse(from: result)
+        } catch {
+            throw Abort(.internalServerError, reason: "Failed to send message: \(error.localizedDescription)")
         }
     }
 }

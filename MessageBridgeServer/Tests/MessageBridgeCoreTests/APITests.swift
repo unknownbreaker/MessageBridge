@@ -53,6 +53,35 @@ enum DatabaseError: Error {
     case queryFailed
 }
 
+/// Mock implementation of MessageSenderProtocol for testing
+final class MockMessageSender: MessageSenderProtocol, @unchecked Sendable {
+    var sendMessageCalled = false
+    var lastRecipient: String?
+    var lastText: String?
+    var lastService: String?
+    var shouldThrowError = false
+    var errorToThrow: MessageSendError = .scriptExecutionFailed("Test error")
+    var resultToReturn: SendResult?
+
+    func sendMessage(to recipient: String, text: String, service: String?) async throws -> SendResult {
+        sendMessageCalled = true
+        lastRecipient = recipient
+        lastText = text
+        lastService = service
+
+        if shouldThrowError {
+            throw errorToThrow
+        }
+
+        return resultToReturn ?? SendResult(
+            success: true,
+            recipient: recipient,
+            service: service ?? "iMessage",
+            timestamp: Date()
+        )
+    }
+}
+
 final class APITests: XCTestCase {
 
     // MARK: - Health Endpoint Tests
@@ -224,13 +253,109 @@ final class APITests: XCTestCase {
         }
     }
 
+    // MARK: - POST /send Tests
+
+    func testSend_withoutAPIKey_returnsUnauthorized() throws {
+        let app = try createTestApp()
+        defer { app.shutdown() }
+
+        try app.test(.POST, "send", beforeRequest: { req in
+            try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello"))
+        }) { response in
+            XCTAssertEqual(response.status, .unauthorized)
+        }
+    }
+
+    func testSend_withValidRequest_sendsMessage() throws {
+        let mockSender = MockMessageSender()
+        let app = try createTestApp(messageSender: mockSender)
+        defer { app.shutdown() }
+
+        try app.test(.POST, "send", headers: ["X-API-Key": "test-api-key"], beforeRequest: { req in
+            try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello from test"))
+        }) { response in
+            XCTAssertEqual(response.status, .ok)
+
+            let result = try response.content.decode(SendResponse.self)
+            XCTAssertTrue(result.success)
+            XCTAssertEqual(result.recipient, "+15551234567")
+        }
+
+        XCTAssertTrue(mockSender.sendMessageCalled)
+        XCTAssertEqual(mockSender.lastRecipient, "+15551234567")
+        XCTAssertEqual(mockSender.lastText, "Hello from test")
+    }
+
+    func testSend_withService_passesServiceToSender() throws {
+        let mockSender = MockMessageSender()
+        let app = try createTestApp(messageSender: mockSender)
+        defer { app.shutdown() }
+
+        try app.test(.POST, "send", headers: ["X-API-Key": "test-api-key"], beforeRequest: { req in
+            try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello", service: "SMS"))
+        }) { response in
+            XCTAssertEqual(response.status, .ok)
+        }
+
+        XCTAssertEqual(mockSender.lastService, "SMS")
+    }
+
+    func testSend_withMissingRecipient_returnsBadRequest() throws {
+        let app = try createTestApp()
+        defer { app.shutdown() }
+
+        try app.test(.POST, "send", headers: ["X-API-Key": "test-api-key"], beforeRequest: { req in
+            try req.content.encode(["text": "Hello"])
+        }) { response in
+            XCTAssertEqual(response.status, .badRequest)
+        }
+    }
+
+    func testSend_withMissingText_returnsBadRequest() throws {
+        let app = try createTestApp()
+        defer { app.shutdown() }
+
+        try app.test(.POST, "send", headers: ["X-API-Key": "test-api-key"], beforeRequest: { req in
+            try req.content.encode(["to": "+15551234567"])
+        }) { response in
+            XCTAssertEqual(response.status, .badRequest)
+        }
+    }
+
+    func testSend_withEmptyText_returnsBadRequest() throws {
+        let app = try createTestApp()
+        defer { app.shutdown() }
+
+        try app.test(.POST, "send", headers: ["X-API-Key": "test-api-key"], beforeRequest: { req in
+            try req.content.encode(SendMessageRequest(to: "+15551234567", text: ""))
+        }) { response in
+            XCTAssertEqual(response.status, .badRequest)
+        }
+    }
+
+    func testSend_whenSenderFails_returnsInternalError() throws {
+        let mockSender = MockMessageSender()
+        mockSender.shouldThrowError = true
+        mockSender.errorToThrow = .scriptExecutionFailed("AppleScript failed")
+
+        let app = try createTestApp(messageSender: mockSender)
+        defer { app.shutdown() }
+
+        try app.test(.POST, "send", headers: ["X-API-Key": "test-api-key"], beforeRequest: { req in
+            try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello"))
+        }) { response in
+            XCTAssertEqual(response.status, .internalServerError)
+        }
+    }
+
     // MARK: - Helper Methods
 
-    private func createTestApp(database: ChatDatabaseProtocol? = nil) throws -> Application {
+    private func createTestApp(database: ChatDatabaseProtocol? = nil, messageSender: MessageSenderProtocol? = nil) throws -> Application {
         let app = Application(.testing)
 
         let db = database ?? MockChatDatabase()
-        try configureRoutes(app, database: db, apiKey: "test-api-key")
+        let sender = messageSender ?? MockMessageSender()
+        try configureRoutes(app, database: db, messageSender: sender, apiKey: "test-api-key")
 
         return app
     }
