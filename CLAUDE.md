@@ -81,6 +81,38 @@ Uses AppleScript via NSAppleScript - requires **Automation** permission for Mess
 
 All endpoints require `X-API-Key` header.
 
+## Coding Guidelines
+
+### General Principles
+- **Avoid deeply nested logic** - Extract nested conditions into early returns or separate functions. Prefer guard statements over nested if-else.
+- **No global variables** - Functions should only receive data through arguments passed into them. Use dependency injection.
+- **Immutability** - Avoid mutating variables passed into a function. Return new values instead of modifying inputs.
+- **Modular design** - Features should be self-contained and swappable without causing cascading changes elsewhere. Use protocols to define boundaries.
+- **Thorough testing** - Create tests for each feature covering success cases, edge cases, and error conditions.
+
+### Swift Conventions
+- Use `actor` for thread-safe classes (e.g., `ChatDatabase`, `BridgeConnection`)
+- Use `@MainActor` for ViewModels that update UI state
+- Prefer `async/await` over callbacks
+- Models should be `Codable`, `Identifiable`, and `Sendable` where applicable
+
+### Server (MessageBridgeServer)
+- Database queries go in `Database/ChatDatabase.swift`
+- Keep models in `Models/` - they're shared with client via copy
+- Use GRDB's `Row` for flexible SQLite queries
+- Open chat.db in read-only mode only
+
+### Client (MessageBridgeClient)
+- Views go in `Views/`, one file per view
+- Use `@EnvironmentObject` for shared state (MessagesViewModel)
+- Use `NavigationSplitView` for the main layout
+- Prefer `@State` for local view state, `@Published` in ViewModels
+
+### Shared Patterns
+- Models are duplicated between server and client (no shared package yet)
+- Use ISO8601 for JSON date encoding/decoding
+- API authentication via `X-API-Key` header
+
 ## Documentation
 
 - `spec.md` - Full project specification with milestones
