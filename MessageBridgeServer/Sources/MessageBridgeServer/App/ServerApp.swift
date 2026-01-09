@@ -1,36 +1,141 @@
 import SwiftUI
+import AppKit
 import MessageBridgeCore
 import ServiceManagement
+
+// Window manager to handle opening windows from menu bar
+class WindowManager: ObservableObject {
+    static let shared = WindowManager()
+
+    var settingsWindow: NSWindow?
+    var logsWindow: NSWindow?
+    weak var appState: AppState?
+
+    func openSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let window = settingsWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        guard let appState = appState else { return }
+
+        let settingsView = SettingsView().environmentObject(appState)
+        let hostingController = NSHostingController(rootView: settingsView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Settings"
+        window.styleMask = [.titled, .closable]
+        window.setContentSize(NSSize(width: 500, height: 400))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        self.settingsWindow = window
+    }
+
+    func openLogs() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let window = logsWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        guard let appState = appState else { return }
+
+        let logsView = LogViewerView().environmentObject(appState)
+        let hostingController = NSHostingController(rootView: logsView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Server Logs"
+        window.styleMask = [.titled, .closable, .resizable]
+        window.setContentSize(NSSize(width: 600, height: 400))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        self.logsWindow = window
+    }
+}
 
 @main
 struct ServerApp: App {
     @StateObject private var appState = AppState()
 
+    init() {
+        // WindowManager.shared.appState will be set when menu appears
+    }
+
     var body: some Scene {
         MenuBarExtra {
-            ServerMenuView()
-                .environmentObject(appState)
+            MenuContentView(appState: appState)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: appState.menuBarIcon)
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(appState.menuBarIconColor, .primary)
+            Image(systemName: appState.menuBarIcon)
+        }
+    }
+}
+
+struct MenuContentView: View {
+    @ObservedObject var appState: AppState
+
+    var body: some View {
+        // Status section
+        Text("MessageBridge Server")
+            .font(.headline)
+        Text(appState.serverStatus.displayText)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        Divider()
+
+        // Server controls
+        if appState.serverStatus.isRunning {
+            Button("Stop Server") {
+                debugLog("Stop Server clicked")
+                Task { await appState.stopServer() }
+            }
+            Button("Restart Server") {
+                debugLog("Restart Server clicked")
+                Task { await appState.restartServer() }
+            }
+        } else {
+            Button("Start Server") {
+                debugLog("Start Server clicked")
+                Task { await appState.startServer() }
+            }
+            .disabled(appState.apiKey.isEmpty)
+        }
+
+        Divider()
+
+        Button("Copy API Key") {
+            debugLog("Copy API Key clicked")
+            appState.copyAPIKey()
+        }
+
+        Divider()
+
+        Button("View Logs...") {
+            debugLog("View Logs clicked")
+            WindowManager.shared.appState = appState
+            WindowManager.shared.openLogs()
+        }
+
+        Button("Settings...") {
+            debugLog("Settings clicked")
+            WindowManager.shared.appState = appState
+            WindowManager.shared.openSettings()
+        }
+
+        Divider()
+
+        Button("Quit") {
+            debugLog("Quit clicked")
+            Task {
+                await appState.stopServer()
+                NSApplication.shared.terminate(nil)
             }
         }
-        .menuBarExtraStyle(.window)
-
-        // Settings window
-        Settings {
-            SettingsView()
-                .environmentObject(appState)
-        }
-
-        // Log viewer window
-        Window("Server Logs", id: "log-viewer") {
-            LogViewerView()
-                .environmentObject(appState)
-        }
-        .windowResizability(.contentSize)
     }
 }
 
@@ -42,6 +147,7 @@ class AppState: ObservableObject {
     @Published var apiKey: String = ""
     @Published var port: Int = 8080
     @Published var startAtLogin: Bool = false
+    @Published var debugLoggingEnabled: Bool = false
     @Published var logs: [LogEntry] = []
 
     // Cloudflare Tunnel
@@ -202,6 +308,7 @@ class AppState: ObservableObject {
         if port == 0 { port = 8080 }
 
         startAtLogin = UserDefaults.standard.bool(forKey: "startAtLogin")
+        debugLoggingEnabled = UserDefaults.standard.bool(forKey: "debugLoggingEnabled")
     }
 
     func saveSettings() {
@@ -211,6 +318,7 @@ class AppState: ObservableObject {
         // Save other settings to UserDefaults
         UserDefaults.standard.set(port, forKey: "serverPort")
         UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
+        UserDefaults.standard.set(debugLoggingEnabled, forKey: "debugLoggingEnabled")
 
         // Update login item
         updateLoginItem()
@@ -225,7 +333,9 @@ class AppState: ObservableObject {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                addLog(level: .warning, message: "Failed to update login item: \(error.localizedDescription)")
+                // This typically fails during development when app isn't code-signed
+                // or not in /Applications - only log at debug level
+                debugLog("Failed to update login item: \(error.localizedDescription)")
             }
         }
     }

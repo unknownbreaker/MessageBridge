@@ -2,6 +2,32 @@ import SwiftUI
 import AppKit
 import MessageBridgeCore
 
+// Debug logging that respects the user's debug setting
+func debugLog(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
+    // Check if debug logging is enabled
+    guard UserDefaults.standard.bool(forKey: "debugLoggingEnabled") else { return }
+
+    let logFile = "/tmp/messagebridge-debug.log"
+    let timestamp = ISO8601DateFormatter().string(from: Date())
+    let fileName = (file as NSString).lastPathComponent
+    let logMessage = "[\(timestamp)] [\(fileName):\(line)] \(function): \(message)\n"
+
+    if let data = logMessage.data(using: .utf8) {
+        if FileManager.default.fileExists(atPath: logFile) {
+            if let handle = FileHandle(forWritingAtPath: logFile) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            }
+        } else {
+            FileManager.default.createFile(atPath: logFile, contents: data)
+        }
+    }
+}
+
+// Note: ServerMenuView is no longer used - we now use native menu in ServerApp.swift
+// Keeping this file for reference and supporting views (TailscaleStatusView, CloudflareStatusView, etc.)
+
 struct ServerMenuView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.openWindow) private var openWindow
@@ -47,29 +73,59 @@ struct ServerMenuView: View {
             Divider()
 
             // Menu items
-            VStack(alignment: .leading, spacing: 4) {
-                MenuButton(title: "View Logs...", icon: "doc.text") {
+            VStack(alignment: .leading, spacing: 8) {
+                Button("View Logs...") {
+                    debugLog("View Logs button clicked")
+                    NSApp.activate(ignoringOtherApps: true)
                     openWindow(id: "log-viewer")
                 }
 
-                MenuButton(title: "Settings...", icon: "gear") {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                Button("Settings...") {
+                    debugLog("Settings button clicked")
+                    // Delay to let menu close first
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        debugLog("Opening settings window...")
+                        NSApp.activate(ignoringOtherApps: true)
+                        // Try multiple approaches
+                        if NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+                            debugLog("showSettingsWindow: succeeded")
+                        } else if NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil) {
+                            debugLog("showPreferencesWindow: succeeded")
+                        } else {
+                            debugLog("Both selectors failed, trying keyboard shortcut")
+                            // Simulate Cmd+, keyboard shortcut
+                            let event = NSEvent.keyEvent(
+                                with: .keyDown,
+                                location: .zero,
+                                modifierFlags: .command,
+                                timestamp: 0,
+                                windowNumber: 0,
+                                context: nil,
+                                characters: ",",
+                                charactersIgnoringModifiers: ",",
+                                isARepeat: false,
+                                keyCode: 43
+                            )
+                            if let event = event {
+                                NSApp.sendEvent(event)
+                            }
+                        }
+                    }
                 }
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal)
+            .padding()
 
             Divider()
 
             // Quit
-            MenuButton(title: "Quit MessageBridge Server", icon: "power") {
+            Button("Quit MessageBridge Server") {
+                debugLog("Quit clicked")
                 Task {
                     await appState.stopServer()
                     NSApplication.shared.terminate(nil)
                 }
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal)
+            .padding()
         }
         .frame(width: 300)
     }
@@ -369,6 +425,8 @@ struct CloudflareStatusView: View {
 
                 if case .notInstalled = appState.tunnelStatus {
                     Button("Setup") {
+                        debugLog("Cloudflare Setup clicked")
+                        NSApp.activate(ignoringOtherApps: true)
                         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                     }
                     .font(.caption)

@@ -69,6 +69,19 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                Toggle("Enable Debug Logging", isOn: $appState.debugLoggingEnabled)
+                    .onChange(of: appState.debugLoggingEnabled) { _, _ in
+                        appState.saveSettings()
+                    }
+            } header: {
+                Text("Developer")
+            } footer: {
+                Text("When enabled, detailed debug logs are written to /tmp/messagebridge-debug.log")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 HStack {
                     Text("Status:")
                     Spacer()
