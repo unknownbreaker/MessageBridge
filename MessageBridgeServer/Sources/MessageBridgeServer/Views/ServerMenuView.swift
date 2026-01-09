@@ -5,7 +5,6 @@ import MessageBridgeCore
 struct ServerMenuView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -54,7 +53,7 @@ struct ServerMenuView: View {
                 }
 
                 MenuButton(title: "Settings...", icon: "gear") {
-                    openSettings()
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 }
             }
             .padding(.vertical, 8)
@@ -344,7 +343,6 @@ struct TailscaleStatusView: View {
 
 struct CloudflareStatusView: View {
     @EnvironmentObject var appState: AppState
-    @Environment(\.openSettings) private var openSettings
     @State private var isStartingTunnel = false
 
     var body: some View {
@@ -371,7 +369,7 @@ struct CloudflareStatusView: View {
 
                 if case .notInstalled = appState.tunnelStatus {
                     Button("Setup") {
-                        openSettings()
+                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                     }
                     .font(.caption)
                     .buttonStyle(.bordered)
