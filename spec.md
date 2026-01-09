@@ -305,6 +305,40 @@ actor AppleScriptMessageSender: MessageSending {
 
 ---
 
+## Milestone 9: Logging & Debugging ✅
+
+**Goal:** Comprehensive logging system for easier debugging and troubleshooting.
+
+### Deliverables
+- [x] `Logger.swift` - Core logging infrastructure with log levels
+- [x] `LogEntry` struct with source location (file, function, line)
+- [x] `LogManager` actor for persistent log storage
+- [x] `LogViewerView` - UI for viewing and filtering logs
+- [x] Automatic log cleanup (7 day retention)
+- [x] Update all error handling to use logger
+- [x] Unit tests for logging (12 tests)
+
+### Success Criteria
+- All errors logged with source location for easy debugging
+- Logs accessible via `Cmd+Shift+L` or app menu
+- Logs persist across app restarts
+- Old logs automatically cleaned up
+
+### Log Levels
+```swift
+logDebug("...")    // Development details
+logInfo("...")     // Notable events
+logWarning("...")  // Non-critical issues
+logError("...", error: error)  // Failures
+```
+
+### Log Storage
+- Location: `~/Library/Application Support/MessageBridge/Logs/`
+- `messagebridge.log` - Human-readable format
+- `messagebridge-logs.json` - Structured JSON format
+
+---
+
 ## Future Enhancements (Out of Scope)
 
 These are not part of the initial implementation:
@@ -367,18 +401,24 @@ MessageBridge/
 │   │   │   │   └── Models.swift
 │   │   │   ├── Services/
 │   │   │   │   └── BridgeConnection.swift
-│   │   │   └── ViewModels/
-│   │   │       └── MessagesViewModel.swift
+│   │   │   ├── ViewModels/
+│   │   │   │   └── MessagesViewModel.swift
+│   │   │   ├── Security/
+│   │   │   │   └── KeychainManager.swift
+│   │   │   └── Logging/
+│   │   │       └── Logger.swift
 │   │   └── MessageBridgeClient/      # Executable (SwiftUI)
 │   │       ├── App/
 │   │       │   └── MessageBridgeApp.swift
 │   │       └── Views/
 │   │           ├── ContentView.swift
 │   │           ├── ConversationListView.swift
-│   │           └── MessageThreadView.swift
+│   │           ├── MessageThreadView.swift
+│   │           └── LogViewerView.swift
 │   └── Tests/
 │       └── MessageBridgeClientCoreTests/
-│           └── MessagesViewModelTests.swift
+│           ├── MessagesViewModelTests.swift
+│           └── LoggerTests.swift
 │
 └── Scripts/
     ├── install-server.sh

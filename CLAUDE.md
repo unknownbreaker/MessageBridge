@@ -271,6 +271,33 @@ All endpoints require `X-API-Key` header.
 - Use `NavigationSplitView` for the main layout
 - Prefer `@State` for local view state, `@Published` in ViewModels
 
+### Logging & Debugging
+
+Use the built-in logging system instead of `print()` statements for all error handling and debugging:
+
+```swift
+// Import is automatic - logging functions are in MessageBridgeClientCore
+
+// Log levels (from least to most severe)
+logDebug("Loaded \(count) conversations")      // Development info
+logInfo("WebSocket connection started")         // Notable events
+logWarning("Notification permission denied")    // Non-critical issues
+logError("Connection failed", error: error)     // Errors with Error object
+logError("Failed to decode message")            // Errors without Error object
+```
+
+**Key features:**
+- **Source location**: Every log automatically captures file, function, and line number
+- **Persistence**: Logs are saved to `~/Library/Application Support/MessageBridge/Logs/`
+- **Auto-cleanup**: Logs older than 7 days are automatically deleted
+- **Viewing**: Users can view logs via `Cmd+Shift+L` or the app menu
+
+**When to use each level:**
+- `logDebug` - Detailed info useful during development (counts, state changes)
+- `logInfo` - Important events worth knowing about (connections, major operations)
+- `logWarning` - Issues that don't prevent operation (permission denied, retry succeeded)
+- `logError` - Failures that affect functionality (connection failed, send failed)
+
 ### Shared Patterns
 - Models are duplicated between server and client (no shared package yet)
 - Use ISO8601 for JSON date encoding/decoding
@@ -301,10 +328,11 @@ MessageBridge/
 │   │   │   ├── Models/
 │   │   │   ├── Services/
 │   │   │   ├── ViewModels/
-│   │   │   └── Security/
+│   │   │   ├── Security/
+│   │   │   └── Logging/              # Logger, LogManager, LogEntry
 │   │   └── MessageBridgeClient/      # Executable (SwiftUI)
 │   │       ├── App/
-│   │       └── Views/
+│   │       └── Views/                # Includes LogViewerView
 │   └── Tests/
 └── Scripts/
     ├── install-server.sh        # Server installer
