@@ -27,11 +27,18 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-APP_PATH="$1"
+APP_PATH_ARG="$1"
 
-if [[ -z "$APP_PATH" ]]; then
+if [[ -z "$APP_PATH_ARG" ]]; then
     echo -e "${RED}Usage: $0 <app_path>${NC}"
     exit 1
+fi
+
+# Convert to absolute path
+if [[ "$APP_PATH_ARG" = /* ]]; then
+    APP_PATH="$APP_PATH_ARG"
+else
+    APP_PATH="$(pwd)/$APP_PATH_ARG"
 fi
 
 if [[ ! -d "$APP_PATH" ]]; then
@@ -83,7 +90,12 @@ find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.framework" \) -print0 | 
 done
 
 # Sign the main executable
-EXECUTABLE=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleExecutable)
+PLIST_PATH="$APP_PATH/Contents/Info.plist"
+if [[ ! -f "$PLIST_PATH" ]]; then
+    echo -e "${RED}Error: Info.plist not found at $PLIST_PATH${NC}"
+    exit 1
+fi
+EXECUTABLE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PLIST_PATH")
 echo "  Signing executable: $EXECUTABLE"
 codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_APPLICATION" "$APP_PATH/Contents/MacOS/$EXECUTABLE"
 
