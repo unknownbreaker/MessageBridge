@@ -28,3 +28,4 @@ DerivedData/
 
 # Build artifacts
 build/
+.env
