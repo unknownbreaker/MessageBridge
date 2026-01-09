@@ -253,6 +253,45 @@ All endpoints require `X-API-Key` header.
 4. **Implement to pass** - Write the minimum code necessary to make all tests pass.
 5. **Refactor with confidence** - Once tests pass, refactor the implementation knowing tests will catch regressions.
 
+### Conventional Commits
+
+All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification for automatic changelog generation and semantic versioning.
+
+**Format:**
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types:**
+| Type | Description | Version Bump |
+|------|-------------|--------------|
+| `feat` | New feature | Minor (0.X.0) |
+| `fix` | Bug fix | Patch (0.0.X) |
+| `docs` | Documentation only | None |
+| `chore` | Maintenance, dependencies | None |
+| `refactor` | Code refactoring | None |
+| `test` | Adding/updating tests | None |
+| `style` | Formatting, whitespace | None |
+| `perf` | Performance improvement | Patch |
+
+**Scopes:** `server`, `client`, `docs`, `ci`, `scripts`
+
+**Examples:**
+```bash
+feat(client): add Tailscale status indicator
+fix(server): handle nil message text in WebSocket
+docs: update installation instructions
+chore(ci): add GitHub Actions workflow
+refactor(client): extract message bubble into component
+BREAKING CHANGE: rename API endpoint from /send to /messages
+```
+
+**Breaking Changes:** Add `BREAKING CHANGE:` in the footer to trigger a major version bump.
+
 ### Swift Conventions
 - Use `actor` for thread-safe classes (e.g., `ChatDatabase`, `BridgeConnection`)
 - Use `@MainActor` for ViewModels that update UI state
@@ -309,6 +348,15 @@ logError("Failed to decode message")            // Errors without Error object
 MessageBridge/
 ├── CLAUDE.md                    # This file - dev guidance + user docs
 ├── spec.md                      # Project specification with milestones
+├── CHANGELOG.md                 # Release history (auto-generated)
+├── CONTRIBUTING.md              # Contribution guidelines
+├── VERSION                      # Current version (semver)
+│
+├── .github/
+│   └── workflows/
+│       ├── ci.yml               # Build & test on PR
+│       └── release.yml          # Build & release on tag
+│
 ├── MessageBridgeServer/
 │   ├── Package.swift
 │   ├── Sources/
@@ -318,31 +366,54 @@ MessageBridge/
 │   │   │   ├── API/
 │   │   │   ├── Messaging/
 │   │   │   ├── FileWatcher/
-│   │   │   └── Security/
-│   │   └── MessageBridgeServer/ # Executable
+│   │   │   ├── Security/
+│   │   │   ├── Tailscale/       # TailscaleManager
+│   │   │   └── Version/
+│   │   └── MessageBridgeServer/ # Menu Bar App (SwiftUI)
+│   │       ├── App/
+│   │       │   └── ServerApp.swift
+│   │       └── Views/
+│   │           ├── MenuBarView.swift
+│   │           ├── StatusMenuView.swift
+│   │           ├── TailscaleSettingsView.swift
+│   │           └── LogViewerView.swift
 │   └── Tests/
+│
 ├── MessageBridgeClient/
 │   ├── Package.swift
 │   ├── Sources/
 │   │   ├── MessageBridgeClientCore/  # Testable library
 │   │   │   ├── Models/
 │   │   │   ├── Services/
+│   │   │   │   ├── BridgeConnection.swift
+│   │   │   │   └── TailscaleManager.swift
 │   │   │   ├── ViewModels/
 │   │   │   ├── Security/
-│   │   │   └── Logging/              # Logger, LogManager, LogEntry
+│   │   │   ├── Logging/
+│   │   │   └── Version/
 │   │   └── MessageBridgeClient/      # Executable (SwiftUI)
 │   │       ├── App/
-│   │       └── Views/                # Includes LogViewerView
+│   │       └── Views/
+│   │           ├── ContentView.swift
+│   │           ├── ConversationListView.swift
+│   │           ├── MessageThreadView.swift
+│   │           ├── LogViewerView.swift
+│   │           └── TailscaleStatusView.swift
 │   └── Tests/
+│
 └── Scripts/
-    ├── install-server.sh        # Server installer
-    ├── package-client.sh        # Client DMG packager
-    ├── setup-tailscale.md       # Network setup guide
-    └── com.messagebridge.server.plist
+    ├── build-release.sh         # Build both apps for release
+    ├── create-dmgs.sh           # Package apps into DMGs
+    ├── generate-changelog.sh    # Generate changelog from commits
+    ├── install-server.sh        # Server installer (legacy)
+    ├── package-client.sh        # Client DMG packager (legacy)
+    └── setup-tailscale.md       # Network setup guide
 ```
 
 ## Documentation
 
 - `CLAUDE.md` - Development guidance and user documentation (this file)
 - `spec.md` - Full project specification with milestones
+- `CONTRIBUTING.md` - Commit conventions and contribution guidelines
+- `CHANGELOG.md` - Version history and release notes
 - `Scripts/setup-tailscale.md` - Detailed Tailscale setup guide

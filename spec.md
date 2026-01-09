@@ -339,9 +339,206 @@ logError("...", error: error)  // Failures
 
 ---
 
+## Milestone 10: Conventional Commits & Versioning
+
+**Goal:** Establish versioning infrastructure and commit standards.
+
+### Deliverables
+- [ ] Define conventional commit standard (feat, fix, chore, docs, refactor)
+- [ ] Add `Version.swift` for programmatic version access
+- [ ] Create `CHANGELOG.md` with initial release notes
+- [ ] Create `CONTRIBUTING.md` with commit conventions
+- [ ] Add commit message validation (optional: commitlint)
+
+### Conventional Commit Format
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types:**
+- `feat:` - New feature (bumps minor version)
+- `fix:` - Bug fix (bumps patch version)
+- `docs:` - Documentation only
+- `chore:` - Maintenance tasks
+- `refactor:` - Code refactoring
+- `test:` - Adding tests
+- `BREAKING CHANGE:` - In footer, bumps major version
+
+### Success Criteria
+- All commits follow conventional format
+- Version can be read programmatically in both apps
+- CHANGELOG documents all releases
+
+---
+
+## Milestone 11: Server App Conversion
+
+**Goal:** Transform server from CLI daemon to macOS menu bar application.
+
+### Deliverables
+- [ ] Create SwiftUI menu bar application structure
+- [ ] Server status indicator in menu bar (running/stopped/error)
+- [ ] Start/stop server controls
+- [ ] API key display with copy button
+- [ ] API key regeneration
+- [ ] Server log viewer
+- [ ] Login Items support (auto-start on login)
+- [ ] Package as `.app` bundle for /Applications
+- [ ] Update installer script for app bundle
+
+### UI Design
+```
+┌─────────────────────────────┐
+│ 🟢 MessageBridge Server     │
+├─────────────────────────────┤
+│ Status: Running             │
+│ Port: 8080                  │
+│ Tailscale IP: 100.x.x.x     │
+├─────────────────────────────┤
+│ ○ Start Server              │
+│ ● Stop Server               │
+├─────────────────────────────┤
+│ API Key: ●●●●●●●● [Copy]    │
+│ Regenerate API Key...       │
+├─────────────────────────────┤
+│ View Logs...                │
+│ Tailscale Settings...       │
+├─────────────────────────────┤
+│ Start at Login  ☑           │
+│ Quit                        │
+└─────────────────────────────┘
+```
+
+### Success Criteria
+- Server runs as menu bar app from /Applications
+- Can start/stop server from menu
+- API key easily accessible
+- Auto-starts on login when enabled
+
+---
+
+## Milestone 12: Tailscale Integration
+
+**Goal:** Built-in Tailscale management in both apps.
+
+### Deliverables
+- [ ] `TailscaleManager.swift` - Interface with `tailscale` CLI
+- [ ] Detect if Tailscale is installed
+- [ ] Get connection status (connected/disconnected/not installed)
+- [ ] Get device's Tailscale IP address
+- [ ] Server app: Tailscale status in menu bar dropdown
+- [ ] Client app: Tailscale status in connection settings
+- [ ] Setup guidance for first-time users
+- [ ] Deep link to Tailscale download if not installed
+
+### TailscaleManager Interface
+```swift
+public actor TailscaleManager {
+    /// Check if Tailscale CLI is available
+    func isInstalled() async -> Bool
+
+    /// Get current connection status
+    func getStatus() async -> TailscaleStatus
+
+    /// Get this device's Tailscale IP
+    func getIPAddress() async -> String?
+
+    /// Get list of devices on tailnet
+    func getDevices() async throws -> [TailscaleDevice]
+}
+
+public enum TailscaleStatus {
+    case notInstalled
+    case stopped
+    case connecting
+    case connected(ip: String)
+    case error(String)
+}
+```
+
+### Success Criteria
+- Both apps show Tailscale connection status
+- Users guided through Tailscale setup
+- Clear indication when Tailscale is not configured
+
+---
+
+## Milestone 13: GitHub Actions & Release Automation
+
+**Goal:** Automated builds, testing, and releases.
+
+### Deliverables
+- [ ] `.github/workflows/ci.yml` - Build and test on every PR
+- [ ] `.github/workflows/release.yml` - Build and release on version tags
+- [ ] Auto-generate changelog from conventional commits
+- [ ] Build both apps as `.app` bundles
+- [ ] Create DMG installers for both apps
+- [ ] Upload DMGs to GitHub Releases
+- [ ] Version extraction from git tags
+- [ ] (Optional) Code signing with Developer ID
+- [ ] (Optional) Notarization for Gatekeeper
+
+### CI Workflow (ci.yml)
+```yaml
+name: CI
+on: [push, pull_request]
+jobs:
+  build-and-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Server
+        run: cd MessageBridgeServer && swift build
+      - name: Test Server
+        run: cd MessageBridgeServer && swift test
+      - name: Build Client
+        run: cd MessageBridgeClient && swift build
+      - name: Test Client
+        run: cd MessageBridgeClient && swift test
+```
+
+### Release Workflow (release.yml)
+```yaml
+name: Release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build Apps
+        run: ./Scripts/build-release.sh
+      - name: Create DMGs
+        run: ./Scripts/create-dmgs.sh
+      - name: Generate Changelog
+        run: ./Scripts/generate-changelog.sh
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/*.dmg
+          body_path: RELEASE_NOTES.md
+```
+
+### Success Criteria
+- PRs automatically built and tested
+- Pushing `v*` tag creates GitHub Release
+- Release includes both DMGs and changelog
+- Version number embedded in apps matches tag
+
+---
+
 ## Future Enhancements (Out of Scope)
 
-These are not part of the initial implementation:
+These are not part of the current implementation:
 
 - [ ] Attachment support (images, files)
 - [ ] Group chat management
@@ -350,6 +547,7 @@ These are not part of the initial implementation:
 - [ ] Contact photo sync
 - [ ] Multiple client support
 - [ ] Message encryption at rest
+- [ ] Code signing and notarization (requires Apple Developer account)
 
 ---
 
@@ -359,11 +557,15 @@ These are not part of the initial implementation:
 |-----------|------------|
 | Server Runtime | Swift 5.9+ |
 | Server Framework | Vapor 4 |
+| Server UI | SwiftUI Menu Bar App |
 | Database Access | GRDB |
 | Client UI | SwiftUI (macOS 13+) |
 | Networking | URLSession + WebSocket |
 | Security | Keychain, Tailscale |
 | Testing | XCTest, Protocol Mocks |
+| CI/CD | GitHub Actions |
+| Versioning | Semantic Versioning |
+| Commits | Conventional Commits |
 
 ---
 
@@ -373,7 +575,14 @@ These are not part of the initial implementation:
 MessageBridge/
 ├── CLAUDE.md                    # Claude Code guidance
 ├── spec.md                      # This file
-├── milestones/                  # Detailed milestone checklists
+├── CHANGELOG.md                 # Release history
+├── CONTRIBUTING.md              # Contribution guidelines
+├── VERSION                      # Current version (semver)
+│
+├── .github/
+│   └── workflows/
+│       ├── ci.yml               # Build & test on PR
+│       └── release.yml          # Build & release on tag
 │
 ├── MessageBridgeServer/
 │   ├── Package.swift
@@ -383,15 +592,22 @@ MessageBridge/
 │   │   │   │   ├── Handle.swift
 │   │   │   │   ├── Message.swift
 │   │   │   │   └── Conversation.swift
-│   │   │   └── Database/
-│   │   │       └── ChatDatabase.swift
-│   │   └── MessageBridgeServer/ # Executable
-│   │       └── main.swift
+│   │   │   ├── Database/
+│   │   │   │   └── ChatDatabase.swift
+│   │   │   ├── Tailscale/
+│   │   │   │   └── TailscaleManager.swift
+│   │   │   └── Version/
+│   │   │       └── Version.swift
+│   │   └── MessageBridgeServer/ # Menu Bar App (SwiftUI)
+│   │       ├── App/
+│   │       │   └── ServerApp.swift
+│   │       └── Views/
+│   │           ├── MenuBarView.swift
+│   │           ├── StatusMenuView.swift
+│   │           ├── TailscaleSettingsView.swift
+│   │           └── LogViewerView.swift
 │   └── Tests/
 │       └── MessageBridgeCoreTests/
-│           ├── HandleTests.swift
-│           ├── MessageTests.swift
-│           └── ConversationTests.swift
 │
 ├── MessageBridgeClient/
 │   ├── Package.swift
@@ -400,13 +616,16 @@ MessageBridge/
 │   │   │   ├── Models/
 │   │   │   │   └── Models.swift
 │   │   │   ├── Services/
-│   │   │   │   └── BridgeConnection.swift
+│   │   │   │   ├── BridgeConnection.swift
+│   │   │   │   └── TailscaleManager.swift
 │   │   │   ├── ViewModels/
 │   │   │   │   └── MessagesViewModel.swift
 │   │   │   ├── Security/
 │   │   │   │   └── KeychainManager.swift
-│   │   │   └── Logging/
-│   │   │       └── Logger.swift
+│   │   │   ├── Logging/
+│   │   │   │   └── Logger.swift
+│   │   │   └── Version/
+│   │   │       └── Version.swift
 │   │   └── MessageBridgeClient/      # Executable (SwiftUI)
 │   │       ├── App/
 │   │       │   └── MessageBridgeApp.swift
@@ -414,13 +633,16 @@ MessageBridge/
 │   │           ├── ContentView.swift
 │   │           ├── ConversationListView.swift
 │   │           ├── MessageThreadView.swift
-│   │           └── LogViewerView.swift
+│   │           ├── LogViewerView.swift
+│   │           └── TailscaleStatusView.swift
 │   └── Tests/
 │       └── MessageBridgeClientCoreTests/
-│           ├── MessagesViewModelTests.swift
-│           └── LoggerTests.swift
 │
 └── Scripts/
-    ├── install-server.sh
-    └── setup-tailscale.md
+    ├── build-release.sh         # Build both apps for release
+    ├── create-dmgs.sh           # Package apps into DMGs
+    ├── generate-changelog.sh    # Generate changelog from commits
+    ├── install-server.sh        # Server installer (legacy)
+    ├── package-client.sh        # Client packager (legacy)
+    └── setup-tailscale.md       # Network setup guide
 ```
