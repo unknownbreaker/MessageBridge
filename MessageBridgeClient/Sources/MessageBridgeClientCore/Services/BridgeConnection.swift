@@ -5,7 +5,7 @@ public protocol BridgeServiceProtocol: Sendable {
     func connect(to url: URL, apiKey: String) async throws
     func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation]
     func fetchMessages(conversationId: String, limit: Int, offset: Int) async throws -> [Message]
-    func sendMessage(text: String, to conversationId: String) async throws -> Message
+    func sendMessage(text: String, to recipient: String) async throws -> Message
 }
 
 /// Handles communication with the MessageBridge server
@@ -92,7 +92,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
         return try decoder.decode([Message].self, from: data)
     }
 
-    public func sendMessage(text: String, to conversationId: String) async throws -> Message {
+    public func sendMessage(text: String, to recipient: String) async throws -> Message {
         guard let serverURL, let apiKey else {
             throw BridgeError.notConnected
         }
@@ -102,7 +102,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
         request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body = ["conversationId": conversationId, "text": text]
+        let body = ["to": recipient, "text": text]
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await urlSession.data(for: request)

@@ -12,6 +12,7 @@ public class MessagesViewModel: ObservableObject {
     @Published public var conversations: [Conversation] = []
     @Published public var messages: [String: [Message]] = [:]
     @Published public var connectionStatus: ConnectionStatus = .disconnected
+    @Published public var lastError: Error?
 
     private let bridgeService: any BridgeServiceProtocol
 
@@ -50,11 +51,40 @@ public class MessagesViewModel: ObservableObject {
         }
     }
 
-    public func sendMessage(_ text: String, to conversationId: String) async {
+    public func sendMessage(_ text: String, toConversation conversation: Conversation) async {
+        // Clear any previous error
+        lastError = nil
+
+        // Get recipient address from first participant (for group chats, server handles routing)
+        guard let recipient = conversation.participants.first?.address else {
+            lastError = BridgeError.sendFailed
+            return
+        }
+
+        let conversationId = conversation.id
+
+        // Optimistic UI update: show message immediately
+        let optimisticMessage = Message(
+            id: Int64.random(in: Int64.min..<0), // Negative ID to indicate pending
+            guid: UUID().uuidString,
+            text: text,
+            date: Date(),
+            isFromMe: true,
+            handleId: nil,
+            conversationId: conversationId
+        )
+        messages[conversationId, default: []].insert(optimisticMessage, at: 0)
+
         do {
-            let message = try await bridgeService.sendMessage(text: text, to: conversationId)
-            messages[conversationId, default: []].insert(message, at: 0)
+            let sentMessage = try await bridgeService.sendMessage(text: text, to: recipient)
+            // Replace optimistic message with real one
+            if let index = messages[conversationId]?.firstIndex(where: { $0.guid == optimisticMessage.guid }) {
+                messages[conversationId]?[index] = sentMessage
+            }
         } catch {
+            // Remove optimistic message on failure
+            messages[conversationId]?.removeAll { $0.guid == optimisticMessage.guid }
+            lastError = error
             print("Failed to send message: \(error)")
         }
     }

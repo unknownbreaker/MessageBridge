@@ -224,16 +224,16 @@ actor AppleScriptMessageSender: MessageSending {
 
 ---
 
-## Milestone 6: macOS Client - Compose & Send
+## Milestone 6: macOS Client - Compose & Send ✅
 
 **Goal:** Add message composition and sending capability.
 
 ### Deliverables
-- [ ] `ComposeView.swift` - Message input with send button
-- [ ] Send message via REST API
-- [ ] Optimistic UI update (show message immediately)
-- [ ] Handle send failures gracefully
-- [ ] Keyboard shortcut: Enter to send, Shift+Enter for newline
+- [x] `ComposeView.swift` - Message input with send button
+- [x] Send message via REST API
+- [x] Optimistic UI update (show message immediately)
+- [x] Handle send failures gracefully
+- [x] Keyboard shortcut: Enter to send, Option+Enter for newline
 
 ### Success Criteria
 - Type message in compose field

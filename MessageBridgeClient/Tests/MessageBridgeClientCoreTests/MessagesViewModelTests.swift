@@ -12,6 +12,8 @@ actor MockBridgeService: BridgeServiceProtocol {
     var messagesToReturn: [Message] = []
     var messageToReturn: Message?
     var shouldThrowError = false
+    var lastRecipient: String?
+    var lastMessageText: String?
 
     func connect(to url: URL, apiKey: String) async throws {
         connectCalled = true
@@ -36,8 +38,10 @@ actor MockBridgeService: BridgeServiceProtocol {
         return messagesToReturn
     }
 
-    func sendMessage(text: String, to conversationId: String) async throws -> Message {
+    func sendMessage(text: String, to recipient: String) async throws -> Message {
         sendMessageCalled = true
+        lastRecipient = recipient
+        lastMessageText = text
         if shouldThrowError {
             throw BridgeError.sendFailed
         }
@@ -110,11 +114,117 @@ final class MessagesViewModelTests: XCTestCase {
         await mockService.setMessageToReturn(sentMessage)
 
         let viewModel = MessagesViewModel(bridgeService: mockService)
-        await viewModel.sendMessage("Hello!", to: "chat-1")
+
+        // Set up a conversation with a participant to send to
+        let conversation = Conversation(
+            id: "chat-1",
+            guid: "guid-1",
+            displayName: "Test User",
+            participants: [Handle(id: 1, address: "+15551234567", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        await mockService.setConversationsToReturn([conversation])
+        await viewModel.loadConversations()
+
+        await viewModel.sendMessage("Hello!", toConversation: conversation)
 
         let sendCalled = await mockService.sendMessageCalled
         XCTAssertTrue(sendCalled)
         XCTAssertEqual(viewModel.messages["chat-1"]?.first?.text, "Hello!")
+    }
+
+    func testSendMessage_optimisticUpdate_showsMessageImmediately() async {
+        let mockService = MockBridgeService()
+
+        // Make the service slow by adding delay in test
+        let sentMessage = Message(
+            id: 100,
+            guid: "sent-msg-guid",
+            text: "Hello!",
+            date: Date(),
+            isFromMe: true,
+            handleId: nil,
+            conversationId: "chat-1"
+        )
+        await mockService.setMessageToReturn(sentMessage)
+
+        let viewModel = MessagesViewModel(bridgeService: mockService)
+
+        let conversation = Conversation(
+            id: "chat-1",
+            guid: "guid-1",
+            displayName: "Test User",
+            participants: [Handle(id: 1, address: "+15551234567", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        await mockService.setConversationsToReturn([conversation])
+        await viewModel.loadConversations()
+
+        // Clear messages to start fresh
+        viewModel.messages["chat-1"] = []
+
+        await viewModel.sendMessage("Hello!", toConversation: conversation)
+
+        // Message should appear in the list
+        XCTAssertEqual(viewModel.messages["chat-1"]?.count, 1)
+        XCTAssertEqual(viewModel.messages["chat-1"]?.first?.text, "Hello!")
+    }
+
+    func testSendMessage_failure_setsErrorState() async {
+        let mockService = MockBridgeService()
+        await mockService.setShouldThrowError(true)
+
+        let viewModel = MessagesViewModel(bridgeService: mockService)
+
+        let conversation = Conversation(
+            id: "chat-1",
+            guid: "guid-1",
+            displayName: "Test User",
+            participants: [Handle(id: 1, address: "+15551234567", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        await mockService.setConversationsToReturn([conversation])
+        await viewModel.loadConversations()
+
+        await viewModel.sendMessage("Hello!", toConversation: conversation)
+
+        // Error should be captured
+        XCTAssertNotNil(viewModel.lastError)
+    }
+
+    func testSendMessage_passesRecipientToService() async {
+        let mockService = MockBridgeService()
+        let sentMessage = Message(
+            id: 100,
+            guid: "sent-msg-guid",
+            text: "Hello!",
+            date: Date(),
+            isFromMe: true,
+            handleId: nil,
+            conversationId: "chat-1"
+        )
+        await mockService.setMessageToReturn(sentMessage)
+
+        let viewModel = MessagesViewModel(bridgeService: mockService)
+
+        let conversation = Conversation(
+            id: "chat-1",
+            guid: "guid-1",
+            displayName: "Test User",
+            participants: [Handle(id: 1, address: "+15551234567", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        await mockService.setConversationsToReturn([conversation])
+        await viewModel.loadConversations()
+
+        await viewModel.sendMessage("Hello!", toConversation: conversation)
+
+        let lastRecipient = await mockService.lastRecipient
+        XCTAssertEqual(lastRecipient, "+15551234567")
     }
 }
 

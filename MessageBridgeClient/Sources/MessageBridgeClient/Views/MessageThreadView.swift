@@ -58,7 +58,7 @@ struct MessageThreadView: View {
     private func sendMessage() {
         guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         Task {
-            await viewModel.sendMessage(messageText, to: conversation.id)
+            await viewModel.sendMessage(messageText, toConversation: conversation)
             messageText = ""
         }
     }
@@ -96,14 +96,19 @@ struct MessageBubble: View {
 struct ComposeView: View {
     @Binding var text: String
     let onSend: () -> Void
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: 12) {
             TextField("Message", text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...5)
+                .focused($isFocused)
                 .onSubmit {
-                    onSend()
+                    // Enter sends message (Option+Enter inserts newline by default)
+                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onSend()
+                    }
                 }
 
             Button(action: onSend) {
@@ -115,6 +120,9 @@ struct ComposeView: View {
             .disabled(text.isEmpty)
         }
         .padding()
+        .onAppear {
+            isFocused = true
+        }
     }
 }
 
