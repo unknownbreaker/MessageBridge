@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Important:** When making changes that affect how users interact with the app (UI, keyboard shortcuts, configuration, installation, etc.), update the User Guide section of this document accordingly.
+
 ## Project Overview
 
 iMessage Bridge is a self-hosted system for accessing iMessages/SMS on a work Mac (without iCloud) by relaying through a home Mac (with iCloud). Two components:
@@ -14,18 +16,132 @@ iMessage Bridge is a self-hosted system for accessing iMessages/SMS on a work Ma
 ### Server (Swift Package)
 ```bash
 cd MessageBridgeServer
-swift build                           # Build
+swift build                           # Build debug
+swift build -c release                # Build release
 swift run MessageBridgeServer         # Run server
 swift run MessageBridgeServer --test-db  # Test database connectivity
-swift test                            # Run tests
+swift test                            # Run tests (43 tests)
 ```
 
-### Client (Xcode)
+### Client (Swift Package)
 ```bash
 cd MessageBridgeClient
-xcodebuild -scheme MessageBridgeClient build
-open MessageBridgeClient.xcodeproj    # Open in Xcode
+swift build                           # Build debug
+swift build -c release                # Build release
+swift run MessageBridgeClient         # Run client
+swift test                            # Run tests (16 tests)
 ```
+
+### Deployment Scripts
+```bash
+cd Scripts
+./install-server.sh                   # Install server on home Mac
+./package-client.sh [version]         # Create client DMG
+```
+
+---
+
+## User Guide
+
+### Installation
+
+#### Server (Home Mac)
+
+1. **Grant Full Disk Access** to Terminal:
+   - System Settings > Privacy & Security > Full Disk Access
+   - Add Terminal (or your terminal app)
+
+2. **Run the installer:**
+   ```bash
+   ./Scripts/install-server.sh
+   ```
+
+3. **Save your API key** - displayed at the end of installation
+
+4. **Install Tailscale** and note your Tailscale IP address
+
+#### Client (Work Mac)
+
+1. **Install Tailscale** and sign in with the same account
+
+2. **Install the client:**
+   - Open the DMG from `build/MessageBridge-Installer.dmg`
+   - Drag MessageBridge to Applications
+
+3. **Configure the client:**
+   - Launch MessageBridge
+   - Enter server URL: `http://<tailscale-ip>:8080`
+   - Enter your API key
+
+### Using the Client
+
+#### Main Interface
+```
+┌──────────────┬─────────────────────────────────────────┐
+│ Conversations│  Message Thread                         │
+├──────────────┼─────────────────────────────────────────┤
+│ [Search...]  │  Contact Name              ● Connected  │
+├──────────────┼─────────────────────────────────────────┤
+│              │                                         │
+│ John Doe     │         Hey, how are you?              │
+│ See you tom… │                     ┌─────────────────┐ │
+│              │                     │ I'm good! You?  │ │
+│ Jane Smith   │                     └─────────────────┘ │
+│ Got it, th…  │                                         │
+│              ├─────────────────────────────────────────┤
+│              │ [Type a message...]              [Send] │
+└──────────────┴─────────────────────────────────────────┘
+```
+
+#### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd+F` | Focus search field |
+| `Cmd+N` | New message (placeholder) |
+| `Enter` | Send message |
+| `Option+Enter` | Insert newline in message |
+
+#### Notifications
+
+- Notifications appear for new messages when the app is in background
+- Click a notification to open that conversation
+- Notifications are cleared when you open a conversation
+
+#### Connection Status
+
+The status indicator in the toolbar shows:
+- 🟢 **Connected** - Successfully connected to server
+- 🟡 **Connecting** - Connection in progress
+- 🔴 **Disconnected** - Not connected to server
+
+### Server Management
+
+```bash
+# Stop server
+launchctl unload ~/Library/LaunchAgents/com.messagebridge.server.plist
+
+# Start server
+launchctl load ~/Library/LaunchAgents/com.messagebridge.server.plist
+
+# Restart server
+launchctl kickstart -k gui/$(id -u)/com.messagebridge.server
+
+# View logs
+tail -f /usr/local/var/log/messagebridge/server.log
+tail -f /usr/local/var/log/messagebridge/error.log
+```
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "Cannot read Messages database" | Grant Full Disk Access to Terminal |
+| Server not accessible from client | Check Tailscale is connected on both Macs |
+| Messages not sending | Grant Automation permission for Messages.app |
+| No notifications | Check notification permissions in System Settings |
+
+---
 
 ## Architecture
 
@@ -68,7 +184,13 @@ Work Mac                              Home Mac
 ### Sending Messages
 Uses AppleScript via NSAppleScript - requires **Automation** permission for Messages.app.
 
-## API Endpoints (Planned)
+### Security
+- API keys stored in macOS Keychain
+- Server: `com.messagebridge.server` service
+- Client: `com.messagebridge.client` service
+- All traffic encrypted via Tailscale (WireGuard)
+
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -80,6 +202,23 @@ Uses AppleScript via NSAppleScript - requires **Automation** permission for Mess
 | WS | /ws | Real-time updates |
 
 All endpoints require `X-API-Key` header.
+
+### WebSocket Messages
+
+```json
+// Server -> Client: New message
+{
+  "type": "new_message",
+  "data": {
+    "id": 123,
+    "conversationId": "chat123",
+    "text": "Hello!",
+    "sender": "+15551234567",
+    "date": "2024-01-15T10:30:00Z",
+    "isFromMe": false
+  }
+}
+```
 
 ## Coding Guidelines
 
@@ -120,7 +259,45 @@ All endpoints require `X-API-Key` header.
 - Use ISO8601 for JSON date encoding/decoding
 - API authentication via `X-API-Key` header
 
+## File Structure
+
+```
+MessageBridge/
+├── CLAUDE.md                    # This file - dev guidance + user docs
+├── spec.md                      # Project specification with milestones
+├── MessageBridgeServer/
+│   ├── Package.swift
+│   ├── Sources/
+│   │   ├── MessageBridgeCore/   # Testable library
+│   │   │   ├── Models/
+│   │   │   ├── Database/
+│   │   │   ├── API/
+│   │   │   ├── Messaging/
+│   │   │   ├── FileWatcher/
+│   │   │   └── Security/
+│   │   └── MessageBridgeServer/ # Executable
+│   └── Tests/
+├── MessageBridgeClient/
+│   ├── Package.swift
+│   ├── Sources/
+│   │   ├── MessageBridgeClientCore/  # Testable library
+│   │   │   ├── Models/
+│   │   │   ├── Services/
+│   │   │   ├── ViewModels/
+│   │   │   └── Security/
+│   │   └── MessageBridgeClient/      # Executable (SwiftUI)
+│   │       ├── App/
+│   │       └── Views/
+│   └── Tests/
+└── Scripts/
+    ├── install-server.sh        # Server installer
+    ├── package-client.sh        # Client DMG packager
+    ├── setup-tailscale.md       # Network setup guide
+    └── com.messagebridge.server.plist
+```
+
 ## Documentation
 
+- `CLAUDE.md` - Development guidance and user documentation (this file)
 - `spec.md` - Full project specification with milestones
-- `milestones/` - Detailed checklists for each milestone
+- `Scripts/setup-tailscale.md` - Detailed Tailscale setup guide
