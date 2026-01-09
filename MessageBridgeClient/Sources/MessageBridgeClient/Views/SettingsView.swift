@@ -29,6 +29,7 @@ struct SettingsView: View {
 struct ConnectionSettingsView: View {
     @State private var serverURLString: String = ""
     @State private var apiKey: String = ""
+    @State private var e2eEnabled: Bool = false
     @State private var showingAPIKey = false
     @State private var saveStatus: String?
 
@@ -39,7 +40,7 @@ struct ConnectionSettingsView: View {
             Section {
                 TextField("Server URL", text: $serverURLString, prompt: Text("http://100.x.y.z:8080"))
                     .textFieldStyle(.roundedBorder)
-                    .help("Enter your home Mac's Tailscale IP address and port")
+                    .help("Enter your home Mac's Tailscale IP address and port, or Cloudflare Tunnel URL")
 
                 HStack {
                     if showingAPIKey {
@@ -60,6 +61,19 @@ struct ConnectionSettingsView: View {
                 .help("API key from your MessageBridge Server")
             } header: {
                 Text("Server Connection")
+            }
+
+            Section {
+                Toggle("End-to-End Encryption", isOn: $e2eEnabled)
+                    .help("Encrypt all data so relay servers cannot read your messages")
+
+                if e2eEnabled {
+                    Text("Messages will be encrypted using your API key before leaving your device.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Security")
             }
 
             Section {
@@ -90,6 +104,7 @@ struct ConnectionSettingsView: View {
         if let config = try? keychainManager.retrieveServerConfig() {
             serverURLString = config.serverURL.absoluteString
             apiKey = config.apiKey
+            e2eEnabled = config.e2eEnabled
         }
     }
 
@@ -99,7 +114,7 @@ struct ConnectionSettingsView: View {
             return
         }
 
-        let config = ServerConfig(serverURL: url, apiKey: apiKey)
+        let config = ServerConfig(serverURL: url, apiKey: apiKey, e2eEnabled: e2eEnabled)
         do {
             try keychainManager.saveServerConfig(config)
             saveStatus = "Saved"

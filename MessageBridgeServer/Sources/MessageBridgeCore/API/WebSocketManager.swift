@@ -1,8 +1,14 @@
 import Vapor
 
+/// Connection info including WebSocket and encryption settings
+private struct ConnectionInfo: Sendable {
+    let webSocket: WebSocket
+    let e2eEncryption: E2EEncryption?
+}
+
 /// Manages WebSocket connections and broadcasts messages to all connected clients
 public actor WebSocketManager {
-    private var connections: [UUID: WebSocket] = [:]
+    private var connections: [UUID: ConnectionInfo] = [:]
     private let encoder: JSONEncoder
 
     public init() {
@@ -12,9 +18,14 @@ public actor WebSocketManager {
     }
 
     /// Add a new WebSocket connection
-    public func addConnection(_ ws: WebSocket) -> UUID {
+    /// - Parameters:
+    ///   - ws: The WebSocket connection
+    ///   - apiKey: If provided and e2eEnabled is true, enables E2E encryption for this connection
+    ///   - e2eEnabled: Whether to enable E2E encryption
+    public func addConnection(_ ws: WebSocket, apiKey: String? = nil, e2eEnabled: Bool = false) -> UUID {
         let id = UUID()
-        connections[id] = ws
+        let encryption = (e2eEnabled && apiKey != nil) ? E2EEncryption(apiKey: apiKey!) : nil
+        connections[id] = ConnectionInfo(webSocket: ws, e2eEncryption: encryption)
         return id
     }
 
@@ -38,37 +49,49 @@ public actor WebSocketManager {
 
     /// Send a connected confirmation to a specific client
     public func sendConnected(to id: UUID) async {
-        guard let ws = connections[id] else { return }
+        guard let connInfo = connections[id] else { return }
 
         let data = ConnectedData()
         let wsMessage = WebSocketMessage(type: .connected, data: data)
 
-        await send(wsMessage, to: ws)
+        await send(wsMessage, to: connInfo)
     }
 
     /// Send an error to a specific client
     public func sendError(_ message: String, to id: UUID) async {
-        guard let ws = connections[id] else { return }
+        guard let connInfo = connections[id] else { return }
 
         let data = ErrorData(message: message)
         let wsMessage = WebSocketMessage(type: .error, data: data)
 
-        await send(wsMessage, to: ws)
+        await send(wsMessage, to: connInfo)
     }
 
     // MARK: - Private Methods
 
     private func broadcast<T: Codable & Sendable>(_ message: WebSocketMessage<T>) async {
-        for (_, ws) in connections {
-            await send(message, to: ws)
+        for (_, connInfo) in connections {
+            await send(message, to: connInfo)
         }
     }
 
-    private func send<T: Codable & Sendable>(_ message: WebSocketMessage<T>, to ws: WebSocket) async {
+    private func send<T: Codable & Sendable>(_ message: WebSocketMessage<T>, to connInfo: ConnectionInfo) async {
         do {
             let data = try encoder.encode(message)
-            if let string = String(data: data, encoding: .utf8) {
-                try await ws.send(string)
+
+            // If E2E encryption is enabled, encrypt the message
+            let messageString: String
+            if let encryption = connInfo.e2eEncryption {
+                let encryptedPayload = try encryption.encrypt(data)
+                let envelope = EncryptedEnvelope(version: 1, payload: encryptedPayload)
+                let envelopeData = try JSONEncoder().encode(envelope)
+                messageString = String(data: envelopeData, encoding: .utf8) ?? ""
+            } else {
+                messageString = String(data: data, encoding: .utf8) ?? ""
+            }
+
+            if !messageString.isEmpty {
+                try await connInfo.webSocket.send(messageString)
             }
         } catch {
             // Log error but don't crash - client may have disconnected

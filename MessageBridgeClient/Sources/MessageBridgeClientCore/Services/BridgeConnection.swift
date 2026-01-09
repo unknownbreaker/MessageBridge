@@ -5,7 +5,7 @@ public typealias NewMessageHandler = @Sendable (Message, String) -> Void
 
 /// Protocol defining the bridge service interface for testability
 public protocol BridgeServiceProtocol: Sendable {
-    func connect(to url: URL, apiKey: String) async throws
+    func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws
     func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation]
     func fetchMessages(conversationId: String, limit: Int, offset: Int) async throws -> [Message]
     func sendMessage(text: String, to recipient: String) async throws -> Message
@@ -35,6 +35,8 @@ public actor BridgeConnection: BridgeServiceProtocol {
     private var urlSession: URLSession
     private var webSocketTask: URLSessionWebSocketTask?
     private var newMessageHandler: NewMessageHandler?
+    private var e2eEnabled: Bool = false
+    private var encryption: E2EEncryption?
 
     public init() {
         let config = URLSessionConfiguration.default
@@ -42,9 +44,15 @@ public actor BridgeConnection: BridgeServiceProtocol {
         self.urlSession = URLSession(configuration: config)
     }
 
-    public func connect(to url: URL, apiKey: String) async throws {
+    public func connect(to url: URL, apiKey: String, e2eEnabled: Bool = false) async throws {
         self.serverURL = url
         self.apiKey = apiKey
+        self.e2eEnabled = e2eEnabled
+
+        // Initialize encryption if E2E is enabled
+        if e2eEnabled {
+            self.encryption = E2EEncryption(apiKey: apiKey)
+        }
 
         // Test connection with health check
         let healthURL = url.appendingPathComponent("health")
@@ -72,6 +80,9 @@ public actor BridgeConnection: BridgeServiceProtocol {
 
         var request = URLRequest(url: components.url!)
         request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        if e2eEnabled {
+            request.addValue("enabled", forHTTPHeaderField: "X-E2E-Encryption")
+        }
 
         let (data, response) = try await urlSession.data(for: request)
 
@@ -80,9 +91,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
             throw BridgeError.requestFailed
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([Conversation].self, from: data)
+        return try decryptResponse(data, as: [Conversation].self)
     }
 
     public func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) async throws -> [Message] {
@@ -101,6 +110,9 @@ public actor BridgeConnection: BridgeServiceProtocol {
 
         var request = URLRequest(url: components.url!)
         request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        if e2eEnabled {
+            request.addValue("enabled", forHTTPHeaderField: "X-E2E-Encryption")
+        }
 
         let (data, response) = try await urlSession.data(for: request)
 
@@ -109,9 +121,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
             throw BridgeError.requestFailed
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([Message].self, from: data)
+        return try decryptResponse(data, as: [Message].self)
     }
 
     public func sendMessage(text: String, to recipient: String) async throws -> Message {
@@ -125,7 +135,16 @@ public actor BridgeConnection: BridgeServiceProtocol {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body = ["to": recipient, "text": text]
-        request.httpBody = try JSONEncoder().encode(body)
+
+        // Encrypt request body if E2E is enabled
+        if e2eEnabled, let encryption {
+            request.addValue("enabled", forHTTPHeaderField: "X-E2E-Encryption")
+            let encryptedPayload = try encryption.encrypt(body)
+            let envelope = EncryptedEnvelope(version: 1, payload: encryptedPayload)
+            request.httpBody = try JSONEncoder().encode(envelope)
+        } else {
+            request.httpBody = try JSONEncoder().encode(body)
+        }
 
         let (data, response) = try await urlSession.data(for: request)
 
@@ -134,9 +153,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
             throw BridgeError.sendFailed
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(Message.self, from: data)
+        return try decryptResponse(data, as: Message.self)
     }
 
     public func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws {
@@ -150,7 +167,10 @@ public actor BridgeConnection: BridgeServiceProtocol {
         var wsComponents = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)!
         wsComponents.scheme = serverURL.scheme == "https" ? "wss" : "ws"
         wsComponents.path = "/ws"
-        wsComponents.queryItems = [URLQueryItem(name: "apiKey", value: apiKey)]
+        wsComponents.queryItems = [
+            URLQueryItem(name: "apiKey", value: apiKey),
+            URLQueryItem(name: "e2e", value: e2eEnabled ? "enabled" : nil)
+        ].compactMap { $0.value != nil ? $0 : nil }
 
         guard let wsURL = wsComponents.url else {
             throw BridgeError.connectionFailed
@@ -206,7 +226,15 @@ public actor BridgeConnection: BridgeServiceProtocol {
         decoder.dateDecodingStrategy = .iso8601
 
         do {
-            let wsMessage = try decoder.decode(WebSocketMessage.self, from: data)
+            // Try to decrypt if E2E is enabled
+            let wsMessage: WebSocketMessage
+            if e2eEnabled, let encryption {
+                // First decode as envelope
+                let envelope = try decoder.decode(EncryptedEnvelope.self, from: data)
+                wsMessage = try encryption.decrypt(envelope.payload, as: WebSocketMessage.self)
+            } else {
+                wsMessage = try decoder.decode(WebSocketMessage.self, from: data)
+            }
 
             if wsMessage.type == "new_message", let messageData = wsMessage.data {
                 let message = Message(
@@ -223,6 +251,22 @@ public actor BridgeConnection: BridgeServiceProtocol {
             }
         } catch {
             logError("Failed to decode WebSocket message", error: error)
+        }
+    }
+
+    // MARK: - E2E Encryption Helpers
+
+    /// Decrypt a response, handling both encrypted and plain responses
+    private func decryptResponse<T: Decodable>(_ data: Data, as type: T.Type) throws -> T {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        if e2eEnabled, let encryption {
+            // Decode the encrypted envelope
+            let envelope = try decoder.decode(EncryptedEnvelope.self, from: data)
+            return try encryption.decrypt(envelope.payload, as: type)
+        } else {
+            return try decoder.decode(type, from: data)
         }
     }
 }

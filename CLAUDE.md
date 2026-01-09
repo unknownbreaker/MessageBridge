@@ -9,7 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 iMessage Bridge is a self-hosted system for accessing iMessages/SMS on a work Mac (without iCloud) by relaying through a home Mac (with iCloud). Two components:
 
 - **MessageBridgeServer** - Swift/Vapor daemon running on home Mac, reads from Messages database, exposes REST/WebSocket API
-- **MessageBridgeClient** - SwiftUI macOS app running on work Mac, connects to server via Tailscale
+- **MessageBridgeClient** - SwiftUI macOS app running on work Mac, connects to server
+
+**Connection Options:**
+- **Tailscale** (recommended) - Zero-config VPN, encrypted tunnel, no port forwarding
+- **Cloudflare Tunnel** - Works when Tailscale isn't available (e.g., corporate restrictions)
+
+**Security:** End-to-end encryption ensures message content is protected even when using relay services like Cloudflare Tunnel.
 
 ## Build Commands
 
@@ -62,7 +68,9 @@ cd Scripts
 
 #### Client (Work Mac)
 
-1. **Install Tailscale** and sign in with the same account
+1. **Network Setup** (choose one):
+   - **Tailscale** (recommended): Install Tailscale and sign in with the same account
+   - **Cloudflare Tunnel**: See `Scripts/setup-cloudflare-tunnel.md`
 
 2. **Install the client:**
    - Open the DMG from `build/MessageBridge-Installer.dmg`
@@ -70,8 +78,12 @@ cd Scripts
 
 3. **Configure the client:**
    - Launch MessageBridge
-   - Enter server URL: `http://<tailscale-ip>:8080`
+   - Open Settings (Cmd+,)
+   - Enter server URL:
+     - Tailscale: `http://<tailscale-ip>:8080`
+     - Cloudflare: `https://messagebridge.yourdomain.com`
    - Enter your API key
+   - **Enable E2E Encryption** (required for Cloudflare Tunnel, recommended for all)
 
 ### Using the Client
 
@@ -202,10 +214,17 @@ Work Mac                              Home Mac
 Uses AppleScript via NSAppleScript - requires **Automation** permission for Messages.app.
 
 ### Security
-- API keys stored in macOS Keychain
-- Server: `com.messagebridge.server` service
-- Client: `com.messagebridge.client` service
-- All traffic encrypted via Tailscale (WireGuard)
+- **API keys** stored in macOS Keychain
+  - Server: `com.messagebridge.server` service
+  - Client: `com.messagebridge.client` service
+- **Transport encryption**:
+  - Tailscale: WireGuard encryption
+  - Cloudflare Tunnel: TLS encryption
+- **End-to-End encryption** (optional, recommended):
+  - Uses AES-256-GCM with HKDF key derivation
+  - API key used to derive encryption key
+  - Enabled via `X-E2E-Encryption: enabled` header
+  - Ensures relay servers cannot read message content
 
 ## API Endpoints
 
@@ -407,7 +426,8 @@ MessageBridge/
     ├── generate-changelog.sh    # Generate changelog from commits
     ├── install-server.sh        # Server installer (legacy)
     ├── package-client.sh        # Client DMG packager (legacy)
-    └── setup-tailscale.md       # Network setup guide
+    ├── setup-tailscale.md       # Tailscale network setup guide
+    └── setup-cloudflare-tunnel.md  # Cloudflare Tunnel setup guide
 ```
 
 ## Documentation
@@ -417,3 +437,4 @@ MessageBridge/
 - `CONTRIBUTING.md` - Commit conventions and contribution guidelines
 - `CHANGELOG.md` - Version history and release notes
 - `Scripts/setup-tailscale.md` - Detailed Tailscale setup guide
+- `Scripts/setup-cloudflare-tunnel.md` - Cloudflare Tunnel setup guide (alternative to Tailscale)

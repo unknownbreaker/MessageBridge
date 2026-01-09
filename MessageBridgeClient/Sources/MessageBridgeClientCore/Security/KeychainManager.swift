@@ -26,10 +26,24 @@ public enum KeychainError: LocalizedError {
 public struct ServerConfig: Codable {
     public let serverURL: URL
     public let apiKey: String
+    public let e2eEnabled: Bool
 
-    public init(serverURL: URL, apiKey: String) {
+    public init(serverURL: URL, apiKey: String, e2eEnabled: Bool = false) {
         self.serverURL = serverURL
         self.apiKey = apiKey
+        self.e2eEnabled = e2eEnabled
+    }
+
+    // Custom decoder to handle missing e2eEnabled field in old configs
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        serverURL = try container.decode(URL.self, forKey: .serverURL)
+        apiKey = try container.decode(String.self, forKey: .apiKey)
+        e2eEnabled = try container.decodeIfPresent(Bool.self, forKey: .e2eEnabled) ?? false
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case serverURL, apiKey, e2eEnabled
     }
 }
 

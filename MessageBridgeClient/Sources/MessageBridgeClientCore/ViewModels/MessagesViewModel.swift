@@ -36,11 +36,12 @@ public class MessagesViewModel: ObservableObject {
         }
     }
 
-    public func connect(to serverURL: URL, apiKey: String) async {
+    public func connect(to serverURL: URL, apiKey: String, e2eEnabled: Bool = false) async {
         connectionStatus = .connecting
         do {
-            try await bridgeService.connect(to: serverURL, apiKey: apiKey)
+            try await bridgeService.connect(to: serverURL, apiKey: apiKey, e2eEnabled: e2eEnabled)
             connectionStatus = .connected
+            logInfo("Connected to server\(e2eEnabled ? " with E2E encryption" : "")")
             await loadConversations()
             await startWebSocket()
         } catch {

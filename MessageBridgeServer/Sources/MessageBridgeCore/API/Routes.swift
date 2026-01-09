@@ -7,8 +7,9 @@ public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, 
         HealthResponse()
     }
 
-    // Protected routes - require API key
+    // Protected routes - require API key and support E2E encryption
     let protected = app.grouped(APIKeyMiddleware(apiKey: apiKey))
+        .grouped(E2EMiddleware(apiKey: apiKey))
 
     // GET /conversations - List all conversations (paginated)
     protected.get("conversations") { req async throws -> ConversationsResponse in
@@ -62,7 +63,8 @@ public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, 
     protected.post("send") { req async throws -> SendResponse in
         let sendRequest: SendMessageRequest
         do {
-            sendRequest = try req.content.decode(SendMessageRequest.self)
+            // Use decryptedContent to handle both encrypted and unencrypted requests
+            sendRequest = try req.decryptedContent(as: SendMessageRequest.self)
         } catch {
             throw Abort(.badRequest, reason: "Invalid request body")
         }
@@ -98,9 +100,17 @@ public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, 
                 return
             }
 
-            // Add connection
+            // Check if E2E encryption is requested
+            let e2eEnabled = req.query[String.self, at: "e2e"] == "enabled" ||
+                           req.headers.first(name: "X-E2E-Encryption") == "enabled"
+
+            // Add connection with E2E encryption if requested
             Task {
-                let connectionId = await wsManager.addConnection(ws)
+                let connectionId = await wsManager.addConnection(
+                    ws,
+                    apiKey: e2eEnabled ? apiKey : nil,
+                    e2eEnabled: e2eEnabled
+                )
                 await wsManager.sendConnected(to: connectionId)
 
                 // Handle disconnect

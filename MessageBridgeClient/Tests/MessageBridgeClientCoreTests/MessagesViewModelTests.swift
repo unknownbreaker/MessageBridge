@@ -18,7 +18,7 @@ actor MockBridgeService: BridgeServiceProtocol {
     var lastMessageText: String?
     var newMessageHandler: NewMessageHandler?
 
-    func connect(to url: URL, apiKey: String) async throws {
+    func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws {
         connectCalled = true
         if shouldThrowError {
             throw BridgeError.connectionFailed

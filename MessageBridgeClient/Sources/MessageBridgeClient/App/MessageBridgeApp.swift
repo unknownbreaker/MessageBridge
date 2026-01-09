@@ -8,12 +8,17 @@ struct MessageBridgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.openWindow) private var openWindow
 
+    private let keychainManager = KeychainManager()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
                 .onAppear {
                     appDelegate.viewModel = viewModel
+                }
+                .task {
+                    await autoConnect()
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -42,6 +47,19 @@ struct MessageBridgeApp: App {
         Settings {
             SettingsView()
         }
+    }
+
+    private func autoConnect() async {
+        guard let config = try? keychainManager.retrieveServerConfig() else {
+            logInfo("No saved server configuration, waiting for user to configure")
+            return
+        }
+
+        await viewModel.connect(
+            to: config.serverURL,
+            apiKey: config.apiKey,
+            e2eEnabled: config.e2eEnabled
+        )
     }
 }
 
