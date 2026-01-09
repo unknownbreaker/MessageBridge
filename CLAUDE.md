@@ -26,7 +26,7 @@ swift build                           # Build debug
 swift build -c release                # Build release
 swift run MessageBridgeServer         # Run server
 swift run MessageBridgeServer --test-db  # Test database connectivity
-swift test                            # Run tests (43 tests)
+swift test                            # Run tests (72 tests)
 ```
 
 ### Client (Swift Package)
@@ -70,7 +70,7 @@ cd Scripts
 
 1. **Network Setup** (choose one):
    - **Tailscale** (recommended): Install Tailscale and sign in with the same account
-   - **Cloudflare Tunnel**: See `Scripts/setup-cloudflare-tunnel.md`
+   - **Cloudflare Tunnel**: Use the built-in wizard in Server Settings > Cloudflare tab, or see `Scripts/setup-cloudflare-tunnel.md` for manual setup
 
 2. **Install the client:**
    - Open the DMG from `build/MessageBridge-Installer.dmg`
@@ -387,6 +387,7 @@ MessageBridge/
 │   │   │   ├── FileWatcher/
 │   │   │   ├── Security/
 │   │   │   ├── Tailscale/       # TailscaleManager
+│   │   │   ├── Cloudflare/      # CloudflaredManager
 │   │   │   └── Version/
 │   │   └── MessageBridgeServer/ # Menu Bar App (SwiftUI)
 │   │       ├── App/
@@ -395,6 +396,7 @@ MessageBridge/
 │   │           ├── MenuBarView.swift
 │   │           ├── StatusMenuView.swift
 │   │           ├── TailscaleSettingsView.swift
+│   │           ├── CloudflareSettingsView.swift
 │   │           └── LogViewerView.swift
 │   └── Tests/
 │

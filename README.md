@@ -71,10 +71,13 @@ Best for: Personal devices where you can install Tailscale on both Macs.
 
 Best for: Work Macs where Tailscale is blocked by IT policies.
 
-1. Install cloudflared on your **home Mac**: `brew install cloudflared`
-2. Run a quick tunnel: `cloudflared tunnel --url http://localhost:8080`
-3. Note the generated URL (e.g., `https://random-words.trycloudflare.com`)
-4. For permanent setup, see [Scripts/setup-cloudflare-tunnel.md](Scripts/setup-cloudflare-tunnel.md)
+**Easy Setup (Recommended):** The server app includes a built-in Cloudflare Tunnel wizard:
+1. Open MessageBridge Server Settings (`Cmd+,`)
+2. Go to the **Cloudflare** tab
+3. Click **Install cloudflared** (one-time, no sudo required)
+4. Click **Start Quick Tunnel** - a temporary URL is generated automatically
+
+**Manual Setup:** For permanent tunnels with custom domains, see [Scripts/setup-cloudflare-tunnel.md](Scripts/setup-cloudflare-tunnel.md)
 
 ### Step 2: Set Up the Server (Home Mac)
 
@@ -134,12 +137,13 @@ The server runs as a menu bar app. Click the menu bar icon to:
 - View server status and Tailscale connection
 - Start/Stop/Restart the server
 - View and copy your API key
+- Start/Stop Cloudflare Tunnel and copy tunnel URL
 - Access settings and logs
 
 **Settings** (`Cmd+,`):
-- Change server port
-- Enable/disable auto-start on login
-- Generate a new API key
+- **General**: Change server port, enable auto-start on login
+- **Security**: View/regenerate API key
+- **Cloudflare**: Install cloudflared, manage Quick Tunnel
 
 ### Client Logs
 
@@ -154,7 +158,7 @@ Logs include source code location (file, function, line) and are automatically c
 ```bash
 cd MessageBridgeServer
 swift build -c release
-swift test  # 54 tests
+swift test  # 72 tests
 ```
 
 ### Client
