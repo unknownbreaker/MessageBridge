@@ -4,7 +4,7 @@ A self-hosted iMessage bridge that lets you access your iMessages and SMS on any
 
 ```
 Work Mac                              Home Mac
-┌───────────────┐    Tailscale VPN    ┌───────────────┐
+┌───────────────┐  Tailscale/Tunnel   ┌───────────────┐
 │ SwiftUI Client│◄───────────────────►│ Vapor Server  │
 └───────────────┘                     └───────┬───────┘
                                               │
@@ -20,7 +20,8 @@ Work Mac                              Home Mac
 - **Privacy first** - All data stays on your hardware, no third-party services
 - **Native experience** - Built with Swift and SwiftUI for a true macOS feel
 - **Real-time sync** - Messages appear instantly via WebSocket
-- **Secure** - End-to-end encrypted via Tailscale VPN
+- **Secure** - End-to-end encryption ensures only you can read your messages
+- **Flexible networking** - Works with Tailscale VPN or Cloudflare Tunnel
 
 ## Features
 
@@ -30,13 +31,16 @@ Work Mac                              Home Mac
 - Search conversations
 - Native macOS notifications
 - Secure API key authentication
+- End-to-end encryption (AES-256-GCM)
 - Auto-start server on login
 
 ## Requirements
 
 - **Home Mac**: macOS 14+, signed into iCloud with Messages enabled
 - **Work Mac**: macOS 14+
-- **Tailscale**: Free account for secure VPN connection
+- **Network**: One of the following:
+  - [Tailscale](https://tailscale.com) (recommended) - Free VPN, easiest setup
+  - [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) - Free, works when Tailscale is blocked
 
 ## Installation
 
@@ -53,11 +57,24 @@ See [Building from Source](#building-from-source) below.
 
 ## Quick Start
 
-### Step 1: Set Up Tailscale (Both Macs)
+### Step 1: Choose Your Network Setup
+
+#### Option A: Tailscale (Recommended)
+
+Best for: Personal devices where you can install Tailscale on both Macs.
 
 1. Download and install [Tailscale](https://tailscale.com/download) on both Macs
 2. Launch Tailscale and sign in with the same account on both
 3. Note your home Mac's Tailscale IP (click the menu bar icon)
+
+#### Option B: Cloudflare Tunnel
+
+Best for: Work Macs where Tailscale is blocked by IT policies.
+
+1. Install cloudflared on your **home Mac**: `brew install cloudflared`
+2. Run a quick tunnel: `cloudflared tunnel --url http://localhost:8080`
+3. Note the generated URL (e.g., `https://random-words.trycloudflare.com`)
+4. For permanent setup, see [Scripts/setup-cloudflare-tunnel.md](Scripts/setup-cloudflare-tunnel.md)
 
 ### Step 2: Set Up the Server (Home Mac)
 
@@ -84,8 +101,11 @@ The server runs in your menu bar with a status indicator:
    - Launch MessageBridge
    - Open Settings (`Cmd+,`)
    - Go to the **Connection** tab
-   - Enter Server URL: `http://<tailscale-ip>:8080` (use your home Mac's Tailscale IP)
+   - Enter Server URL:
+     - Tailscale: `http://<tailscale-ip>:8080`
+     - Cloudflare: `https://<your-tunnel-url>`
    - Enter the API Key from Step 2
+   - **Enable "End-to-End Encryption"** (required for Cloudflare, recommended for all)
    - Click Save
 4. **Verify Connection** - The status indicator in the toolbar should turn green
 
@@ -134,7 +154,7 @@ Logs include source code location (file, function, line) and are automatically c
 ```bash
 cd MessageBridgeServer
 swift build -c release
-swift test  # 43 tests
+swift test  # 54 tests
 ```
 
 ### Client
@@ -142,7 +162,7 @@ swift test  # 43 tests
 ```bash
 cd MessageBridgeClient
 swift build -c release
-swift test  # 28 tests
+swift test  # 37 tests
 ```
 
 ## Architecture
@@ -171,10 +191,13 @@ All endpoints require `X-API-Key` header.
 
 ## Security
 
-- API keys stored in macOS Keychain
-- All traffic encrypted via Tailscale (WireGuard protocol)
-- Server only accessible via VPN (no port forwarding)
-- Messages database accessed read-only
+- **API keys** stored in macOS Keychain
+- **End-to-end encryption** (AES-256-GCM) - Message content encrypted before leaving your device
+- **Transport security**:
+  - Tailscale: WireGuard protocol
+  - Cloudflare Tunnel: TLS encryption (enable E2E for full privacy)
+- **No port forwarding** required - Server not exposed to internet
+- **Read-only database access** - Messages.app handles all writes
 
 ## Troubleshooting
 
@@ -198,7 +221,8 @@ MessageBridge/
 │   ├── build-release.sh     # Build both apps
 │   ├── create-dmgs.sh       # Create DMG installers
 │   ├── generate-changelog.sh # Generate release notes
-│   └── setup-tailscale.md   # Network setup guide
+│   ├── setup-tailscale.md   # Tailscale setup guide
+│   └── setup-cloudflare-tunnel.md # Cloudflare Tunnel guide
 ├── CLAUDE.md                # Development docs
 ├── CONTRIBUTING.md          # Contribution guidelines
 ├── CHANGELOG.md             # Version history
