@@ -582,6 +582,168 @@ public struct EncryptedEnvelope: Codable {
 
 ---
 
+## Milestone 15: Cloudflare Tunnel Setup Wizard
+
+**Goal:** Simplify Cloudflare Tunnel setup with a guided wizard in the server app, eliminating manual terminal commands.
+
+### Problem Statement
+Current Cloudflare Tunnel setup requires:
+1. Installing `cloudflared` via Homebrew (terminal)
+2. Running `cloudflared tunnel login` (opens browser)
+3. Creating a tunnel via CLI
+4. Creating a config file manually
+5. Setting up a LaunchAgent manually
+6. Running the tunnel
+
+This is too complex for non-technical users and error-prone.
+
+### Deliverables
+- [ ] Detect if `cloudflared` is installed
+- [ ] One-click `cloudflared` installation (download binary directly, no Homebrew required)
+- [ ] OAuth flow integration for Cloudflare login
+- [ ] Automatic tunnel creation and configuration
+- [ ] Generate and manage config.yml automatically
+- [ ] Start/stop tunnel from server UI
+- [ ] LaunchAgent creation for auto-start
+- [ ] Tunnel status indicator in menu bar
+- [ ] Quick tunnel mode (temporary URL, no account needed)
+- [ ] Named tunnel mode (permanent URL, requires Cloudflare account)
+
+### UI Design
+```
+┌─────────────────────────────────────────┐
+│ Cloudflare Tunnel Setup                 │
+├─────────────────────────────────────────┤
+│                                         │
+│  ○ Quick Tunnel (Temporary URL)         │
+│    No account needed. URL changes on    │
+│    each restart.                        │
+│                                         │
+│  ○ Named Tunnel (Permanent URL)         │
+│    Requires free Cloudflare account.    │
+│    URL stays the same forever.          │
+│                                         │
+├─────────────────────────────────────────┤
+│              [Continue →]               │
+└─────────────────────────────────────────┘
+
+// Quick Tunnel flow:
+┌─────────────────────────────────────────┐
+│ Quick Tunnel Active                     │
+├─────────────────────────────────────────┤
+│                                         │
+│  Your tunnel URL:                       │
+│  ┌─────────────────────────────────┐    │
+│  │ https://abc-xyz.trycloudflare.com │  │
+│  └─────────────────────────────────┘    │
+│                        [Copy URL]       │
+│                                         │
+│  Status: ● Connected                    │
+│                                         │
+│  ⚠️ This URL will change when you       │
+│     restart the tunnel.                 │
+│                                         │
+├─────────────────────────────────────────┤
+│  [Stop Tunnel]    [Switch to Named →]   │
+└─────────────────────────────────────────┘
+
+// Named Tunnel flow:
+┌─────────────────────────────────────────┐
+│ Connect Cloudflare Account              │
+├─────────────────────────────────────────┤
+│                                         │
+│  Click below to authorize MessageBridge │
+│  to create tunnels on your account.     │
+│                                         │
+│         [Connect Cloudflare →]          │
+│                                         │
+│  This will open your browser.           │
+│                                         │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│ Named Tunnel Active                     │
+├─────────────────────────────────────────┤
+│                                         │
+│  Your permanent tunnel URL:             │
+│  ┌─────────────────────────────────┐    │
+│  │ https://messagebridge.domain.com │   │
+│  └─────────────────────────────────┘    │
+│                        [Copy URL]       │
+│                                         │
+│  Status: ● Connected                    │
+│  Tunnel: messagebridge-xxxxx            │
+│                                         │
+│  ☑ Start tunnel automatically           │
+│                                         │
+├─────────────────────────────────────────┤
+│  [Stop Tunnel]         [Disconnect]     │
+└─────────────────────────────────────────┘
+```
+
+### CloudflaredManager Interface
+```swift
+public actor CloudflaredManager {
+    /// Check if cloudflared binary exists
+    func isInstalled() async -> Bool
+
+    /// Download and install cloudflared binary
+    func install() async throws
+
+    /// Start a quick tunnel (temporary URL)
+    func startQuickTunnel(port: Int) async throws -> String  // Returns URL
+
+    /// Stop the running tunnel
+    func stopTunnel() async throws
+
+    /// Get current tunnel status
+    func getStatus() async -> TunnelStatus
+
+    /// Login to Cloudflare (opens browser)
+    func login() async throws
+
+    /// Create a named tunnel
+    func createNamedTunnel(name: String) async throws -> TunnelInfo
+
+    /// Configure DNS for named tunnel
+    func configureDNS(tunnelId: String, hostname: String) async throws
+
+    /// Start named tunnel
+    func startNamedTunnel(name: String, port: Int) async throws
+
+    /// Create LaunchAgent for auto-start
+    func enableAutoStart() async throws
+
+    /// Remove LaunchAgent
+    func disableAutoStart() async throws
+}
+
+public enum TunnelStatus {
+    case notInstalled
+    case stopped
+    case starting
+    case running(url: String, isQuickTunnel: Bool)
+    case error(String)
+}
+```
+
+### Implementation Notes
+1. **Binary Installation**: Download `cloudflared` directly from GitHub releases, no Homebrew dependency
+2. **Quick Tunnel**: Uses `cloudflared tunnel --url` which requires no authentication
+3. **Named Tunnel**: Requires OAuth flow via `cloudflared tunnel login`
+4. **Process Management**: Use `Process` to spawn and manage `cloudflared` subprocess
+5. **URL Detection**: Parse stdout from cloudflared to extract the assigned URL
+6. **Config Storage**: Store tunnel config in `~/Library/Application Support/MessageBridge/`
+
+### Success Criteria
+- User can set up Cloudflare Tunnel without using Terminal
+- Quick tunnel works with single click
+- Named tunnel setup takes < 2 minutes
+- Tunnel auto-starts with server when enabled
+- Clear status indication in menu bar
+
+---
+
 ## Future Enhancements (Out of Scope)
 
 These are not part of the current implementation:
