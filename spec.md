@@ -264,16 +264,16 @@ actor AppleScriptMessageSender: MessageSending {
 
 ---
 
-## Milestone 8: Deployment & Security
+## Milestone 8: Deployment & Security ✅
 
 **Goal:** Production-ready deployment with proper security.
 
 ### Deliverables
-- [ ] LaunchAgent plist for server auto-start
-- [ ] Keychain storage for API key
-- [ ] Tailscale setup documentation
-- [ ] Server installer script
-- [ ] Client DMG packaging
+- [x] LaunchAgent plist for server auto-start
+- [x] Keychain storage for API key
+- [x] Tailscale setup documentation
+- [x] Server installer script
+- [x] Client DMG packaging
 
 ### Success Criteria
 - Server starts automatically on home Mac login
