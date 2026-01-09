@@ -1,7 +1,12 @@
 #!/bin/bash
 #
 # MessageBridge Release Builder
-# Builds both server and client apps for release distribution.
+# Builds server and/or client apps for release distribution.
+#
+# Usage:
+#   ./build-release.sh              # Build both apps
+#   ./build-release.sh server       # Build server only
+#   ./build-release.sh client       # Build client only
 #
 
 set -e
@@ -17,44 +22,84 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
 
+# Parse arguments
+BUILD_TARGET="${1:-all}"
+
 echo -e "${BLUE}================================${NC}"
 echo -e "${BLUE}MessageBridge Release Builder${NC}"
 echo -e "${BLUE}================================${NC}"
 echo ""
 
-# Get version from VERSION file or git tag
-VERSION=$(cat "$PROJECT_DIR/VERSION" 2>/dev/null || echo "0.0.0")
-echo -e "${YELLOW}Building version: ${VERSION}${NC}"
-echo ""
+# Function to parse version into components
+parse_version() {
+    local version="$1"
+    IFS='.' read -r MAJOR MINOR PATCH <<< "$version"
+    MAJOR=${MAJOR:-0}
+    MINOR=${MINOR:-0}
+    PATCH=${PATCH:-0}
+}
+
+# Function to sync Version.swift with VERSION file
+sync_version() {
+    local version_file="$1"
+    local swift_file="$2"
+    local app_name="$3"
+
+    if [[ ! -f "$version_file" ]]; then
+        echo -e "${RED}✗ VERSION file not found: $version_file${NC}" >&2
+        return 1
+    fi
+
+    local version=$(cat "$version_file" | tr -d '[:space:]')
+    parse_version "$version"
+
+    if [[ -f "$swift_file" ]]; then
+        sed -i '' "s/AppVersion(major: [0-9]*, minor: [0-9]*, patch: [0-9]*)/AppVersion(major: $MAJOR, minor: $MINOR, patch: $PATCH)/" "$swift_file"
+        echo -e "${GREEN}✓ $app_name Version.swift synced to $version${NC}" >&2
+    fi
+
+    echo "$version"
+}
 
 # Create build directory
 mkdir -p "$BUILD_DIR"
-rm -rf "$BUILD_DIR"/*
 
 # Build Server
-echo -e "${YELLOW}Building MessageBridge Server...${NC}"
-cd "$PROJECT_DIR/MessageBridgeServer"
+build_server() {
+    echo ""
+    echo -e "${YELLOW}Building MessageBridge Server...${NC}"
 
-# Build release binary
-swift build -c release
+    # Get server version
+    SERVER_VERSION=$(sync_version \
+        "$PROJECT_DIR/MessageBridgeServer/VERSION" \
+        "$PROJECT_DIR/MessageBridgeServer/Sources/MessageBridgeCore/Version/Version.swift" \
+        "Server")
 
-# Create app bundle structure
-APP_NAME="MessageBridge Server"
-SERVER_APP="$BUILD_DIR/$APP_NAME.app"
-mkdir -p "$SERVER_APP/Contents/MacOS"
-mkdir -p "$SERVER_APP/Contents/Resources"
+    echo -e "${YELLOW}Server version: ${SERVER_VERSION}${NC}"
 
-# Copy binary
-cp ".build/release/MessageBridgeServer" "$SERVER_APP/Contents/MacOS/MessageBridge Server"
+    cd "$PROJECT_DIR/MessageBridgeServer"
 
-# Copy icon
-if [[ -f "$PROJECT_DIR/Assets/AppIcon-Server.icns" ]]; then
-    cp "$PROJECT_DIR/Assets/AppIcon-Server.icns" "$SERVER_APP/Contents/Resources/AppIcon.icns"
-    echo -e "${GREEN}✓ Server icon copied${NC}"
-fi
+    # Build release binary
+    swift build -c release
 
-# Create Info.plist
-cat > "$SERVER_APP/Contents/Info.plist" << EOF
+    # Create app bundle structure
+    APP_NAME="MessageBridge Server"
+    SERVER_APP="$BUILD_DIR/$APP_NAME.app"
+    rm -rf "$SERVER_APP"
+    mkdir -p "$SERVER_APP/Contents/MacOS"
+    mkdir -p "$SERVER_APP/Contents/Resources"
+
+    # Copy binary
+    cp ".build/release/MessageBridgeServer" "$SERVER_APP/Contents/MacOS/MessageBridge Server"
+
+    # Copy icon
+    if [[ -f "$PROJECT_DIR/Assets/AppIcon-Server.icns" ]]; then
+        cp "$PROJECT_DIR/Assets/AppIcon-Server.icns" "$SERVER_APP/Contents/Resources/AppIcon.icns"
+        echo -e "${GREEN}✓ Server icon copied${NC}"
+    fi
+
+    # Create Info.plist
+    cat > "$SERVER_APP/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -74,9 +119,9 @@ cat > "$SERVER_APP/Contents/Info.plist" << EOF
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>${VERSION}</string>
+    <string>${SERVER_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>${VERSION}</string>
+    <string>${SERVER_VERSION}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>
@@ -89,33 +134,45 @@ cat > "$SERVER_APP/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-echo -e "${GREEN}✓ Server app built: $SERVER_APP${NC}"
+    echo -e "${GREEN}✓ Server app built: $SERVER_APP${NC}"
+}
 
 # Build Client
-echo ""
-echo -e "${YELLOW}Building MessageBridge Client...${NC}"
-cd "$PROJECT_DIR/MessageBridgeClient"
+build_client() {
+    echo ""
+    echo -e "${YELLOW}Building MessageBridge Client...${NC}"
 
-# Build release binary
-swift build -c release
+    # Get client version
+    CLIENT_VERSION=$(sync_version \
+        "$PROJECT_DIR/MessageBridgeClient/VERSION" \
+        "$PROJECT_DIR/MessageBridgeClient/Sources/MessageBridgeClientCore/Version/Version.swift" \
+        "Client")
 
-# Create app bundle structure
-APP_NAME="MessageBridge"
-CLIENT_APP="$BUILD_DIR/$APP_NAME.app"
-mkdir -p "$CLIENT_APP/Contents/MacOS"
-mkdir -p "$CLIENT_APP/Contents/Resources"
+    echo -e "${YELLOW}Client version: ${CLIENT_VERSION}${NC}"
 
-# Copy binary
-cp ".build/release/MessageBridgeClient" "$CLIENT_APP/Contents/MacOS/MessageBridge"
+    cd "$PROJECT_DIR/MessageBridgeClient"
 
-# Copy icon
-if [[ -f "$PROJECT_DIR/Assets/AppIcon-Client.icns" ]]; then
-    cp "$PROJECT_DIR/Assets/AppIcon-Client.icns" "$CLIENT_APP/Contents/Resources/AppIcon.icns"
-    echo -e "${GREEN}✓ Client icon copied${NC}"
-fi
+    # Build release binary
+    swift build -c release
 
-# Create Info.plist
-cat > "$CLIENT_APP/Contents/Info.plist" << EOF
+    # Create app bundle structure
+    APP_NAME="MessageBridge"
+    CLIENT_APP="$BUILD_DIR/$APP_NAME.app"
+    rm -rf "$CLIENT_APP"
+    mkdir -p "$CLIENT_APP/Contents/MacOS"
+    mkdir -p "$CLIENT_APP/Contents/Resources"
+
+    # Copy binary
+    cp ".build/release/MessageBridgeClient" "$CLIENT_APP/Contents/MacOS/MessageBridge"
+
+    # Copy icon
+    if [[ -f "$PROJECT_DIR/Assets/AppIcon-Client.icns" ]]; then
+        cp "$PROJECT_DIR/Assets/AppIcon-Client.icns" "$CLIENT_APP/Contents/Resources/AppIcon.icns"
+        echo -e "${GREEN}✓ Client icon copied${NC}"
+    fi
+
+    # Create Info.plist
+    cat > "$CLIENT_APP/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -135,9 +192,9 @@ cat > "$CLIENT_APP/Contents/Info.plist" << EOF
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>${VERSION}</string>
+    <string>${CLIENT_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>${VERSION}</string>
+    <string>${CLIENT_VERSION}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
@@ -148,7 +205,27 @@ cat > "$CLIENT_APP/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-echo -e "${GREEN}✓ Client app built: $CLIENT_APP${NC}"
+    echo -e "${GREEN}✓ Client app built: $CLIENT_APP${NC}"
+}
+
+# Execute based on target
+case "$BUILD_TARGET" in
+    server)
+        build_server
+        ;;
+    client)
+        build_client
+        ;;
+    all|"")
+        build_server
+        build_client
+        ;;
+    *)
+        echo -e "${RED}Unknown target: $BUILD_TARGET${NC}"
+        echo "Usage: $0 [server|client|all]"
+        exit 1
+        ;;
+esac
 
 # Summary
 echo ""

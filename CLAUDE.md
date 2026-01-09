@@ -266,7 +266,27 @@ All endpoints require `X-API-Key` header.
 - **Test-driven development** - Always write tests first, then implement code to make them pass. Tests act as user stories that define expected behavior.
 - **Documentation updates required** - Whenever any user-facing or external-facing part of the app is changed (UI, settings, API, CLI, installation, etc.), all related documentation must be updated to reflect the change. This includes README.md, CLAUDE.md (User Guide section), spec.md, and any relevant guides in Scripts/.
 - **Automate repetitive tasks** - Create CI/CD pipelines and scripts to automate repetitive tasks such as building, testing, releasing, and deployment. Manual processes should be automated when performed more than once.
-- **Versioning and releases** - Always use semantic versioning (semver) for the project. Create git tags and GitHub releases for each version with release notes, changelogs, and downloadable artifacts. Bump version numbers according to conventional commits (feat = minor, fix = patch, breaking change = major).
+- **Versioning and releases** - Server and Client are versioned independently. Each has its own VERSION file (`MessageBridgeServer/VERSION` and `MessageBridgeClient/VERSION`). Use prefixed git tags: `server-v1.2.3` or `client-v1.2.3`. Bump version numbers according to conventional commits (feat = minor, fix = patch, breaking change = major).
+
+### Versioning
+
+Server and Client apps are versioned separately since they have different release cycles:
+
+- **Server version**: `MessageBridgeServer/VERSION`
+- **Client version**: `MessageBridgeClient/VERSION`
+
+**Git tags use prefixes:**
+- Server releases: `server-v1.2.3`
+- Client releases: `client-v1.2.3`
+
+**Build script automatically syncs versions:**
+```bash
+./Scripts/build-release.sh              # Build both apps
+./Scripts/build-release.sh server       # Build server only
+./Scripts/build-release.sh client       # Build client only
+```
+
+The build script reads from each app's VERSION file and updates the corresponding Version.swift before building.
 
 ### Testing Workflow
 1. **Write failing tests first** - Define what the feature should do through test cases before writing any implementation code.
@@ -372,7 +392,6 @@ MessageBridge/
 ├── spec.md                      # Project specification with milestones
 ├── CHANGELOG.md                 # Release history (auto-generated)
 ├── CONTRIBUTING.md              # Contribution guidelines
-├── VERSION                      # Current version (semver)
 │
 ├── .github/
 │   └── workflows/
@@ -380,6 +399,7 @@ MessageBridge/
 │       └── release.yml          # Build & release on tag
 │
 ├── MessageBridgeServer/
+│   ├── VERSION                  # Server version (semver)
 │   ├── Package.swift
 │   ├── Sources/
 │   │   ├── MessageBridgeCore/   # Testable library
@@ -404,6 +424,7 @@ MessageBridge/
 │   └── Tests/
 │
 ├── MessageBridgeClient/
+│   ├── VERSION                  # Client version (semver)
 │   ├── Package.swift
 │   ├── Sources/
 │   │   ├── MessageBridgeClientCore/  # Testable library

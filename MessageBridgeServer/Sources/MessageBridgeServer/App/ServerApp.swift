@@ -9,6 +9,7 @@ class WindowManager: ObservableObject {
 
     var settingsWindow: NSWindow?
     var logsWindow: NSWindow?
+    var aboutWindow: NSWindow?
     weak var appState: AppState?
 
     func openSettings() {
@@ -55,6 +56,27 @@ class WindowManager: ObservableObject {
         window.makeKeyAndOrderFront(nil)
 
         self.logsWindow = window
+    }
+
+    func openAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let window = aboutWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let aboutView = AboutView()
+        let hostingController = NSHostingController(rootView: aboutView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "About MessageBridge Server"
+        window.styleMask = [.titled, .closable]
+        window.setContentSize(NSSize(width: 350, height: 300))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        self.aboutWindow = window
     }
 }
 
@@ -125,6 +147,13 @@ struct MenuContentView: View {
             debugLog("Settings clicked")
             WindowManager.shared.appState = appState
             WindowManager.shared.openSettings()
+        }
+
+        Divider()
+
+        Button("About MessageBridge Server") {
+            debugLog("About clicked")
+            WindowManager.shared.openAbout()
         }
 
         Divider()
