@@ -264,6 +264,7 @@ All endpoints require `X-API-Key` header.
 - **Immutability** - Avoid mutating variables passed into a function. Return new values instead of modifying inputs.
 - **Modular design** - Features should be self-contained and swappable without causing cascading changes elsewhere. Use protocols to define boundaries.
 - **Test-driven development** - Always write tests first, then implement code to make them pass. Tests act as user stories that define expected behavior.
+- **Documentation updates required** - Whenever any user-facing or external-facing part of the app is changed (UI, settings, API, CLI, installation, etc.), all related documentation must be updated to reflect the change. This includes README.md, CLAUDE.md (User Guide section), spec.md, and any relevant guides in Scripts/.
 
 ### Testing Workflow
 1. **Write failing tests first** - Define what the feature should do through test cases before writing any implementation code.
