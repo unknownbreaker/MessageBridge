@@ -582,7 +582,7 @@ public struct EncryptedEnvelope: Codable {
 
 ---
 
-## Milestone 15: Cloudflare Tunnel Setup Wizard
+## Milestone 15: Cloudflare Tunnel Setup Wizard ✅
 
 **Goal:** Simplify Cloudflare Tunnel setup with a guided wizard in the server app, eliminating manual terminal commands.
 
@@ -597,16 +597,21 @@ Current Cloudflare Tunnel setup requires:
 
 This is too complex for non-technical users and error-prone.
 
-### Deliverables
-- [ ] Detect if `cloudflared` is installed
-- [ ] One-click `cloudflared` installation (download binary directly, no Homebrew required)
+### Deliverables (Quick Tunnel - Phase 1)
+- [x] Detect if `cloudflared` is installed
+- [x] One-click `cloudflared` installation (download binary directly, no Homebrew required)
+- [x] Start/stop tunnel from server UI
+- [x] Tunnel status indicator in menu bar
+- [x] Quick tunnel mode (temporary URL, no account needed)
+- [x] Cloudflare settings tab in server preferences
+- [x] CloudflaredManager actor with process management
+- [x] Unit tests for CloudflaredManager (18 tests)
+
+### Future Enhancements (Named Tunnel - Phase 2)
 - [ ] OAuth flow integration for Cloudflare login
 - [ ] Automatic tunnel creation and configuration
 - [ ] Generate and manage config.yml automatically
-- [ ] Start/stop tunnel from server UI
 - [ ] LaunchAgent creation for auto-start
-- [ ] Tunnel status indicator in menu bar
-- [ ] Quick tunnel mode (temporary URL, no account needed)
 - [ ] Named tunnel mode (permanent URL, requires Cloudflare account)
 
 ### UI Design
