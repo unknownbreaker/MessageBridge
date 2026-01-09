@@ -467,18 +467,18 @@ public enum TailscaleStatus {
 
 ---
 
-## Milestone 13: GitHub Actions & Release Automation
+## Milestone 13: GitHub Actions & Release Automation ✅
 
 **Goal:** Automated builds, testing, and releases.
 
 ### Deliverables
-- [ ] `.github/workflows/ci.yml` - Build and test on every PR
-- [ ] `.github/workflows/release.yml` - Build and release on version tags
-- [ ] Auto-generate changelog from conventional commits
-- [ ] Build both apps as `.app` bundles
-- [ ] Create DMG installers for both apps
-- [ ] Upload DMGs to GitHub Releases
-- [ ] Version extraction from git tags
+- [x] `.github/workflows/ci.yml` - Build and test on every PR
+- [x] `.github/workflows/release.yml` - Build and release on version tags
+- [x] Auto-generate changelog from conventional commits
+- [x] Build both apps as `.app` bundles
+- [x] Create DMG installers for both apps
+- [x] Upload DMGs to GitHub Releases
+- [x] Version extraction from git tags
 - [ ] (Optional) Code signing with Developer ID
 - [ ] (Optional) Notarization for Gatekeeper
 

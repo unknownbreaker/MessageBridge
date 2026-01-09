@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build Server
+        run: |
+          cd MessageBridgeServer
+          swift build -c release
+
+      - name: Test Server
+        run: |
+          cd MessageBridgeServer
+          swift test
+
+      - name: Build Client
+        run: |
+          cd MessageBridgeClient
+          swift build -c release
+
+      - name: Test Client
+        run: |
+          cd MessageBridgeClient
+          swift test
+
+      - name: Verify apps build as bundles
+        run: |
+          # Build server app bundle
+          cd MessageBridgeServer
+          swift build -c release
+
+          # Build client app bundle
+          cd ../MessageBridgeClient
+          swift build -c release
