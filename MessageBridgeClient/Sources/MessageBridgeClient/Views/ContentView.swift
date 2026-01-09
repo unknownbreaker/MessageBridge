@@ -9,11 +9,12 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             ConversationListView(
-                conversations: viewModel.conversations,
+                conversations: filteredConversations,
                 selection: $selectedConversation,
                 searchText: $searchText
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 350)
+            .searchable(text: $searchText, prompt: "Search conversations")
         } detail: {
             if let conversation = selectedConversation {
                 MessageThreadView(conversation: conversation)
@@ -26,6 +27,26 @@ struct ContentView: View {
             ToolbarItem(placement: .automatic) {
                 ConnectionStatusView(status: viewModel.connectionStatus)
             }
+        }
+        .onChange(of: selectedConversation) { newValue in
+            viewModel.selectConversation(newValue?.id)
+        }
+        .task {
+            await viewModel.requestNotificationPermission()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openConversation)) { notification in
+            if let conversationId = notification.userInfo?["conversationId"] as? String {
+                // Find and select the conversation
+                selectedConversation = viewModel.conversations.first { $0.id == conversationId }
+            }
+        }
+    }
+
+    private var filteredConversations: [Conversation] {
+        guard !searchText.isEmpty else { return viewModel.conversations }
+        return viewModel.conversations.filter { conversation in
+            conversation.displayName.localizedCaseInsensitiveContains(searchText) ||
+            conversation.participants.contains { $0.address.localizedCaseInsensitiveContains(searchText) }
         }
     }
 }

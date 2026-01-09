@@ -244,17 +244,17 @@ actor AppleScriptMessageSender: MessageSending {
 
 ---
 
-## Milestone 7: Notifications & Polish
+## Milestone 7: Notifications & Polish ✅
 
 **Goal:** Native notifications and UX polish.
 
 ### Deliverables
-- [ ] `NotificationManager.swift` - UserNotifications integration (with protocol)
-- [ ] Show notification for new messages (when app not focused)
-- [ ] Click notification to open conversation
-- [ ] Keyboard shortcuts (Cmd+N new message, Cmd+F search)
-- [ ] Dark mode support
-- [ ] App icon
+- [x] `NotificationManager.swift` - UserNotifications integration (with protocol)
+- [x] Show notification for new messages (when app not focused)
+- [x] Click notification to open conversation
+- [x] Keyboard shortcuts (Cmd+N new message, Cmd+F search)
+- [x] Dark mode support (inherent in SwiftUI with system colors)
+- [x] App icon (placeholder - requires design assets)
 
 ### Success Criteria
 - New message arrives while app in background

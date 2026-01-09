@@ -13,13 +13,27 @@ public class MessagesViewModel: ObservableObject {
     @Published public var messages: [String: [Message]] = [:]
     @Published public var connectionStatus: ConnectionStatus = .disconnected
     @Published public var lastError: Error?
+    @Published public var selectedConversationId: String?
 
     private let bridgeService: any BridgeServiceProtocol
+    private let notificationManager: NotificationManager
 
-    public init(bridgeService: any BridgeServiceProtocol = BridgeConnection()) {
+    public init(
+        bridgeService: any BridgeServiceProtocol = BridgeConnection(),
+        notificationManager: NotificationManager = NotificationManager()
+    ) {
         self.bridgeService = bridgeService
+        self.notificationManager = notificationManager
         // Load placeholder data for now
         loadPlaceholderData()
+    }
+
+    public func requestNotificationPermission() async {
+        do {
+            _ = try await notificationManager.requestAuthorization()
+        } catch {
+            print("Failed to request notification permission: \(error)")
+        }
     }
 
     public func connect(to serverURL: URL, apiKey: String) async {
@@ -28,9 +42,61 @@ public class MessagesViewModel: ObservableObject {
             try await bridgeService.connect(to: serverURL, apiKey: apiKey)
             connectionStatus = .connected
             await loadConversations()
+            await startWebSocket()
         } catch {
             connectionStatus = .disconnected
             print("Connection failed: \(error)")
+        }
+    }
+
+    private func startWebSocket() async {
+        do {
+            try await bridgeService.startWebSocket { [weak self] message, sender in
+                Task { @MainActor [weak self] in
+                    await self?.handleNewMessage(message, sender: sender)
+                }
+            }
+        } catch {
+            print("Failed to start WebSocket: \(error)")
+        }
+    }
+
+    private func handleNewMessage(_ message: Message, sender: String) async {
+        // Add message to the conversation
+        let conversationId = message.conversationId
+        messages[conversationId, default: []].insert(message, at: 0)
+
+        // Update conversation's last message
+        if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
+            var updatedConversation = conversations[index]
+            updatedConversation = Conversation(
+                id: updatedConversation.id,
+                guid: updatedConversation.guid,
+                displayName: updatedConversation.displayName,
+                participants: updatedConversation.participants,
+                lastMessage: message,
+                isGroup: updatedConversation.isGroup
+            )
+            conversations[index] = updatedConversation
+        }
+
+        // Show notification if message is not from me and conversation is not selected
+        if !message.isFromMe && selectedConversationId != conversationId {
+            do {
+                try await notificationManager.showNotification(for: message, senderName: sender)
+            } catch {
+                print("Failed to show notification: \(error)")
+            }
+        }
+    }
+
+    public func selectConversation(_ conversationId: String?) {
+        selectedConversationId = conversationId
+        // Clear notifications for this conversation when selected
+        if let id = conversationId {
+            Task {
+                await notificationManager.clearNotifications(for: id)
+            }
         }
     }
 

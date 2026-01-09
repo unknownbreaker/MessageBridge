@@ -7,6 +7,8 @@ actor MockBridgeService: BridgeServiceProtocol {
     var fetchConversationsCalled = false
     var fetchMessagesCalled = false
     var sendMessageCalled = false
+    var startWebSocketCalled = false
+    var stopWebSocketCalled = false
 
     var conversationsToReturn: [Conversation] = []
     var messagesToReturn: [Message] = []
@@ -14,6 +16,7 @@ actor MockBridgeService: BridgeServiceProtocol {
     var shouldThrowError = false
     var lastRecipient: String?
     var lastMessageText: String?
+    var newMessageHandler: NewMessageHandler?
 
     func connect(to url: URL, apiKey: String) async throws {
         connectCalled = true
@@ -47,16 +50,38 @@ actor MockBridgeService: BridgeServiceProtocol {
         }
         return messageToReturn!
     }
+
+    func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws {
+        startWebSocketCalled = true
+        newMessageHandler = onNewMessage
+    }
+
+    func stopWebSocket() async {
+        stopWebSocketCalled = true
+        newMessageHandler = nil
+    }
+
+    // Helper to simulate receiving a new message
+    func simulateNewMessage(_ message: Message, sender: String) {
+        newMessageHandler?(message, sender)
+    }
 }
 
 @MainActor
 final class MessagesViewModelTests: XCTestCase {
 
+    // Helper to create ViewModel with mock services
+    private func createViewModel(mockService: MockBridgeService) -> MessagesViewModel {
+        let mockNotificationCenter = MockNotificationCenter()
+        let notificationManager = NotificationManager(notificationCenter: mockNotificationCenter)
+        return MessagesViewModel(bridgeService: mockService, notificationManager: notificationManager)
+    }
+
     // MARK: - Connection Tests
 
     func testConnect_success_setsStatusToConnected() async {
         let mockService = MockBridgeService()
-        let viewModel = MessagesViewModel(bridgeService: mockService)
+        let viewModel = createViewModel(mockService: mockService)
 
         await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
 
@@ -68,7 +93,7 @@ final class MessagesViewModelTests: XCTestCase {
     func testConnect_failure_setsStatusToDisconnected() async {
         let mockService = MockBridgeService()
         await mockService.setShouldThrowError(true)
-        let viewModel = MessagesViewModel(bridgeService: mockService)
+        let viewModel = createViewModel(mockService: mockService)
 
         await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
 
@@ -89,7 +114,7 @@ final class MessagesViewModelTests: XCTestCase {
         )
         await mockService.setConversationsToReturn([testConversation])
 
-        let viewModel = MessagesViewModel(bridgeService: mockService)
+        let viewModel = createViewModel(mockService: mockService)
         await viewModel.loadConversations()
 
         let fetchCalled = await mockService.fetchConversationsCalled
@@ -113,7 +138,7 @@ final class MessagesViewModelTests: XCTestCase {
         )
         await mockService.setMessageToReturn(sentMessage)
 
-        let viewModel = MessagesViewModel(bridgeService: mockService)
+        let viewModel = createViewModel(mockService: mockService)
 
         // Set up a conversation with a participant to send to
         let conversation = Conversation(
@@ -149,7 +174,7 @@ final class MessagesViewModelTests: XCTestCase {
         )
         await mockService.setMessageToReturn(sentMessage)
 
-        let viewModel = MessagesViewModel(bridgeService: mockService)
+        let viewModel = createViewModel(mockService: mockService)
 
         let conversation = Conversation(
             id: "chat-1",
@@ -176,7 +201,7 @@ final class MessagesViewModelTests: XCTestCase {
         let mockService = MockBridgeService()
         await mockService.setShouldThrowError(true)
 
-        let viewModel = MessagesViewModel(bridgeService: mockService)
+        let viewModel = createViewModel(mockService: mockService)
 
         let conversation = Conversation(
             id: "chat-1",
@@ -208,7 +233,7 @@ final class MessagesViewModelTests: XCTestCase {
         )
         await mockService.setMessageToReturn(sentMessage)
 
-        let viewModel = MessagesViewModel(bridgeService: mockService)
+        let viewModel = createViewModel(mockService: mockService)
 
         let conversation = Conversation(
             id: "chat-1",
