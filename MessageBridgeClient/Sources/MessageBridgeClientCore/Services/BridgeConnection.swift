@@ -59,10 +59,29 @@ public actor BridgeConnection: BridgeServiceProtocol {
         var request = URLRequest(url: healthURL)
         request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
 
-        let (_, response) = try await urlSession.data(for: request)
+        logDebug("Attempting to connect to: \(healthURL.absoluteString)")
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                logError("Connection failed: Response is not HTTP")
+                throw BridgeError.connectionFailed
+            }
+
+            logDebug("Server responded with status: \(httpResponse.statusCode)")
+
+            if httpResponse.statusCode != 200 {
+                let body = String(data: data, encoding: .utf8) ?? "empty"
+                logError("Connection failed: HTTP \(httpResponse.statusCode) - \(body)")
+                throw BridgeError.connectionFailed
+            }
+
+            logInfo("Successfully connected to server")
+        } catch let error as BridgeError {
+            throw error
+        } catch {
+            logError("Connection failed: \(error.localizedDescription)")
             throw BridgeError.connectionFailed
         }
     }
