@@ -87,13 +87,14 @@ Launch MessageBridge and enter:
 |----------|--------|
 | `Cmd+F` | Search conversations |
 | `Cmd+N` | New message |
+| `Cmd+Shift+L` | View logs |
 | `Enter` | Send message |
 | `Option+Enter` | New line in message |
 
 ### Server Management
 
 ```bash
-# View logs
+# View server logs
 tail -f /usr/local/var/log/messagebridge/server.log
 
 # Restart server
@@ -102,6 +103,12 @@ launchctl kickstart -k gui/$(id -u)/com.messagebridge.server
 # Stop server
 launchctl unload ~/Library/LaunchAgents/com.messagebridge.server.plist
 ```
+
+### Client Logs
+
+View client logs via the menu: **MessageBridge > View Logs** (or `Cmd+Shift+L`)
+
+Logs include source code location (file, function, line) and are automatically cleaned up after 7 days.
 
 ## Building from Source
 
@@ -118,7 +125,7 @@ swift test  # 43 tests
 ```bash
 cd MessageBridgeClient
 swift build -c release
-swift test  # 16 tests
+swift test  # 28 tests
 ```
 
 ## Architecture

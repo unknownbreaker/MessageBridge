@@ -32,7 +32,7 @@ public class MessagesViewModel: ObservableObject {
         do {
             _ = try await notificationManager.requestAuthorization()
         } catch {
-            print("Failed to request notification permission: \(error)")
+            logWarning("Failed to request notification permission: \(error.localizedDescription)")
         }
     }
 
@@ -45,7 +45,7 @@ public class MessagesViewModel: ObservableObject {
             await startWebSocket()
         } catch {
             connectionStatus = .disconnected
-            print("Connection failed: \(error)")
+            logError("Connection failed", error: error)
         }
     }
 
@@ -56,8 +56,9 @@ public class MessagesViewModel: ObservableObject {
                     await self?.handleNewMessage(message, sender: sender)
                 }
             }
+            logInfo("WebSocket connection started")
         } catch {
-            print("Failed to start WebSocket: \(error)")
+            logError("Failed to start WebSocket", error: error)
         }
     }
 
@@ -85,7 +86,7 @@ public class MessagesViewModel: ObservableObject {
             do {
                 try await notificationManager.showNotification(for: message, senderName: sender)
             } catch {
-                print("Failed to show notification: \(error)")
+                logWarning("Failed to show notification: \(error.localizedDescription)")
             }
         }
     }
@@ -103,8 +104,9 @@ public class MessagesViewModel: ObservableObject {
     public func loadConversations() async {
         do {
             conversations = try await bridgeService.fetchConversations(limit: 50, offset: 0)
+            logDebug("Loaded \(conversations.count) conversations")
         } catch {
-            print("Failed to load conversations: \(error)")
+            logError("Failed to load conversations", error: error)
         }
     }
 
@@ -112,8 +114,9 @@ public class MessagesViewModel: ObservableObject {
         do {
             let msgs = try await bridgeService.fetchMessages(conversationId: conversationId, limit: 50, offset: 0)
             messages[conversationId] = msgs
+            logDebug("Loaded \(msgs.count) messages for conversation \(conversationId)")
         } catch {
-            print("Failed to load messages: \(error)")
+            logError("Failed to load messages for conversation \(conversationId)", error: error)
         }
     }
 
@@ -151,7 +154,7 @@ public class MessagesViewModel: ObservableObject {
             // Remove optimistic message on failure
             messages[conversationId]?.removeAll { $0.guid == optimisticMessage.guid }
             lastError = error
-            print("Failed to send message: \(error)")
+            logError("Failed to send message to \(recipient)", error: error)
         }
     }
 

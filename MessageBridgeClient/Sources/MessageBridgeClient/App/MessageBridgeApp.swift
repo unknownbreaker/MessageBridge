@@ -6,6 +6,7 @@ import MessageBridgeClientCore
 struct MessageBridgeApp: App {
     @StateObject private var viewModel = MessagesViewModel()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup {
@@ -24,7 +25,19 @@ struct MessageBridgeApp: App {
                 .keyboardShortcut("n", modifiers: .command)
             }
             // Note: Cmd+F is automatically handled by .searchable modifier
+
+            CommandGroup(after: .appSettings) {
+                Button("View Logs...") {
+                    openWindow(id: "log-viewer")
+                }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
+            }
         }
+
+        Window("Logs", id: "log-viewer") {
+            LogViewerView()
+        }
+        .windowResizability(.contentSize)
     }
 }
 

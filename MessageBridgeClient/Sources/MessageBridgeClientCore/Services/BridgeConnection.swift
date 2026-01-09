@@ -194,7 +194,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
             receiveWebSocketMessage()
 
         case .failure(let error):
-            print("WebSocket error: \(error)")
+            logError("WebSocket error", error: error)
             // Could implement reconnection logic here
         }
     }
@@ -222,7 +222,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
                 newMessageHandler?(message, sender)
             }
         } catch {
-            print("Failed to decode WebSocket message: \(error)")
+            logError("Failed to decode WebSocket message", error: error)
         }
     }
 }

@@ -29,7 +29,7 @@ cd MessageBridgeClient
 swift build                           # Build debug
 swift build -c release                # Build release
 swift run MessageBridgeClient         # Run client
-swift test                            # Run tests (16 tests)
+swift test                            # Run tests (28 tests)
 ```
 
 ### Deployment Scripts
@@ -99,6 +99,7 @@ cd Scripts
 |----------|--------|
 | `Cmd+F` | Focus search field |
 | `Cmd+N` | New message (placeholder) |
+| `Cmd+Shift+L` | View logs |
 | `Enter` | Send message |
 | `Option+Enter` | Insert newline in message |
 
@@ -114,6 +115,22 @@ The status indicator in the toolbar shows:
 - 🟢 **Connected** - Successfully connected to server
 - 🟡 **Connecting** - Connection in progress
 - 🔴 **Disconnected** - Not connected to server
+
+#### Viewing Logs
+
+Access application logs via the menu: **MessageBridge > View Logs** (or `Cmd+Shift+L`)
+
+The log viewer shows:
+- **Log levels**: Debug, Info, Warning, Error (with filtering)
+- **Source location**: File, function, and line number where the log was generated
+- **Search**: Filter logs by message content, filename, or function name
+- **Export**: Save logs to a text file for sharing or debugging
+
+Logs are stored at: `~/Library/Application Support/MessageBridge/Logs/`
+- `messagebridge.log` - Human-readable log file
+- `messagebridge-logs.json` - Structured JSON log file
+
+**Automatic cleanup**: Logs older than 7 days are automatically deleted to save disk space.
 
 ### Server Management
 
