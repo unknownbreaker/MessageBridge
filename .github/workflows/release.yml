@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'server-v*'
+      - 'client-v*'
 
 permissions:
   contents: write
@@ -24,40 +25,77 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Extract version from tag
-        id: version
+      - name: Determine release type and version
+        id: release-info
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+          if [[ "$TAG" == server-v* ]]; then
+            VERSION=${TAG#server-v}
+            echo "type=server" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "app_name=MessageBridge Server" >> $GITHUB_OUTPUT
+            echo "Building Server version: $VERSION"
+          elif [[ "$TAG" == client-v* ]]; then
+            VERSION=${TAG#client-v}
+            echo "type=client" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "app_name=MessageBridge" >> $GITHUB_OUTPUT
+            echo "Building Client version: $VERSION"
+          else
+            echo "Unknown tag format: $TAG"
+            exit 1
+          fi
 
       - name: Update VERSION file
         run: |
-          echo "${{ steps.version.outputs.version }}" > VERSION
+          TYPE=${{ steps.release-info.outputs.type }}
+          VERSION=${{ steps.release-info.outputs.version }}
 
-      - name: Build Release Apps
+          if [[ "$TYPE" == "server" ]]; then
+            echo "$VERSION" > MessageBridgeServer/VERSION
+          elif [[ "$TYPE" == "client" ]]; then
+            echo "$VERSION" > MessageBridgeClient/VERSION
+          fi
+
+      - name: Build Release App
         run: |
           chmod +x Scripts/build-release.sh
-          ./Scripts/build-release.sh
+          ./Scripts/build-release.sh ${{ steps.release-info.outputs.type }}
 
-      - name: Create DMGs
+      - name: Create DMG
         run: |
           chmod +x Scripts/create-dmgs.sh
-          ./Scripts/create-dmgs.sh ${{ steps.version.outputs.version }}
+          ./Scripts/create-dmgs.sh ${{ steps.release-info.outputs.type }} ${{ steps.release-info.outputs.version }}
 
       - name: Generate Release Notes
         run: |
-          chmod +x Scripts/generate-changelog.sh
-          ./Scripts/generate-changelog.sh > RELEASE_NOTES.md
+          TYPE=${{ steps.release-info.outputs.type }}
+          VERSION=${{ steps.release-info.outputs.version }}
+
+          # Get commits since last tag of this type
+          LAST_TAG=$(git tag -l "${TYPE}-v*" --sort=-v:refname | grep -v "${{ steps.release-info.outputs.tag }}" | head -1)
+
+          if [[ -n "$LAST_TAG" ]]; then
+            echo "## What's Changed" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            git log --pretty=format:"* %s (%h)" ${LAST_TAG}..HEAD -- $(if [[ "$TYPE" == "server" ]]; then echo "MessageBridgeServer/"; else echo "MessageBridgeClient/"; fi) >> RELEASE_NOTES.md
+          else
+            echo "## Initial Release" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "First release of ${{ steps.release-info.outputs.app_name }} v${VERSION}" >> RELEASE_NOTES.md
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: "${{ steps.release-info.outputs.app_name }} v${{ steps.release-info.outputs.version }}"
           files: |
             build/*.dmg
           body_path: RELEASE_NOTES.md
           draft: false
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          prerelease: ${{ contains(steps.release-info.outputs.version, '-') }}
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

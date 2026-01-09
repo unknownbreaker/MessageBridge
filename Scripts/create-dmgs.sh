@@ -1,7 +1,13 @@
 #!/bin/bash
 #
 # MessageBridge DMG Creator
-# Creates DMG installers for both server and client apps.
+# Creates DMG installers for server and/or client apps.
+#
+# Usage:
+#   ./create-dmgs.sh                    # Create both DMGs (reads from VERSION files)
+#   ./create-dmgs.sh server [version]   # Create server DMG only
+#   ./create-dmgs.sh client [version]   # Create client DMG only
+#   ./create-dmgs.sh all [version]      # Create both DMGs with specified version
 #
 
 set -e
@@ -17,81 +23,110 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
 
-# Get version from argument or VERSION file
-VERSION=${1:-$(cat "$PROJECT_DIR/VERSION" 2>/dev/null || echo "0.0.0")}
+# Parse arguments
+BUILD_TARGET="${1:-all}"
+VERSION_ARG="${2:-}"
 
 echo -e "${BLUE}================================${NC}"
 echo -e "${BLUE}MessageBridge DMG Creator${NC}"
 echo -e "${BLUE}================================${NC}"
 echo ""
-echo -e "${YELLOW}Creating DMGs for version: ${VERSION}${NC}"
-echo ""
 
-# Check if apps exist
-if [[ ! -d "$BUILD_DIR/MessageBridge Server.app" ]]; then
-    echo -e "${RED}Error: Server app not found. Run build-release.sh first.${NC}"
-    exit 1
-fi
+# Function to create server DMG
+create_server_dmg() {
+    local version="${1:-$(cat "$PROJECT_DIR/MessageBridgeServer/VERSION" 2>/dev/null | tr -d '[:space:]')}"
+    version="${version:-0.0.0}"
 
-if [[ ! -d "$BUILD_DIR/MessageBridge.app" ]]; then
-    echo -e "${RED}Error: Client app not found. Run build-release.sh first.${NC}"
-    exit 1
-fi
+    echo -e "${YELLOW}Creating Server DMG (v${version})...${NC}"
 
-# Create Server DMG
-echo -e "${YELLOW}Creating Server DMG...${NC}"
-SERVER_DMG_NAME="MessageBridge-Server-${VERSION}.dmg"
-SERVER_DMG_PATH="$BUILD_DIR/$SERVER_DMG_NAME"
+    if [[ ! -d "$BUILD_DIR/MessageBridge Server.app" ]]; then
+        echo -e "${RED}Error: Server app not found. Run build-release.sh server first.${NC}"
+        return 1
+    fi
 
-# Create temporary directory for DMG contents
-SERVER_DMG_TEMP="$BUILD_DIR/dmg-server-temp"
-rm -rf "$SERVER_DMG_TEMP"
-mkdir -p "$SERVER_DMG_TEMP"
+    SERVER_DMG_NAME="MessageBridge-Server-${version}.dmg"
+    SERVER_DMG_PATH="$BUILD_DIR/$SERVER_DMG_NAME"
 
-# Copy app to temp directory
-cp -R "$BUILD_DIR/MessageBridge Server.app" "$SERVER_DMG_TEMP/"
+    # Create temporary directory for DMG contents
+    SERVER_DMG_TEMP="$BUILD_DIR/dmg-server-temp"
+    rm -rf "$SERVER_DMG_TEMP"
+    mkdir -p "$SERVER_DMG_TEMP"
 
-# Create symlink to Applications
-ln -s /Applications "$SERVER_DMG_TEMP/Applications"
+    # Copy app to temp directory
+    cp -R "$BUILD_DIR/MessageBridge Server.app" "$SERVER_DMG_TEMP/"
 
-# Create DMG
-hdiutil create -volname "MessageBridge Server" \
-    -srcfolder "$SERVER_DMG_TEMP" \
-    -ov -format UDZO \
-    "$SERVER_DMG_PATH"
+    # Create symlink to Applications
+    ln -s /Applications "$SERVER_DMG_TEMP/Applications"
 
-# Cleanup
-rm -rf "$SERVER_DMG_TEMP"
+    # Create DMG
+    hdiutil create -volname "MessageBridge Server" \
+        -srcfolder "$SERVER_DMG_TEMP" \
+        -ov -format UDZO \
+        "$SERVER_DMG_PATH"
 
-echo -e "${GREEN}✓ Server DMG created: $SERVER_DMG_PATH${NC}"
+    # Cleanup
+    rm -rf "$SERVER_DMG_TEMP"
 
-# Create Client DMG
-echo ""
-echo -e "${YELLOW}Creating Client DMG...${NC}"
-CLIENT_DMG_NAME="MessageBridge-${VERSION}.dmg"
-CLIENT_DMG_PATH="$BUILD_DIR/$CLIENT_DMG_NAME"
+    echo -e "${GREEN}✓ Server DMG created: $SERVER_DMG_PATH${NC}"
+}
 
-# Create temporary directory for DMG contents
-CLIENT_DMG_TEMP="$BUILD_DIR/dmg-client-temp"
-rm -rf "$CLIENT_DMG_TEMP"
-mkdir -p "$CLIENT_DMG_TEMP"
+# Function to create client DMG
+create_client_dmg() {
+    local version="${1:-$(cat "$PROJECT_DIR/MessageBridgeClient/VERSION" 2>/dev/null | tr -d '[:space:]')}"
+    version="${version:-0.0.0}"
 
-# Copy app to temp directory
-cp -R "$BUILD_DIR/MessageBridge.app" "$CLIENT_DMG_TEMP/"
+    echo -e "${YELLOW}Creating Client DMG (v${version})...${NC}"
 
-# Create symlink to Applications
-ln -s /Applications "$CLIENT_DMG_TEMP/Applications"
+    if [[ ! -d "$BUILD_DIR/MessageBridge.app" ]]; then
+        echo -e "${RED}Error: Client app not found. Run build-release.sh client first.${NC}"
+        return 1
+    fi
 
-# Create DMG
-hdiutil create -volname "MessageBridge" \
-    -srcfolder "$CLIENT_DMG_TEMP" \
-    -ov -format UDZO \
-    "$CLIENT_DMG_PATH"
+    CLIENT_DMG_NAME="MessageBridge-${version}.dmg"
+    CLIENT_DMG_PATH="$BUILD_DIR/$CLIENT_DMG_NAME"
 
-# Cleanup
-rm -rf "$CLIENT_DMG_TEMP"
+    # Create temporary directory for DMG contents
+    CLIENT_DMG_TEMP="$BUILD_DIR/dmg-client-temp"
+    rm -rf "$CLIENT_DMG_TEMP"
+    mkdir -p "$CLIENT_DMG_TEMP"
 
-echo -e "${GREEN}✓ Client DMG created: $CLIENT_DMG_PATH${NC}"
+    # Copy app to temp directory
+    cp -R "$BUILD_DIR/MessageBridge.app" "$CLIENT_DMG_TEMP/"
+
+    # Create symlink to Applications
+    ln -s /Applications "$CLIENT_DMG_TEMP/Applications"
+
+    # Create DMG
+    hdiutil create -volname "MessageBridge" \
+        -srcfolder "$CLIENT_DMG_TEMP" \
+        -ov -format UDZO \
+        "$CLIENT_DMG_PATH"
+
+    # Cleanup
+    rm -rf "$CLIENT_DMG_TEMP"
+
+    echo -e "${GREEN}✓ Client DMG created: $CLIENT_DMG_PATH${NC}"
+}
+
+# Execute based on target
+case "$BUILD_TARGET" in
+    server)
+        create_server_dmg "$VERSION_ARG"
+        ;;
+    client)
+        create_client_dmg "$VERSION_ARG"
+        ;;
+    all|"")
+        create_server_dmg "$VERSION_ARG"
+        echo ""
+        create_client_dmg "$VERSION_ARG"
+        ;;
+    *)
+        echo -e "${RED}Unknown target: $BUILD_TARGET${NC}"
+        echo "Usage: $0 [server|client|all] [version]"
+        exit 1
+        ;;
+esac
 
 # Summary
 echo ""
@@ -100,4 +135,4 @@ echo -e "${GREEN}DMG Creation Complete!${NC}"
 echo -e "${GREEN}================================${NC}"
 echo ""
 echo "DMGs created:"
-ls -la "$BUILD_DIR"/*.dmg
+ls -la "$BUILD_DIR"/*.dmg 2>/dev/null || echo "No DMG files found"
