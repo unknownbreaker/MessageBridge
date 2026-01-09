@@ -339,15 +339,15 @@ logError("...", error: error)  // Failures
 
 ---
 
-## Milestone 10: Conventional Commits & Versioning
+## Milestone 10: Conventional Commits & Versioning ✅
 
 **Goal:** Establish versioning infrastructure and commit standards.
 
 ### Deliverables
-- [ ] Define conventional commit standard (feat, fix, chore, docs, refactor)
-- [ ] Add `Version.swift` for programmatic version access
-- [ ] Create `CHANGELOG.md` with initial release notes
-- [ ] Create `CONTRIBUTING.md` with commit conventions
+- [x] Define conventional commit standard (feat, fix, chore, docs, refactor)
+- [x] Add `Version.swift` for programmatic version access
+- [x] Create `CHANGELOG.md` with initial release notes
+- [x] Create `CONTRIBUTING.md` with commit conventions
 - [ ] Add commit message validation (optional: commitlint)
 
 ### Conventional Commit Format
