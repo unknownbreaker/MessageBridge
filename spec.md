@@ -536,6 +536,52 @@ jobs:
 
 ---
 
+## Milestone 14: E2E Encryption & Cloudflare Tunnel ✅
+
+**Goal:** Add end-to-end encryption and alternative network connectivity via Cloudflare Tunnel.
+
+### Deliverables
+- [x] `E2EEncryption.swift` - AES-256-GCM encryption with HKDF key derivation
+- [x] `E2EMiddleware.swift` - Vapor middleware for automatic response encryption
+- [x] `EncryptedEnvelope` - JSON wrapper for encrypted payloads
+- [x] Server: Encrypt responses when `X-E2E-Encryption: enabled` header present
+- [x] Server: Decrypt incoming request bodies for `/send` endpoint
+- [x] Server: WebSocket encryption support per connection
+- [x] Client: E2E toggle in Settings UI
+- [x] Client: Encrypt/decrypt all API traffic when enabled
+- [x] Client: Handle encrypted WebSocket messages
+- [x] Cloudflare Tunnel setup guide (`Scripts/setup-cloudflare-tunnel.md`)
+- [x] Unit tests for encryption (11 server tests, 9 client tests)
+
+### E2E Encryption Design
+```swift
+public struct E2EEncryption {
+    private let key: SymmetricKey  // Derived from API key via HKDF
+
+    public func encrypt(_ data: Data) throws -> String  // Base64 ciphertext
+    public func decrypt(_ base64: String) throws -> Data
+}
+
+public struct EncryptedEnvelope: Codable {
+    let version: Int      // Protocol version (currently 1)
+    let payload: String   // Base64-encoded AES-GCM ciphertext
+}
+```
+
+### Key Derivation
+- Input: API key (shared secret)
+- Salt: `"MessageBridge-E2E-Salt-v1"`
+- Info: `"MessageBridge-E2E-Encryption"`
+- Output: 256-bit AES key via HKDF-SHA256
+
+### Success Criteria
+- Messages encrypted before leaving device
+- Relay servers (Cloudflare) cannot read content
+- Same API key decrypts on both ends
+- Works with both Tailscale and Cloudflare Tunnel
+
+---
+
 ## Future Enhancements (Out of Scope)
 
 These are not part of the current implementation:
@@ -561,7 +607,8 @@ These are not part of the current implementation:
 | Database Access | GRDB |
 | Client UI | SwiftUI (macOS 13+) |
 | Networking | URLSession + WebSocket |
-| Security | Keychain, Tailscale |
+| Security | Keychain, AES-256-GCM, HKDF |
+| Network Options | Tailscale VPN, Cloudflare Tunnel |
 | Testing | XCTest, Protocol Mocks |
 | CI/CD | GitHub Actions |
 | Versioning | Semantic Versioning |
@@ -594,6 +641,12 @@ MessageBridge/
 │   │   │   │   └── Conversation.swift
 │   │   │   ├── Database/
 │   │   │   │   └── ChatDatabase.swift
+│   │   │   ├── API/
+│   │   │   │   ├── Routes.swift
+│   │   │   │   ├── E2EMiddleware.swift
+│   │   │   │   └── WebSocketManager.swift
+│   │   │   ├── Security/
+│   │   │   │   └── E2EEncryption.swift
 │   │   │   ├── Tailscale/
 │   │   │   │   └── TailscaleManager.swift
 │   │   │   └── Version/
@@ -621,7 +674,8 @@ MessageBridge/
 │   │   │   ├── ViewModels/
 │   │   │   │   └── MessagesViewModel.swift
 │   │   │   ├── Security/
-│   │   │   │   └── KeychainManager.swift
+│   │   │   │   ├── KeychainManager.swift
+│   │   │   │   └── E2EEncryption.swift
 │   │   │   ├── Logging/
 │   │   │   │   └── Logger.swift
 │   │   │   └── Version/
@@ -644,5 +698,6 @@ MessageBridge/
     ├── generate-changelog.sh    # Generate changelog from commits
     ├── install-server.sh        # Server installer (legacy)
     ├── package-client.sh        # Client packager (legacy)
-    └── setup-tailscale.md       # Network setup guide
+    ├── setup-tailscale.md       # Tailscale network setup guide
+    └── setup-cloudflare-tunnel.md  # Cloudflare Tunnel setup guide
 ```
