@@ -47,6 +47,12 @@ mkdir -p "$SERVER_APP/Contents/Resources"
 # Copy binary
 cp ".build/release/MessageBridgeServer" "$SERVER_APP/Contents/MacOS/MessageBridge Server"
 
+# Copy icon
+if [[ -f "$PROJECT_DIR/Assets/AppIcon-Server.icns" ]]; then
+    cp "$PROJECT_DIR/Assets/AppIcon-Server.icns" "$SERVER_APP/Contents/Resources/AppIcon.icns"
+    echo -e "${GREEN}✓ Server icon copied${NC}"
+fi
+
 # Create Info.plist
 cat > "$SERVER_APP/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -101,6 +107,12 @@ mkdir -p "$CLIENT_APP/Contents/Resources"
 
 # Copy binary
 cp ".build/release/MessageBridgeClient" "$CLIENT_APP/Contents/MacOS/MessageBridge"
+
+# Copy icon
+if [[ -f "$PROJECT_DIR/Assets/AppIcon-Client.icns" ]]; then
+    cp "$PROJECT_DIR/Assets/AppIcon-Client.icns" "$CLIENT_APP/Contents/Resources/AppIcon.icns"
+    echo -e "${GREEN}✓ Client icon copied${NC}"
+fi
 
 # Create Info.plist
 cat > "$CLIENT_APP/Contents/Info.plist" << EOF
