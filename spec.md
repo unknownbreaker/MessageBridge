@@ -375,19 +375,19 @@ logError("...", error: error)  // Failures
 
 ---
 
-## Milestone 11: Server App Conversion
+## Milestone 11: Server App Conversion ✅
 
 **Goal:** Transform server from CLI daemon to macOS menu bar application.
 
 ### Deliverables
-- [ ] Create SwiftUI menu bar application structure
-- [ ] Server status indicator in menu bar (running/stopped/error)
-- [ ] Start/stop server controls
-- [ ] API key display with copy button
-- [ ] API key regeneration
-- [ ] Server log viewer
-- [ ] Login Items support (auto-start on login)
-- [ ] Package as `.app` bundle for /Applications
+- [x] Create SwiftUI menu bar application structure
+- [x] Server status indicator in menu bar (running/stopped/error)
+- [x] Start/stop server controls
+- [x] API key display with copy button
+- [x] API key regeneration
+- [x] Server log viewer
+- [x] Login Items support (auto-start on login)
+- [x] Package as `.app` bundle for /Applications
 - [ ] Update installer script for app bundle
 
 ### UI Design

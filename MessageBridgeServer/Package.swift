@@ -4,12 +4,11 @@ import PackageDescription
 let package = Package(
     name: "MessageBridgeServer",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.24.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
         .target(
@@ -24,11 +23,8 @@ let package = Package(
             name: "MessageBridgeServer",
             dependencies: [
                 "MessageBridgeCore",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            swiftSettings: [
-                .unsafeFlags(["-parse-as-library"])
-            ]
+            path: "Sources/MessageBridgeServer"
         ),
         .testTarget(
             name: "MessageBridgeCoreTests",
