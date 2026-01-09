@@ -36,12 +36,14 @@ jobs:
             echo "type=server" >> $GITHUB_OUTPUT
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "app_name=MessageBridge Server" >> $GITHUB_OUTPUT
+            echo "app_path=build/MessageBridge Server.app" >> $GITHUB_OUTPUT
             echo "Building Server version: $VERSION"
           elif [[ "$TAG" == client-v* ]]; then
             VERSION=${TAG#client-v}
             echo "type=client" >> $GITHUB_OUTPUT
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "app_name=MessageBridge" >> $GITHUB_OUTPUT
+            echo "app_path=build/MessageBridge.app" >> $GITHUB_OUTPUT
             echo "Building Client version: $VERSION"
           else
             echo "Unknown tag format: $TAG"
@@ -64,6 +66,60 @@ jobs:
           chmod +x Scripts/build-release.sh
           ./Scripts/build-release.sh ${{ steps.release-info.outputs.type }}
 
+      - name: Import Code Signing Certificate
+        if: ${{ env.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 != '' }}
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Create keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          echo -n "$APPLE_DEVELOPER_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # Set keychain as default
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+          security default-keychain -s "$KEYCHAIN_PATH"
+
+          # Allow codesign to access keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Store keychain path for cleanup
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+
+      - name: Code Sign and Notarize
+        if: ${{ env.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 != '' }}
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          chmod +x Scripts/codesign-notarize.sh
+          ./Scripts/codesign-notarize.sh "${{ steps.release-info.outputs.app_path }}"
+
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          if [[ -n "$KEYCHAIN_PATH" ]]; then
+            security delete-keychain "$KEYCHAIN_PATH" || true
+          fi
+
       - name: Create DMG
         run: |
           chmod +x Scripts/create-dmgs.sh
@@ -85,6 +141,15 @@ jobs:
             echo "## Initial Release" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
             echo "First release of ${{ steps.release-info.outputs.app_name }} v${VERSION}" >> RELEASE_NOTES.md
+          fi
+
+          # Add signing status
+          echo "" >> RELEASE_NOTES.md
+          echo "---" >> RELEASE_NOTES.md
+          if [[ -n "${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}" ]]; then
+            echo "✅ **Signed and Notarized** - This release is code signed and notarized by Apple." >> RELEASE_NOTES.md
+          else
+            echo "⚠️ **Unsigned** - This release is not code signed. You may need to right-click and select 'Open' to run it." >> RELEASE_NOTES.md
           fi
 
       - name: Create GitHub Release
