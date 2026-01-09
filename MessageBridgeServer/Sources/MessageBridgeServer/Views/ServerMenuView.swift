@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import MessageBridgeCore
 
 struct ServerMenuView: View {
@@ -24,6 +25,14 @@ struct ServerMenuView: View {
 
             // API Key section
             APIKeyView()
+                .environmentObject(appState)
+                .padding(.vertical, 8)
+                .padding(.horizontal)
+
+            Divider()
+
+            // Tailscale status
+            TailscaleStatusView()
                 .environmentObject(appState)
                 .padding(.vertical, 8)
                 .padding(.horizontal)
@@ -208,6 +217,118 @@ struct MenuButton: View {
         }
         .buttonStyle(.plain)
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Tailscale Status View
+
+struct TailscaleStatusView: View {
+    @EnvironmentObject var appState: AppState
+    @State private var tailscaleStatus: TailscaleStatus = .notInstalled
+    @State private var isLoading = true
+
+    private let tailscaleManager = TailscaleManager()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Tailscale")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .frame(width: 12, height: 12)
+                } else {
+                    Button {
+                        Task {
+                            await refreshStatus()
+                        }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Refresh status")
+                }
+            }
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+
+                Text(tailscaleStatus.displayText)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer()
+
+                if case .notInstalled = tailscaleStatus {
+                    Button("Install") {
+                        Task {
+                            let url = await tailscaleManager.getDownloadURL()
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                } else if case .stopped = tailscaleStatus {
+                    Button("Open") {
+                        Task {
+                            await tailscaleManager.openTailscaleApp()
+                        }
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+
+            if case .connected(let ip, _) = tailscaleStatus {
+                HStack {
+                    Text("IP:")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(ip)
+                        .font(.system(.caption2, design: .monospaced))
+
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(ip, forType: .string)
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Copy IP address")
+                }
+            }
+        }
+        .task {
+            await refreshStatus()
+        }
+    }
+
+    private func refreshStatus() async {
+        isLoading = true
+        tailscaleStatus = await tailscaleManager.getStatus(forceRefresh: true)
+        isLoading = false
+    }
+
+    private var statusColor: Color {
+        switch tailscaleStatus {
+        case .notInstalled: return .gray
+        case .stopped: return .red
+        case .connecting: return .yellow
+        case .connected: return .green
+        case .error: return .orange
+        }
     }
 }
 

@@ -38,6 +38,10 @@ struct MessageBridgeApp: App {
             LogViewerView()
         }
         .windowResizability(.contentSize)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 

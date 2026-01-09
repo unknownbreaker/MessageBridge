@@ -421,19 +421,19 @@ logError("...", error: error)  // Failures
 
 ---
 
-## Milestone 12: Tailscale Integration
+## Milestone 12: Tailscale Integration ✅
 
 **Goal:** Built-in Tailscale management in both apps.
 
 ### Deliverables
-- [ ] `TailscaleManager.swift` - Interface with `tailscale` CLI
-- [ ] Detect if Tailscale is installed
-- [ ] Get connection status (connected/disconnected/not installed)
-- [ ] Get device's Tailscale IP address
-- [ ] Server app: Tailscale status in menu bar dropdown
-- [ ] Client app: Tailscale status in connection settings
-- [ ] Setup guidance for first-time users
-- [ ] Deep link to Tailscale download if not installed
+- [x] `TailscaleManager.swift` - Interface with `tailscale` CLI
+- [x] Detect if Tailscale is installed
+- [x] Get connection status (connected/disconnected/not installed)
+- [x] Get device's Tailscale IP address
+- [x] Server app: Tailscale status in menu bar dropdown
+- [x] Client app: Tailscale status in connection settings
+- [x] Setup guidance for first-time users
+- [x] Deep link to Tailscale download if not installed
 
 ### TailscaleManager Interface
 ```swift
