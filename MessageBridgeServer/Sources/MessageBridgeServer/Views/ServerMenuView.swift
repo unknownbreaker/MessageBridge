@@ -39,6 +39,14 @@ struct ServerMenuView: View {
 
             Divider()
 
+            // Cloudflare Tunnel status
+            CloudflareStatusView()
+                .environmentObject(appState)
+                .padding(.vertical, 8)
+                .padding(.horizontal)
+
+            Divider()
+
             // Menu items
             VStack(alignment: .leading, spacing: 4) {
                 MenuButton(title: "View Logs...", icon: "doc.text") {
@@ -328,6 +336,109 @@ struct TailscaleStatusView: View {
         case .connecting: return .yellow
         case .connected: return .green
         case .error: return .orange
+        }
+    }
+}
+
+// MARK: - Cloudflare Status View
+
+struct CloudflareStatusView: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.openSettings) private var openSettings
+    @State private var isStartingTunnel = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Cloudflare Tunnel")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+            }
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+
+                Text(appState.tunnelStatus.displayText)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer()
+
+                if case .notInstalled = appState.tunnelStatus {
+                    Button("Setup") {
+                        openSettings()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                } else if !appState.tunnelStatus.isRunning {
+                    Button("Start") {
+                        startTunnel()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isStartingTunnel || !appState.serverStatus.isRunning)
+                } else {
+                    Button("Stop") {
+                        stopTunnel()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+
+            if case .running(let url, _) = appState.tunnelStatus {
+                HStack {
+                    Text(url)
+                        .font(.system(.caption2, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Button {
+                        appState.copyTunnelURL()
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Copy tunnel URL")
+                }
+            }
+        }
+    }
+
+    private var statusColor: Color {
+        switch appState.tunnelStatus {
+        case .notInstalled: return .gray
+        case .stopped: return .secondary
+        case .starting: return .yellow
+        case .running: return .green
+        case .error: return .orange
+        }
+    }
+
+    private func startTunnel() {
+        isStartingTunnel = true
+        Task {
+            do {
+                try await appState.startTunnel()
+            } catch {
+                // Error is logged in AppState
+            }
+            isStartingTunnel = false
+        }
+    }
+
+    private func stopTunnel() {
+        Task {
+            await appState.stopTunnel()
         }
     }
 }

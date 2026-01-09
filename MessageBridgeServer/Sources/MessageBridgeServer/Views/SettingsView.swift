@@ -20,12 +20,18 @@ struct SettingsView: View {
                     Label("Security", systemImage: "lock")
                 }
 
+            CloudflareSettingsView()
+                .environmentObject(appState)
+                .tabItem {
+                    Label("Cloudflare", systemImage: "cloud")
+                }
+
             AboutView()
                 .tabItem {
                     Label("About", systemImage: "info.circle")
                 }
         }
-        .frame(width: 450, height: 300)
+        .frame(width: 450, height: 350)
         .onAppear {
             portText = String(appState.port)
         }

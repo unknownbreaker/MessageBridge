@@ -44,7 +44,12 @@ class AppState: ObservableObject {
     @Published var startAtLogin: Bool = false
     @Published var logs: [LogEntry] = []
 
+    // Cloudflare Tunnel
+    @Published var tunnelStatus: TunnelStatus = .stopped
+    @Published var cloudflaredInfo: CloudflaredInfo?
+
     let serverManager = ServerManager()
+    let cloudflaredManager = CloudflaredManager()
 
     var menuBarIcon: String {
         switch serverStatus {
@@ -66,9 +71,13 @@ class AppState: ObservableObject {
 
     init() {
         loadSettings()
-        // Auto-start if enabled
-        if startAtLogin && !apiKey.isEmpty {
-            Task {
+        setupTunnelStatusHandler()
+
+        // Check cloudflared installation and auto-start server if enabled
+        Task {
+            await checkCloudflaredInstallation()
+
+            if startAtLogin && !apiKey.isEmpty {
                 await startServer()
             }
         }
@@ -118,6 +127,60 @@ class AppState: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(apiKey, forType: .string)
         addLog(level: .debug, message: "API key copied to clipboard")
+    }
+
+    // MARK: - Cloudflare Tunnel
+
+    func setupTunnelStatusHandler() {
+        Task {
+            await cloudflaredManager.onStatusChange { [weak self] status in
+                Task { @MainActor in
+                    self?.tunnelStatus = status
+                }
+            }
+        }
+    }
+
+    func checkCloudflaredInstallation() async {
+        let isInstalled = await cloudflaredManager.isInstalled()
+        if isInstalled {
+            cloudflaredInfo = await cloudflaredManager.getInfo()
+            tunnelStatus = .stopped
+        } else {
+            tunnelStatus = .notInstalled
+            cloudflaredInfo = nil
+        }
+    }
+
+    func installCloudflared() async throws {
+        addLog(level: .info, message: "Installing cloudflared...")
+        try await cloudflaredManager.install()
+        cloudflaredInfo = await cloudflaredManager.getInfo()
+        tunnelStatus = .stopped
+        addLog(level: .info, message: "cloudflared installed successfully")
+    }
+
+    func startTunnel() async throws {
+        guard serverStatus.isRunning else {
+            throw CloudflaredError.failedToStart("Server must be running first")
+        }
+        addLog(level: .info, message: "Starting Cloudflare Tunnel...")
+        let url = try await cloudflaredManager.startQuickTunnel(port: port)
+        addLog(level: .info, message: "Tunnel started: \(url)")
+    }
+
+    func stopTunnel() async {
+        addLog(level: .info, message: "Stopping Cloudflare Tunnel...")
+        await cloudflaredManager.stopTunnel()
+        addLog(level: .info, message: "Tunnel stopped")
+    }
+
+    func copyTunnelURL() {
+        if let url = tunnelStatus.url {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url, forType: .string)
+            addLog(level: .debug, message: "Tunnel URL copied to clipboard")
+        }
     }
 
     // MARK: - Settings Persistence
