@@ -23,11 +23,8 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                ConnectionStatusView(status: viewModel.connectionStatus)
-            }
-        }
+        .navigationTitle("MessageBridge")
+        .navigationSubtitle(viewModel.connectionStatus.text)
         .onChange(of: selectedConversation) { newValue in
             viewModel.selectConversation(newValue?.id)
         }

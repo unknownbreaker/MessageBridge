@@ -21,7 +21,6 @@ struct MessageBridgeApp: App {
                     await autoConnect()
                 }
         }
-        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Message") {
