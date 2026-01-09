@@ -69,15 +69,7 @@ Best for: Personal devices where you can install Tailscale on both Macs.
 
 #### Option B: Cloudflare Tunnel
 
-Best for: Work Macs where Tailscale is blocked by IT policies.
-
-**Easy Setup (Recommended):** The server app includes a built-in Cloudflare Tunnel wizard:
-1. Open MessageBridge Server Settings (`Cmd+,`)
-2. Go to the **Cloudflare** tab
-3. Click **Install cloudflared** (one-time, no sudo required)
-4. Click **Start Quick Tunnel** - a temporary URL is generated automatically
-
-**Manual Setup:** For permanent tunnels with custom domains, see [Scripts/setup-cloudflare-tunnel.md](Scripts/setup-cloudflare-tunnel.md)
+Best for: Work Macs where Tailscale is blocked by IT policies. Setup is done on your **Home Mac** using the server app's built-in wizard (see Step 2.6 below).
 
 ### Step 2: Set Up the Server (Home Mac)
 
@@ -89,6 +81,12 @@ Best for: Work Macs where Tailscale is blocked by IT policies.
    - System Settings > Privacy & Security > Full Disk Access > Enable MessageBridge Server
 4. **Start the Server** - Click "Start Server" in the menu bar dropdown
 5. **Copy your API Key** - Click the copy button next to the API key (you'll need this for the client)
+6. **Set Up Cloudflare Tunnel** (if using Option B):
+   - Open Settings (`Cmd+,`) and go to the **Cloudflare** tab
+   - Click **Install cloudflared** (one-time, no sudo required)
+   - Click **Start Quick Tunnel** - a temporary URL is generated automatically
+   - Copy the tunnel URL (you'll need this for the client)
+   - For permanent tunnels with custom domains, see [Scripts/setup-cloudflare-tunnel.md](Scripts/setup-cloudflare-tunnel.md)
 
 The server runs in your menu bar with a status indicator:
 - Gray: Stopped
