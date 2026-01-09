@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90D9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E5C8A;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bubbleGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8E8E8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="greenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#34C759;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#248A3D;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="40" y="40" width="944" height="944" rx="180" ry="180" fill="url(#bgGradient)"/>
+
+  <!-- Left message bubble (outgoing - white) -->
+  <path d="M180 340
+           Q180 280 240 280
+           L460 280
+           Q520 280 520 340
+           L520 480
+           Q520 540 460 540
+           L300 540
+           L240 600
+           L260 540
+           L240 540
+           Q180 540 180 480
+           Z"
+        fill="url(#bubbleGradient)"
+        filter="drop-shadow(0 4px 8px rgba(0,0,0,0.2))"/>
+
+  <!-- Right message bubble (incoming - green) -->
+  <path d="M504 420
+           Q504 360 564 360
+           L784 360
+           Q844 360 844 420
+           L844 560
+           Q844 620 784 620
+           L764 620
+           L784 680
+           L724 620
+           L564 620
+           Q504 620 504 560
+           Z"
+        fill="url(#greenGradient)"
+        filter="drop-shadow(0 4px 8px rgba(0,0,0,0.2))"/>
+
+  <!-- Bridge/connection arc -->
+  <path d="M350 640
+           Q512 720 674 640"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="24"
+        stroke-linecap="round"
+        opacity="0.9"/>
+
+  <!-- Bridge pillars -->
+  <rect x="326" y="640" width="48" height="100" rx="8" fill="#FFFFFF" opacity="0.9"/>
+  <rect x="650" y="640" width="48" height="100" rx="8" fill="#FFFFFF" opacity="0.9"/>
+
+  <!-- Connection dots on bubbles -->
+  <circle cx="350" cy="410" r="20" fill="#4A90D9"/>
+  <circle cx="674" cy="490" r="20" fill="#FFFFFF"/>
+</svg>
