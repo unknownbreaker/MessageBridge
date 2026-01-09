@@ -144,16 +144,16 @@ actor AppleScriptMessageSender: MessageSending {
 
 ---
 
-## Milestone 4: Real-Time Updates
+## Milestone 4: Real-Time Updates ✅
 
 **Goal:** Push new messages to connected clients via WebSocket.
 
 ### Deliverables
-- [ ] `FileWatcher.swift` - FSEvents monitor for chat.db changes (use protocol)
-- [ ] WebSocket endpoint at `/ws`
-- [ ] Push new messages to all connected clients
-- [ ] Handle reconnection gracefully
-- [ ] Unit tests with mock file watcher
+- [x] `FileWatcher.swift` - FSEvents monitor for chat.db changes (use protocol)
+- [x] WebSocket endpoint at `/ws`
+- [x] Push new messages to all connected clients
+- [x] Handle reconnection gracefully
+- [x] Unit tests with mock file watcher (7 tests)
 
 ### Success Criteria
 1. Client connects to WebSocket

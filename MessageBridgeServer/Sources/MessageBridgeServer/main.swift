@@ -109,12 +109,22 @@ struct MessageBridgeServer: AsyncParsableCommand {
         print("Starting MessageBridge server on port \(port)...")
 
         let messageSender = AppleScriptMessageSender()
+        let webSocketManager = WebSocketManager()
+
+        // Set up file watcher for real-time message updates
+        let fileWatcher = FSEventsFileWatcher(path: dbPath)
+        let messageDetector = MessageChangeDetector(database: database, fileWatcher: fileWatcher)
 
         let app = try await Application.make(.production)
         app.http.server.configuration.port = port
         app.http.server.configuration.hostname = "0.0.0.0"
 
-        try configureRoutes(app, database: database, messageSender: messageSender, apiKey: apiKey)
+        try configureRoutes(app, database: database, messageSender: messageSender, apiKey: apiKey, webSocketManager: webSocketManager)
+
+        // Start detecting new messages and broadcast to WebSocket clients
+        try await messageDetector.startDetecting { message, sender in
+            await webSocketManager.broadcastNewMessage(message, sender: sender)
+        }
 
         print("✓ Server running at http://0.0.0.0:\(port)")
         print("✓ API endpoints:")
@@ -123,8 +133,10 @@ struct MessageBridgeServer: AsyncParsableCommand {
         print("  GET  /conversations/:id/messages  - Messages for conversation")
         print("  GET  /search?q=<query>            - Search messages")
         print("  POST /send                        - Send a message")
+        print("  WS   /ws                          - Real-time updates")
         print("")
         print("All endpoints except /health require X-API-Key header.")
+        print("WebSocket accepts apiKey as query param or X-API-Key header.")
 
         try await app.execute()
     }

@@ -1,7 +1,7 @@
 import Vapor
 
 /// Configures all API routes for the application
-public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, messageSender: MessageSenderProtocol, apiKey: String) throws {
+public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, messageSender: MessageSenderProtocol, apiKey: String, webSocketManager: WebSocketManager? = nil) throws {
     // Health check - no authentication required
     app.get("health") { _ in
         HealthResponse()
@@ -84,6 +84,38 @@ public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, 
             return SendResponse(from: result)
         } catch {
             throw Abort(.internalServerError, reason: "Failed to send message: \(error.localizedDescription)")
+        }
+    }
+
+    // WebSocket endpoint for real-time updates
+    if let wsManager = webSocketManager {
+        app.webSocket("ws") { req, ws in
+            // Validate API key from query parameter or header
+            let providedKey = req.query[String.self, at: "apiKey"] ?? req.headers.first(name: "X-API-Key")
+
+            guard providedKey == apiKey else {
+                _ = ws.close(code: .policyViolation)
+                return
+            }
+
+            // Add connection
+            Task {
+                let connectionId = await wsManager.addConnection(ws)
+                await wsManager.sendConnected(to: connectionId)
+
+                // Handle disconnect
+                ws.onClose.whenComplete { _ in
+                    Task {
+                        await wsManager.removeConnection(connectionId)
+                    }
+                }
+            }
+
+            // Handle incoming text messages (for future use)
+            ws.onText { ws, text in
+                // Could handle client commands here in the future
+                _ = text
+            }
         }
     }
 }
