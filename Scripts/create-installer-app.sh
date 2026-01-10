@@ -116,12 +116,8 @@ on run
         end if
     end try
 
-    -- Show success and offer to launch
-    set dialogResult to display dialog appName & " has been installed successfully!" buttons {"Close", "Open " & appName} default button 2 with icon note
-
-    if button returned of dialogResult is ("Open " & appName) then
-        do shell script "open " & quoted form of destApp
-    end if
+    -- Show success message
+    display dialog appName & " has been installed successfully!" buttons {"OK"} default button "OK" with icon note
 end run
 APPLESCRIPT_END
 
