@@ -97,7 +97,11 @@ on run
         return
     end try
 
+    -- Show success message BEFORE ejecting (installer runs from DMG!)
+    display dialog appName & " has been installed successfully!" buttons {"OK"} default button "OK" with icon note
+
     -- Eject the DMG and optionally move to trash (all errors silenced)
+    -- This happens AFTER the dialog so the installer code is still accessible
     try
         -- Find the DMG file path before ejecting
         set dmgPath to do shell script "hdiutil info | awk -v vol=" & quoted form of volumePath & " '
@@ -115,9 +119,6 @@ on run
             end try
         end if
     end try
-
-    -- Show success message
-    display dialog appName & " has been installed successfully!" buttons {"OK"} default button "OK" with icon note
 end run
 APPLESCRIPT_END
 
