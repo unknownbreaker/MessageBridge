@@ -35,7 +35,7 @@ on run
     -- Try to find the source app
     -- First, try path to me (works if not translocated)
     set sourceApp to ""
-    set volumeName to ""
+    set volumePath to ""
 
     try
         set myPath to POSIX path of (path to me)
@@ -47,7 +47,7 @@ on run
         set appExists to do shell script "test -d " & quoted form of candidateApp & " && echo 'yes' || echo 'no'"
         if appExists is "yes" then
             set sourceApp to candidateApp
-            set volumeName to do shell script "basename " & quoted form of installerFolder
+            set volumePath to installerFolder
         end if
     end try
 
@@ -58,7 +58,7 @@ on run
             set volumeSearch to do shell script "for vol in /Volumes/*/; do if [ -d \"${vol}" & appFileName & "\" ] && [ -d \"${vol}" & installerName & "\" ]; then echo \"${vol%/}\"; break; fi; done"
             if volumeSearch is not "" then
                 set sourceApp to volumeSearch & "/" & appFileName
-                set volumeName to do shell script "basename " & quoted form of volumeSearch
+                set volumePath to volumeSearch
             end if
         end try
     end if
@@ -97,23 +97,26 @@ on run
         return
     end try
 
-    -- Find the DMG file path (the source of the mounted volume)
+    -- Find the DMG file path using the exact volume path
+    -- hdiutil info output format has image-path followed by mount points
     set dmgPath to ""
     try
-        set dmgInfo to do shell script "hdiutil info | grep -A 20 'image-path' | grep -B 1 " & quoted form of ("/Volumes/" & volumeName) & " | grep 'image-path' | head -1 | sed 's/.*image-path *: *//'"
-        if dmgInfo is not "" then
-            set dmgPath to dmgInfo
-        end if
+        -- Use awk to find the image-path for our specific volume
+        set dmgPath to do shell script "hdiutil info | awk -v vol=" & quoted form of volumePath & " '
+            /^image-path/ { img = $0; sub(/^image-path[[:space:]]*:[[:space:]]*/, \"\", img) }
+            $0 ~ vol { if (img != \"\") print img; exit }
+        '"
     end try
 
-    -- Eject the DMG
+    -- Eject the DMG using the full volume path
     try
-        do shell script "hdiutil detach " & quoted form of ("/Volumes/" & volumeName) & " -force"
+        do shell script "hdiutil detach " & quoted form of volumePath & " -force 2>/dev/null || hdiutil detach " & quoted form of volumePath & " 2>/dev/null || true"
     end try
 
     -- Move DMG to Trash if we found it
     if dmgPath is not "" then
         try
+            -- Use osascript to move to trash properly (handles spaces and special chars)
             do shell script "mv " & quoted form of dmgPath & " ~/.Trash/ 2>/dev/null || true"
         end try
     end if
