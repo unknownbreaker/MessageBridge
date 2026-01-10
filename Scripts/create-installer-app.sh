@@ -30,28 +30,44 @@ cat > "$TEMP_SCRIPT" << 'APPLESCRIPT_END'
 on run
     set appName to "APP_NAME_PLACEHOLDER"
     set appFileName to appName & ".app"
+    set installerName to "Install " & appName & ".app"
 
-    -- Get the path to this installer app
-    set myPath to POSIX path of (path to me)
+    -- Try to find the source app
+    -- First, try path to me (works if not translocated)
+    set sourceApp to ""
+    set volumeName to ""
 
-    -- Remove trailing slash if present
-    if myPath ends with "/" then
-        set myPath to text 1 thru -2 of myPath
+    try
+        set myPath to POSIX path of (path to me)
+        if myPath ends with "/" then
+            set myPath to text 1 thru -2 of myPath
+        end if
+        set installerFolder to do shell script "dirname " & quoted form of myPath
+        set candidateApp to installerFolder & "/" & appFileName
+        set appExists to do shell script "test -d " & quoted form of candidateApp & " && echo 'yes' || echo 'no'"
+        if appExists is "yes" then
+            set sourceApp to candidateApp
+            set volumeName to do shell script "basename " & quoted form of installerFolder
+        end if
+    end try
+
+    -- If not found (likely due to App Translocation), search mounted volumes
+    if sourceApp is "" then
+        try
+            -- Find volumes that contain both the app and installer
+            set volumeSearch to do shell script "for vol in /Volumes/*/; do if [ -d \"${vol}" & appFileName & "\" ] && [ -d \"${vol}" & installerName & "\" ]; then echo \"${vol%/}\"; break; fi; done"
+            if volumeSearch is not "" then
+                set sourceApp to volumeSearch & "/" & appFileName
+                set volumeName to do shell script "basename " & quoted form of volumeSearch
+            end if
+        end try
     end if
 
-    -- Get the folder containing the installer (the DMG volume)
-    set installerFolder to do shell script "dirname " & quoted form of myPath
-    set sourceApp to installerFolder & "/" & appFileName
-
-    -- Check if source app exists
-    set appExists to do shell script "test -d " & quoted form of sourceApp & " && echo 'yes' || echo 'no'"
-    if appExists is "no" then
-        display alert "Installation Error" message "Could not find " & appFileName & " in the disk image." as critical
+    -- Still not found? Show error
+    if sourceApp is "" then
+        display alert "Installation Error" message "Could not find " & appFileName & " in any mounted disk image. Please make sure the disk image is mounted." as critical
         return
     end if
-
-    -- Get the volume name (DMG mount point)
-    set volumeName to do shell script "basename " & quoted form of installerFolder
 
     -- Destination in Applications
     set destApp to "/Applications/" & appFileName
