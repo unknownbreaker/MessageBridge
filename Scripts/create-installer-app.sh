@@ -31,36 +31,46 @@ on run
     set appName to "APP_NAME_PLACEHOLDER"
     set appFileName to appName & ".app"
 
-    -- Get the path to this installer (inside the DMG)
-    set installerPath to path to me
-    set installerFolder to POSIX path of (container of installerPath as text)
-    set sourceApp to installerFolder & appFileName
+    -- Get the path to this installer app
+    set myPath to POSIX path of (path to me)
+
+    -- Remove trailing slash if present
+    if myPath ends with "/" then
+        set myPath to text 1 thru -2 of myPath
+    end if
+
+    -- Get the folder containing the installer (the DMG volume)
+    set installerFolder to do shell script "dirname " & quoted form of myPath
+    set sourceApp to installerFolder & "/" & appFileName
 
     -- Check if source app exists
-    tell application "System Events"
-        if not (exists file sourceApp) then
-            display alert "Installation Error" message "Could not find " & appFileName & " in the disk image." as critical
-            return
-        end if
-    end tell
+    set appExists to do shell script "test -d " & quoted form of sourceApp & " && echo 'yes' || echo 'no'"
+    if appExists is "no" then
+        display alert "Installation Error" message "Could not find " & appFileName & " in the disk image." as critical
+        return
+    end if
 
     -- Get the volume name (DMG mount point)
-    set volumePath to do shell script "dirname " & quoted form of installerFolder
-    set volumeName to do shell script "basename " & quoted form of volumePath
+    set volumeName to do shell script "basename " & quoted form of installerFolder
 
     -- Destination in Applications
     set destApp to "/Applications/" & appFileName
 
-    -- Check if app already exists
-    set appExists to do shell script "test -d " & quoted form of destApp & " && echo 'yes' || echo 'no'"
+    -- Check if app already exists in Applications
+    set destExists to do shell script "test -d " & quoted form of destApp & " && echo 'yes' || echo 'no'"
 
-    if appExists is "yes" then
+    if destExists is "yes" then
         set dialogResult to display dialog appName & " is already installed. Do you want to replace it?" buttons {"Cancel", "Replace"} default button "Replace" with icon caution
         if button returned of dialogResult is "Cancel" then
             return
         end if
         -- Remove existing app
-        do shell script "rm -rf " & quoted form of destApp with administrator privileges
+        try
+            do shell script "rm -rf " & quoted form of destApp with administrator privileges
+        on error errMsg
+            display alert "Error" message "Could not remove existing installation: " & errMsg as critical
+            return
+        end try
     end if
 
     -- Copy app to Applications
@@ -74,7 +84,7 @@ on run
     -- Find the DMG file path (the source of the mounted volume)
     set dmgPath to ""
     try
-        set dmgInfo to do shell script "hdiutil info | grep -B 20 " & quoted form of ("/Volumes/" & volumeName) & " | grep 'image-path' | tail -1 | awk '{print $3}'"
+        set dmgInfo to do shell script "hdiutil info | grep -A 20 'image-path' | grep -B 1 " & quoted form of ("/Volumes/" & volumeName) & " | grep 'image-path' | head -1 | sed 's/.*image-path *: *//'"
         if dmgInfo is not "" then
             set dmgPath to dmgInfo
         end if
@@ -88,7 +98,7 @@ on run
     -- Move DMG to Trash if we found it
     if dmgPath is not "" then
         try
-            do shell script "mv " & quoted form of dmgPath & " ~/.Trash/"
+            do shell script "mv " & quoted form of dmgPath & " ~/.Trash/ 2>/dev/null || true"
         end try
     end if
 
