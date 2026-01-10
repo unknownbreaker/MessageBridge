@@ -3,7 +3,7 @@ import MessageBridgeClientCore
 
 struct ConversationListView: View {
     let conversations: [Conversation]
-    @Binding var selection: Conversation?
+    @Binding var selection: String?
     @Binding var searchText: String
 
     var filteredConversations: [Conversation] {
@@ -17,9 +17,9 @@ struct ConversationListView: View {
     }
 
     var body: some View {
-        List(filteredConversations, selection: $selection) { conversation in
+        List(filteredConversations, id: \.id, selection: $selection) { conversation in
             ConversationRow(conversation: conversation)
-                .tag(conversation)
+                .tag(conversation.id)
         }
         .listStyle(.sidebar)
         .searchable(text: $searchText, prompt: "Search")
@@ -88,7 +88,7 @@ struct ConversationRow: View {
                 isGroup: false
             )
         ],
-        selection: .constant(nil),
+        selection: .constant(nil as String?),
         searchText: .constant("")
     )
     .frame(width: 280)

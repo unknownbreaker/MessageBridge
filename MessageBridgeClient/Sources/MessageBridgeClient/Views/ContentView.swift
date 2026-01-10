@@ -3,14 +3,19 @@ import MessageBridgeClientCore
 
 struct ContentView: View {
     @EnvironmentObject var viewModel: MessagesViewModel
-    @State private var selectedConversation: Conversation?
+    @State private var selectedConversationId: String?
     @State private var searchText = ""
+
+    private var selectedConversation: Conversation? {
+        guard let id = selectedConversationId else { return nil }
+        return viewModel.conversations.first { $0.id == id }
+    }
 
     var body: some View {
         NavigationSplitView {
             ConversationListView(
                 conversations: filteredConversations,
-                selection: $selectedConversation,
+                selection: $selectedConversationId,
                 searchText: $searchText
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 350)
@@ -25,16 +30,15 @@ struct ContentView: View {
         }
         .navigationTitle("MessageBridge")
         .navigationSubtitle(viewModel.connectionStatus.text)
-        .onChange(of: selectedConversation) { newValue in
-            viewModel.selectConversation(newValue?.id)
+        .onChange(of: selectedConversationId) { newValue in
+            viewModel.selectConversation(newValue)
         }
         .task {
             await viewModel.requestNotificationPermission()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openConversation)) { notification in
             if let conversationId = notification.userInfo?["conversationId"] as? String {
-                // Find and select the conversation
-                selectedConversation = viewModel.conversations.first { $0.id == conversationId }
+                selectedConversationId = conversationId
             }
         }
     }
