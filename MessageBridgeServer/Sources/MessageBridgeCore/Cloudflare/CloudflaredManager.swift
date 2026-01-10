@@ -253,7 +253,9 @@ public actor CloudflaredManager {
             if data.isEmpty { break }
 
             if let text = String(data: data, encoding: .utf8) {
-                Task { await self.processOutput(text) }
+                Task { [weak self] in
+                    await self?.processOutput(text)
+                }
             }
         }
     }
