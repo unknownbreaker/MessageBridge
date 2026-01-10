@@ -28,7 +28,22 @@ struct ConnectionSettingsView: View {
     @State private var showingAPIKey = false
     @State private var saveStatus: String?
 
+    // Original values to track changes
+    @State private var originalServerURLString: String = ""
+    @State private var originalApiKey: String = ""
+    @State private var originalE2eEnabled: Bool = false
+
     private let keychainManager = KeychainManager()
+
+    private var hasChanges: Bool {
+        serverURLString != originalServerURLString ||
+        apiKey != originalApiKey ||
+        e2eEnabled != originalE2eEnabled
+    }
+
+    private var canSave: Bool {
+        hasChanges && !serverURLString.isEmpty && !apiKey.isEmpty
+    }
 
     var body: some View {
         Form {
@@ -85,7 +100,7 @@ struct ConnectionSettingsView: View {
                         saveSettings()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(serverURLString.isEmpty || apiKey.isEmpty)
+                    .disabled(!canSave)
                 }
             }
         }
@@ -100,6 +115,11 @@ struct ConnectionSettingsView: View {
             serverURLString = config.serverURL.absoluteString
             apiKey = config.apiKey
             e2eEnabled = config.e2eEnabled
+
+            // Store original values to track changes
+            originalServerURLString = serverURLString
+            originalApiKey = apiKey
+            originalE2eEnabled = e2eEnabled
         }
     }
 
@@ -113,6 +133,12 @@ struct ConnectionSettingsView: View {
         do {
             try keychainManager.saveServerConfig(config)
             saveStatus = "Saved"
+
+            // Update original values so button disables
+            originalServerURLString = serverURLString
+            originalApiKey = apiKey
+            originalE2eEnabled = e2eEnabled
+
             // Clear status after 2 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 saveStatus = nil
