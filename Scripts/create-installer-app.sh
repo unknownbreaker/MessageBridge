@@ -97,29 +97,24 @@ on run
         return
     end try
 
-    -- Find the DMG file path using the exact volume path
-    -- hdiutil info output format has image-path followed by mount points
-    set dmgPath to ""
+    -- Eject the DMG and optionally move to trash (all errors silenced)
     try
-        -- Use awk to find the image-path for our specific volume
+        -- Find the DMG file path before ejecting
         set dmgPath to do shell script "hdiutil info | awk -v vol=" & quoted form of volumePath & " '
             /^image-path/ { img = $0; sub(/^image-path[[:space:]]*:[[:space:]]*/, \"\", img) }
             $0 ~ vol { if (img != \"\") print img; exit }
         '"
-    end try
 
-    -- Eject the DMG using the full volume path
-    try
-        do shell script "hdiutil detach " & quoted form of volumePath & " -force 2>/dev/null || hdiutil detach " & quoted form of volumePath & " 2>/dev/null || true"
-    end try
+        -- Eject the DMG
+        do shell script "hdiutil detach " & quoted form of volumePath & " -force 2>/dev/null || true"
 
-    -- Move DMG to Trash if we found it
-    if dmgPath is not "" then
-        try
-            -- Use osascript to move to trash properly (handles spaces and special chars)
-            do shell script "mv " & quoted form of dmgPath & " ~/.Trash/ 2>/dev/null || true"
-        end try
-    end if
+        -- Try to move DMG to trash (completely optional, ignore all errors)
+        if dmgPath is not "" then
+            try
+                do shell script "mv " & quoted form of dmgPath & " ~/.Trash/ 2>/dev/null"
+            end try
+        end if
+    end try
 
     -- Show success and offer to launch
     set dialogResult to display dialog appName & " has been installed successfully!" buttons {"Close", "Open " & appName} default button 2 with icon note
