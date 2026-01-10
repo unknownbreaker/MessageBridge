@@ -65,6 +65,30 @@ public actor CloudflaredManager {
         return CloudflaredInfo(path: path, version: version)
     }
 
+    /// Get the latest version available from GitHub
+    public func getLatestVersion() async -> String? {
+        let urlString = "https://api.github.com/repos/cloudflare/cloudflared/releases/latest"
+        guard let url = URL(string: urlString) else { return nil }
+
+        do {
+            var request = URLRequest(url: url)
+            request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+
+            let (data, _) = try await URLSession.shared.data(for: request)
+
+            // Parse JSON to get tag_name
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let tagName = json["tag_name"] as? String {
+                // Remove leading "v" or other prefixes if present
+                return tagName.replacingOccurrences(of: "^v?", with: "", options: .regularExpression)
+            }
+        } catch {
+            // Silently fail - update check is not critical
+        }
+
+        return nil
+    }
+
     /// Download and install cloudflared binary
     public func install() async throws {
         let downloadURL = try getDownloadURL()

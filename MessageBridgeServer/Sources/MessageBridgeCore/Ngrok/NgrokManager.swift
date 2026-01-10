@@ -57,6 +57,16 @@ public actor NgrokManager {
         return NgrokInfo(path: path, version: version)
     }
 
+    /// Get the latest version available
+    /// Note: ngrok doesn't have a simple public API for version info,
+    /// so this returns nil and update checking is skipped for ngrok
+    public func getLatestVersion() async -> String? {
+        // ngrok uses equinox.io for distribution which doesn't have a public version API
+        // For now, return nil - users can manually check for updates
+        // or we could implement checking by downloading and comparing versions
+        return nil
+    }
+
     /// Download and install ngrok binary
     public func install() async throws {
         let downloadURL = try getDownloadURL()

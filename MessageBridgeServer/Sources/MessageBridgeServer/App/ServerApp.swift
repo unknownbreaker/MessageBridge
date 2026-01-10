@@ -186,6 +186,13 @@ class AppState: ObservableObject {
     @Published var cloudflaredInfo: CloudflaredInfo?
     @Published var ngrokInfo: NgrokInfo?
 
+    // Auto-update settings
+    @Published var cloudflaredAutoUpdate: Bool = false
+    @Published var ngrokAutoUpdate: Bool = false
+    @Published var cloudflaredUpdateAvailable: String? = nil
+    @Published var ngrokUpdateAvailable: String? = nil
+    @Published var isCheckingForUpdates: Bool = false
+
     let serverManager = ServerManager()
     let cloudflaredManager = CloudflaredManager()
     let ngrokManager = NgrokManager()
@@ -384,6 +391,87 @@ class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Update Checking
+
+    func checkForUpdates() async {
+        isCheckingForUpdates = true
+        addLog(level: .info, message: "Checking for tunnel software updates...")
+
+        // Check cloudflared updates
+        if cloudflaredInfo != nil {
+            if let latestVersion = await cloudflaredManager.getLatestVersion() {
+                if let currentVersion = cloudflaredInfo?.version,
+                   isNewerVersion(latestVersion, than: currentVersion) {
+                    cloudflaredUpdateAvailable = latestVersion
+                    addLog(level: .info, message: "cloudflared update available: \(latestVersion)")
+                } else {
+                    cloudflaredUpdateAvailable = nil
+                    addLog(level: .debug, message: "cloudflared is up to date")
+                }
+            }
+        }
+
+        // Check ngrok updates
+        if ngrokInfo != nil {
+            if let latestVersion = await ngrokManager.getLatestVersion() {
+                if let currentVersion = ngrokInfo?.version,
+                   isNewerVersion(latestVersion, than: currentVersion) {
+                    ngrokUpdateAvailable = latestVersion
+                    addLog(level: .info, message: "ngrok update available: \(latestVersion)")
+                } else {
+                    ngrokUpdateAvailable = nil
+                    addLog(level: .debug, message: "ngrok is up to date")
+                }
+            }
+        }
+
+        isCheckingForUpdates = false
+    }
+
+    func updateCloudflared() async throws {
+        addLog(level: .info, message: "Updating cloudflared...")
+
+        // Stop tunnel if running
+        if cloudfareTunnelStatus.isRunning {
+            await stopCloudfareTunnel()
+        }
+
+        try await cloudflaredManager.install()
+        cloudflaredInfo = await cloudflaredManager.getInfo()
+        cloudflaredUpdateAvailable = nil
+        addLog(level: .info, message: "cloudflared updated successfully")
+    }
+
+    func updateNgrok() async throws {
+        addLog(level: .info, message: "Updating ngrok...")
+
+        // Stop tunnel if running
+        if ngrokTunnelStatus.isRunning {
+            await stopNgrokTunnel()
+        }
+
+        try await ngrokManager.install()
+        ngrokInfo = await ngrokManager.getInfo()
+        ngrokUpdateAvailable = nil
+        addLog(level: .info, message: "ngrok updated successfully")
+    }
+
+    /// Compare version strings (simple semantic versioning comparison)
+    private func isNewerVersion(_ new: String, than current: String) -> Bool {
+        let newParts = new.split(separator: ".").compactMap { Int($0) }
+        let currentParts = current.split(separator: ".").compactMap { Int($0) }
+
+        for i in 0..<max(newParts.count, currentParts.count) {
+            let newVal = i < newParts.count ? newParts[i] : 0
+            let currentVal = i < currentParts.count ? currentParts[i] : 0
+
+            if newVal > currentVal { return true }
+            if newVal < currentVal { return false }
+        }
+
+        return false
+    }
+
     // MARK: - Settings Persistence
 
     private let keychainManager = KeychainManager()
@@ -410,6 +498,10 @@ class AppState: ObservableObject {
            let provider = TunnelProvider(rawValue: providerRaw) {
             selectedTunnelProvider = provider
         }
+
+        // Load auto-update settings
+        cloudflaredAutoUpdate = UserDefaults.standard.bool(forKey: "cloudflaredAutoUpdate")
+        ngrokAutoUpdate = UserDefaults.standard.bool(forKey: "ngrokAutoUpdate")
     }
 
     func saveSettings() {
@@ -421,6 +513,8 @@ class AppState: ObservableObject {
         UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
         UserDefaults.standard.set(debugLoggingEnabled, forKey: "debugLoggingEnabled")
         UserDefaults.standard.set(selectedTunnelProvider.rawValue, forKey: "tunnelProvider")
+        UserDefaults.standard.set(cloudflaredAutoUpdate, forKey: "cloudflaredAutoUpdate")
+        UserDefaults.standard.set(ngrokAutoUpdate, forKey: "ngrokAutoUpdate")
 
         // Update login item
         updateLoginItem()

@@ -5,6 +5,7 @@ struct TunnelSettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var isInstalling = false
     @State private var isStartingTunnel = false
+    @State private var isUpdating = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -76,6 +77,74 @@ struct TunnelSettingsView: View {
                     Text("Downloads \(binaryName) automatically. No sudo required.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            // Updates Section (only shown when binary is installed)
+            if isInstalled {
+                Section {
+                    Toggle("Auto-check for updates", isOn: autoUpdateBinding)
+                        .onChange(of: autoUpdateBinding.wrappedValue) { _, _ in
+                            appState.saveSettings()
+                        }
+
+                    HStack {
+                        Button {
+                            checkForUpdates()
+                        } label: {
+                            HStack {
+                                if appState.isCheckingForUpdates {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 16, height: 16)
+                                    Text("Checking...")
+                                } else {
+                                    Label("Check for Updates", systemImage: "arrow.clockwise")
+                                }
+                            }
+                        }
+                        .disabled(appState.isCheckingForUpdates)
+
+                        Spacer()
+
+                        if let updateVersion = updateAvailable {
+                            Text("v\(updateVersion) available")
+                                .font(.caption)
+                                .foregroundStyle(.blue)
+                        }
+                    }
+
+                    if updateAvailable != nil {
+                        Button {
+                            updateBinary()
+                        } label: {
+                            HStack {
+                                if isUpdating {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 16, height: 16)
+                                    Text("Updating...")
+                                } else {
+                                    Label("Update \(binaryName)", systemImage: "arrow.down.circle.fill")
+                                }
+                            }
+                        }
+                        .disabled(isUpdating || currentTunnelStatus.isRunning)
+                    }
+                } header: {
+                    Text("Updates")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if appState.selectedTunnelProvider == .ngrok {
+                            Text("Note: ngrok version checking is not available. Use \"Check for Updates\" to reinstall the latest version.")
+                                .foregroundStyle(.secondary)
+                        }
+                        if currentTunnelStatus.isRunning && updateAvailable != nil {
+                            Text("Stop the tunnel before updating.")
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .font(.caption)
                 }
             }
 
@@ -189,6 +258,22 @@ struct TunnelSettingsView: View {
         }
     }
 
+    private var autoUpdateBinding: Binding<Bool> {
+        switch appState.selectedTunnelProvider {
+        case .cloudflare:
+            return $appState.cloudflaredAutoUpdate
+        case .ngrok:
+            return $appState.ngrokAutoUpdate
+        }
+    }
+
+    private var updateAvailable: String? {
+        switch appState.selectedTunnelProvider {
+        case .cloudflare: return appState.cloudflaredUpdateAvailable
+        case .ngrok: return appState.ngrokUpdateAvailable
+        }
+    }
+
     private var currentTunnelStatus: TunnelStatus {
         switch appState.selectedTunnelProvider {
         case .cloudflare: return appState.cloudfareTunnelStatus
@@ -254,6 +339,32 @@ struct TunnelSettingsView: View {
             case .ngrok:
                 await appState.stopNgrokTunnel()
             }
+        }
+    }
+
+    private func checkForUpdates() {
+        errorMessage = nil
+        Task {
+            await appState.checkForUpdates()
+        }
+    }
+
+    private func updateBinary() {
+        isUpdating = true
+        errorMessage = nil
+
+        Task {
+            do {
+                switch appState.selectedTunnelProvider {
+                case .cloudflare:
+                    try await appState.updateCloudflared()
+                case .ngrok:
+                    try await appState.updateNgrok()
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isUpdating = false
         }
     }
 }
