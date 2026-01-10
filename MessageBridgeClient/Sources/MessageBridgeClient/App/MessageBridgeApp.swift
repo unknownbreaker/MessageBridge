@@ -67,8 +67,30 @@ struct MessageBridgeApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     weak var viewModel: MessagesViewModel?
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Clear any saved window/toolbar state to prevent crashes from incompatible state
+        // This is necessary after changing toolbar configuration between versions
+        UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration com.apple.NSWindow.toolbar")
+        UserDefaults.standard.removeObject(forKey: "NSWindow Frame main")
+
+        // Also clear any SwiftUI-specific toolbar state
+        if let bundleID = Bundle.main.bundleIdentifier {
+            let savedStateURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+                .appendingPathComponent(bundleID)
+                .appendingPathComponent("Saved Application State")
+            if let url = savedStateURL, FileManager.default.fileExists(atPath: url.path) {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
+    }
+
+    // Disable state restoration to prevent crashes from incompatible saved toolbar state
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        return false
     }
 
     // Handle notification when app is in foreground
