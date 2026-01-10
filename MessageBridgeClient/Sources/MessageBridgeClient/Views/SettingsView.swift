@@ -10,11 +10,6 @@ struct SettingsView: View {
                     Label("Connection", systemImage: "network")
                 }
 
-            TailscaleSettingsView()
-                .tabItem {
-                    Label("Tailscale", systemImage: "link")
-                }
-
             AboutView()
                 .tabItem {
                     Label("About", systemImage: "info.circle")
@@ -40,7 +35,7 @@ struct ConnectionSettingsView: View {
             Section {
                 TextField("Server URL", text: $serverURLString, prompt: Text("http://100.x.y.z:8080"))
                     .textFieldStyle(.roundedBorder)
-                    .help("Enter your home Mac's Tailscale IP address and port, or Cloudflare Tunnel URL")
+                    .help("Enter your server URL (e.g., http://100.x.y.z:8080 or https://tunnel.example.com)")
 
                 HStack {
                     if showingAPIKey {
@@ -128,193 +123,6 @@ struct ConnectionSettingsView: View {
     }
 }
 
-// MARK: - Tailscale Settings
-
-struct TailscaleSettingsView: View {
-    @State private var tailscaleStatus: TailscaleStatus = .notInstalled
-    @State private var devices: [TailscaleDevice] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-
-    private let tailscaleManager = TailscaleManager()
-
-    var body: some View {
-        Form {
-            Section {
-                HStack {
-                    Label {
-                        Text("Status")
-                    } icon: {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 10, height: 10)
-                    }
-
-                    Spacer()
-
-                    if isLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else {
-                        Text(tailscaleStatus.displayText)
-                            .foregroundStyle(.secondary)
-
-                        Button {
-                            Task { await refreshStatus() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                if case .connected(let ip, let hostname) = tailscaleStatus {
-                    LabeledContent("IP Address") {
-                        HStack {
-                            Text(ip)
-                                .font(.system(.body, design: .monospaced))
-                            Button {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(ip, forType: .string)
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Copy IP address")
-                        }
-                    }
-
-                    LabeledContent("Hostname") {
-                        Text(hostname)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if case .notInstalled = tailscaleStatus {
-                    HStack {
-                        Text("Tailscale is required to connect to your server.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Button("Download") {
-                            Task {
-                                let url = await tailscaleManager.getDownloadURL()
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-
-                if case .stopped = tailscaleStatus {
-                    HStack {
-                        Text("Tailscale is installed but not running.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Button("Open Tailscale") {
-                            Task {
-                                await tailscaleManager.openTailscaleApp()
-                            }
-                        }
-                    }
-                }
-            } header: {
-                Text("Tailscale VPN")
-            }
-
-            if case .connected = tailscaleStatus, !devices.isEmpty {
-                Section {
-                    ForEach(devices) { device in
-                        HStack {
-                            Image(systemName: deviceIcon(for: device))
-                                .foregroundStyle(device.online ? .green : .secondary)
-
-                            VStack(alignment: .leading) {
-                                Text(device.name)
-                                    .fontWeight(device.isSelf ? .semibold : .regular)
-                                Text(device.displayIP)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            if device.isSelf {
-                                Text("This device")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if device.online {
-                                Text("Online")
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
-                            } else {
-                                Text("Offline")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Tailnet Devices")
-                }
-            }
-        }
-        .padding()
-        .task {
-            await refreshStatus()
-            if case .connected = tailscaleStatus {
-                await loadDevices()
-            }
-        }
-    }
-
-    private func refreshStatus() async {
-        isLoading = true
-        tailscaleStatus = await tailscaleManager.getStatus(forceRefresh: true)
-        isLoading = false
-    }
-
-    private func loadDevices() async {
-        do {
-            devices = try await tailscaleManager.getDevices()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private var statusColor: Color {
-        switch tailscaleStatus {
-        case .notInstalled: return .gray
-        case .stopped: return .red
-        case .connecting: return .yellow
-        case .connected: return .green
-        case .error: return .orange
-        }
-    }
-
-    private func deviceIcon(for device: TailscaleDevice) -> String {
-        if let os = device.os?.lowercased() {
-            if os.contains("macos") || os.contains("darwin") {
-                return "desktopcomputer"
-            } else if os.contains("ios") {
-                return "iphone"
-            } else if os.contains("android") {
-                return "phone"
-            } else if os.contains("windows") {
-                return "pc"
-            } else if os.contains("linux") {
-                return "server.rack"
-            }
-        }
-        return "network"
-    }
-}
-
 // MARK: - About View
 
 struct AboutView: View {
@@ -332,7 +140,7 @@ struct AboutView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Text("Access your iMessages from any Mac using Tailscale VPN.")
+            Text("Access your iMessages from any Mac.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

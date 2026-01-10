@@ -13,6 +13,18 @@ public protocol BridgeServiceProtocol: Sendable {
     func stopWebSocket() async
 }
 
+/// Response wrapper for conversations endpoint
+struct ConversationsResponse: Codable {
+    let conversations: [Conversation]
+    let nextCursor: String?
+}
+
+/// Response wrapper for messages endpoint
+struct MessagesResponse: Codable {
+    let messages: [Message]
+    let nextCursor: String?
+}
+
 /// WebSocket message envelope - decode type first, then data based on type
 struct WebSocketEnvelope: Codable {
     let type: String
@@ -109,14 +121,15 @@ public actor BridgeConnection: BridgeServiceProtocol {
             request.addValue("enabled", forHTTPHeaderField: "X-E2E-Encryption")
         }
 
-        let (data, response) = try await urlSession.data(for: request)
+        let (data, httpResponse) = try await urlSession.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let response = httpResponse as? HTTPURLResponse,
+              response.statusCode == 200 else {
             throw BridgeError.requestFailed
         }
 
-        return try decryptResponse(data, as: [Conversation].self)
+        let conversationsResponse = try decryptResponse(data, as: ConversationsResponse.self)
+        return conversationsResponse.conversations
     }
 
     public func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) async throws -> [Message] {
@@ -139,14 +152,15 @@ public actor BridgeConnection: BridgeServiceProtocol {
             request.addValue("enabled", forHTTPHeaderField: "X-E2E-Encryption")
         }
 
-        let (data, response) = try await urlSession.data(for: request)
+        let (data, httpResponse) = try await urlSession.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let response = httpResponse as? HTTPURLResponse,
+              response.statusCode == 200 else {
             throw BridgeError.requestFailed
         }
 
-        return try decryptResponse(data, as: [Message].self)
+        let messagesResponse = try decryptResponse(data, as: MessagesResponse.self)
+        return messagesResponse.messages
     }
 
     public func sendMessage(text: String, to recipient: String) async throws -> Message {
