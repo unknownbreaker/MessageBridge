@@ -128,7 +128,7 @@ public actor NgrokManager {
         }
 
         // Wait for URL to appear (with timeout)
-        let url = try await waitForURL(timeout: 30)
+        let url = try await waitForURL(timeout: 60)
         return url
     }
 
@@ -251,9 +251,34 @@ public actor NgrokManager {
         }
     }
 
-    /// Process output text and look for tunnel URL
+    /// Process output text and look for tunnel URL or errors
     private func processOutput(_ text: String) {
         outputBuffer += text
+
+        // Check for errors first - ngrok outputs JSON logs with "err" field
+        // Example: {"err":"authentication failed: The account ... email address is verified...","lvl":"eror","msg":"failed to reconnect session"}
+        if let errRange = outputBuffer.range(of: #""err"\s*:\s*"([^"]+)"#, options: .regularExpression) {
+            let errMatch = String(outputBuffer[errRange])
+            // Extract the error message from the JSON field
+            if let msgStart = errMatch.range(of: ":\""),
+               let msgEnd = errMatch.range(of: "\"", range: errMatch.index(after: msgStart.upperBound)..<errMatch.endIndex) {
+                var errorMsg = String(errMatch[msgStart.upperBound..<msgEnd.lowerBound])
+                // Clean up escaped characters
+                errorMsg = errorMsg.replacingOccurrences(of: "\\r\\n", with: " ")
+                    .replacingOccurrences(of: "\\n", with: " ")
+                    .trimmingCharacters(in: .whitespaces)
+
+                // Check for specific error types
+                if errorMsg.contains("email address is verified") {
+                    updateStatus(.error("Email verification required. Visit: dashboard.ngrok.com/user/settings"))
+                } else if errorMsg.contains("authentication failed") || errorMsg.contains("auth") {
+                    updateStatus(.error("Authentication failed: \(errorMsg)"))
+                } else {
+                    updateStatus(.error(errorMsg))
+                }
+                return
+            }
+        }
 
         // ngrok outputs JSON logs, look for the URL in the "url" field
         // Example line: {"lvl":"info","msg":"started tunnel","obj":"tunnels","name":"command_line","addr":"http://localhost:8080","url":"https://abc123.ngrok-free.app"}
