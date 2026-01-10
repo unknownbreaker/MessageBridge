@@ -1,5 +1,7 @@
 name: Release
 
+# DISABLED: Using local builds to save GitHub Actions minutes
+# To re-enable, remove the 'if: false' line from the job below
 on:
   push:
     tags:
@@ -11,6 +13,7 @@ permissions:
 
 jobs:
   release:
+    if: false  # Disabled to save Actions minutes - use ./mb release locally
     name: Build and Release
     runs-on: macos-14
 

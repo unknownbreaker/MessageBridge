@@ -20,10 +20,10 @@ struct SettingsView: View {
                     Label("Security", systemImage: "lock")
                 }
 
-            CloudflareSettingsView()
+            TunnelSettingsView()
                 .environmentObject(appState)
                 .tabItem {
-                    Label("Cloudflare", systemImage: "cloud")
+                    Label("Tunnel", systemImage: "network")
                 }
         }
         .frame(width: 450, height: 350)

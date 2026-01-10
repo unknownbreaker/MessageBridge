@@ -1,26 +1,18 @@
 import Foundation
 
-// TunnelStatus is defined in Tunnel/TunnelTypes.swift
-
-/// Information about an installed cloudflared binary
-public struct CloudflaredInfo: Sendable {
-    public let path: String
-    public let version: String?
-}
-
-/// Manages the cloudflared binary and tunnel process
-public actor CloudflaredManager {
-    /// Possible locations for cloudflared binary
+/// Manages the ngrok binary and tunnel process
+public actor NgrokManager {
+    /// Possible locations for ngrok binary
     private let searchPaths = [
-        "/opt/homebrew/bin/cloudflared",
-        "/usr/local/bin/cloudflared",
-        "/usr/bin/cloudflared"
+        "/opt/homebrew/bin/ngrok",
+        "/usr/local/bin/ngrok",
+        "/usr/bin/ngrok"
     ]
 
     /// App-specific install location (no sudo required)
     private var appBinaryPath: String {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("MessageBridge/bin/cloudflared").path
+        return appSupport.appendingPathComponent("MessageBridge/bin/ngrok").path
     }
 
     /// Currently running tunnel process
@@ -52,20 +44,20 @@ public actor CloudflaredManager {
         statusChangeHandler = handler
     }
 
-    /// Check if cloudflared is installed
+    /// Check if ngrok is installed
     public func isInstalled() -> Bool {
         findBinary() != nil
     }
 
-    /// Get information about installed cloudflared
-    public func getInfo() async -> CloudflaredInfo? {
+    /// Get information about installed ngrok
+    public func getInfo() async -> NgrokInfo? {
         guard let path = findBinary() else { return nil }
 
         let version = await getVersion(at: path)
-        return CloudflaredInfo(path: path, version: version)
+        return NgrokInfo(path: path, version: version)
     }
 
-    /// Download and install cloudflared binary
+    /// Download and install ngrok binary
     public func install() async throws {
         let downloadURL = try getDownloadURL()
 
@@ -76,22 +68,17 @@ public actor CloudflaredManager {
         // Download the binary
         let (tempURL, _) = try await URLSession.shared.download(from: downloadURL)
 
-        // If it's a tgz, extract it
-        if downloadURL.pathExtension == "tgz" {
-            try await extractTgz(tempURL, to: appBinaryPath)
-        } else {
-            // Direct binary download
-            try FileManager.default.moveItem(atPath: tempURL.path, toPath: appBinaryPath)
-        }
+        // ngrok comes as a zip file
+        try await extractZip(tempURL, to: appBinaryPath)
 
         // Make executable
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: appBinaryPath)
     }
 
-    /// Start a quick tunnel (temporary URL, no account needed)
-    public func startQuickTunnel(port: Int = 8080) async throws -> String {
+    /// Start a tunnel (requires ngrok account for persistent URLs, free tier available)
+    public func startTunnel(port: Int = 8080) async throws -> String {
         guard let binaryPath = findBinary() else {
-            throw CloudflaredError.notInstalled
+            throw NgrokError.notInstalled
         }
 
         // Stop any existing tunnel
@@ -101,7 +88,8 @@ public actor CloudflaredManager {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binaryPath)
-        process.arguments = ["tunnel", "--url", "http://localhost:\(port)"]
+        // Use http mode for simplicity - ngrok free tier generates random URLs
+        process.arguments = ["http", "\(port)", "--log", "stdout", "--log-format", "json"]
 
         // Set up pipes for output
         let outputPipe = Pipe()
@@ -124,7 +112,7 @@ public actor CloudflaredManager {
         let outputHandle = outputPipe.fileHandleForReading
         let errorHandle = errorPipe.fileHandleForReading
 
-        // Read from both stdout and stderr (cloudflared logs to stderr)
+        // Read from both stdout and stderr
         Task.detached { [weak self] in
             self?.readOutputSync(from: outputHandle)
         }
@@ -136,7 +124,7 @@ public actor CloudflaredManager {
             try process.run()
         } catch {
             updateStatus(.error("Failed to start: \(error.localizedDescription)"))
-            throw CloudflaredError.failedToStart(error.localizedDescription)
+            throw NgrokError.failedToStart(error.localizedDescription)
         }
 
         // Wait for URL to appear (with timeout)
@@ -173,7 +161,7 @@ public actor CloudflaredManager {
 
     // MARK: - Private Methods
 
-    /// Find cloudflared binary in known locations
+    /// Find ngrok binary in known locations
     private func findBinary() -> String? {
         // Check app-specific location first
         if FileManager.default.isExecutableFile(atPath: appBinaryPath) {
@@ -190,7 +178,7 @@ public actor CloudflaredManager {
         return nil
     }
 
-    /// Get version from cloudflared binary
+    /// Get version from ngrok binary
     private func getVersion(at path: String) async -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
@@ -206,7 +194,7 @@ public actor CloudflaredManager {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
 
-            // Parse version from output like "cloudflared version 2024.1.0 (built 2024-01-15)"
+            // Parse version from output like "ngrok version 3.5.0"
             if let match = output.range(of: #"version [\d.]+"#, options: .regularExpression) {
                 return String(output[match]).replacingOccurrences(of: "version ", with: "")
             }
@@ -217,7 +205,7 @@ public actor CloudflaredManager {
         return nil
     }
 
-    /// Get the download URL for cloudflared based on architecture
+    /// Get the download URL for ngrok based on architecture
     private func getDownloadURL() throws -> URL {
         #if arch(arm64)
         let arch = "arm64"
@@ -225,24 +213,27 @@ public actor CloudflaredManager {
         let arch = "amd64"
         #endif
 
-        let urlString = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-\(arch).tgz"
+        // ngrok downloads are zip files from their CDN
+        let urlString = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-\(arch).zip"
         guard let url = URL(string: urlString) else {
-            throw CloudflaredError.invalidDownloadURL
+            throw NgrokError.invalidDownloadURL
         }
         return url
     }
 
-    /// Extract tgz archive
-    private func extractTgz(_ archiveURL: URL, to destinationPath: String) async throws {
+    /// Extract zip archive
+    private func extractZip(_ archiveURL: URL, to destinationPath: String) async throws {
+        let destinationDir = (destinationPath as NSString).deletingLastPathComponent
+
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-        process.arguments = ["-xzf", archiveURL.path, "-C", (destinationPath as NSString).deletingLastPathComponent]
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = ["-o", archiveURL.path, "-d", destinationDir]
 
         try process.run()
         process.waitUntilExit()
 
         if process.terminationStatus != 0 {
-            throw CloudflaredError.extractionFailed
+            throw NgrokError.extractionFailed
         }
     }
 
@@ -262,12 +253,22 @@ public actor CloudflaredManager {
     private func processOutput(_ text: String) {
         outputBuffer += text
 
-        // Look for the tunnel URL pattern
-        // Example: "https://random-words-here.trycloudflare.com"
-        let pattern = #"https://[a-z0-9-]+\.trycloudflare\.com"#
-        if let range = outputBuffer.range(of: pattern, options: .regularExpression) {
-            let url = String(outputBuffer[range])
-            updateStatus(.running(url: url, isQuickTunnel: true))
+        // ngrok outputs JSON logs, look for the URL in the "url" field
+        // Example line: {"lvl":"info","msg":"started tunnel","obj":"tunnels","name":"command_line","addr":"http://localhost:8080","url":"https://abc123.ngrok-free.app"}
+
+        // Try to find HTTPS URL pattern for ngrok
+        let patterns = [
+            #"https://[a-z0-9-]+\.ngrok-free\.app"#,
+            #"https://[a-z0-9-]+\.ngrok\.io"#,
+            #"https://[a-z0-9-]+\.ngrok\.app"#
+        ]
+
+        for pattern in patterns {
+            if let range = outputBuffer.range(of: pattern, options: .regularExpression) {
+                let url = String(outputBuffer[range])
+                updateStatus(.running(url: url, isQuickTunnel: true))
+                return
+            }
         }
     }
 
@@ -281,18 +282,18 @@ public actor CloudflaredManager {
             }
 
             if case .error(let message) = _status {
-                throw CloudflaredError.tunnelFailed(message)
+                throw NgrokError.tunnelFailed(message)
             }
 
             // Check if process died
             if let process = tunnelProcess, !process.isRunning {
-                throw CloudflaredError.tunnelFailed("Process terminated unexpectedly")
+                throw NgrokError.tunnelFailed("Process terminated unexpectedly")
             }
 
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         }
 
-        throw CloudflaredError.timeout
+        throw NgrokError.timeout
     }
 
     /// Handle tunnel process termination
@@ -312,9 +313,17 @@ public actor CloudflaredManager {
     }
 }
 
+// MARK: - Info
+
+/// Information about an installed ngrok binary
+public struct NgrokInfo: Sendable {
+    public let path: String
+    public let version: String?
+}
+
 // MARK: - Errors
 
-public enum CloudflaredError: LocalizedError {
+public enum NgrokError: LocalizedError {
     case notInstalled
     case invalidDownloadURL
     case downloadFailed
@@ -322,23 +331,26 @@ public enum CloudflaredError: LocalizedError {
     case failedToStart(String)
     case tunnelFailed(String)
     case timeout
+    case authTokenRequired
 
     public var errorDescription: String? {
         switch self {
         case .notInstalled:
-            return "cloudflared is not installed"
+            return "ngrok is not installed"
         case .invalidDownloadURL:
             return "Invalid download URL"
         case .downloadFailed:
-            return "Failed to download cloudflared"
+            return "Failed to download ngrok"
         case .extractionFailed:
-            return "Failed to extract cloudflared archive"
+            return "Failed to extract ngrok archive"
         case .failedToStart(let reason):
             return "Failed to start tunnel: \(reason)"
         case .tunnelFailed(let reason):
             return "Tunnel failed: \(reason)"
         case .timeout:
             return "Timed out waiting for tunnel URL"
+        case .authTokenRequired:
+            return "ngrok auth token required (run: ngrok config add-authtoken <token>)"
         }
     }
 }

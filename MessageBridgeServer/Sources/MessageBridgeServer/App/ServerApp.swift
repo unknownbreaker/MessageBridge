@@ -179,12 +179,24 @@ class AppState: ObservableObject {
     @Published var debugLoggingEnabled: Bool = false
     @Published var logs: [LogEntry] = []
 
-    // Cloudflare Tunnel
-    @Published var tunnelStatus: TunnelStatus = .stopped
+    // Tunnel Providers
+    @Published var selectedTunnelProvider: TunnelProvider = .cloudflare
+    @Published var cloudfareTunnelStatus: TunnelStatus = .stopped
+    @Published var ngrokTunnelStatus: TunnelStatus = .stopped
     @Published var cloudflaredInfo: CloudflaredInfo?
+    @Published var ngrokInfo: NgrokInfo?
 
     let serverManager = ServerManager()
     let cloudflaredManager = CloudflaredManager()
+    let ngrokManager = NgrokManager()
+
+    // Legacy computed property for backward compatibility
+    var tunnelStatus: TunnelStatus {
+        switch selectedTunnelProvider {
+        case .cloudflare: return cloudfareTunnelStatus
+        case .ngrok: return ngrokTunnelStatus
+        }
+    }
 
     var menuBarIcon: String {
         switch serverStatus {
@@ -206,11 +218,11 @@ class AppState: ObservableObject {
 
     init() {
         loadSettings()
-        setupTunnelStatusHandler()
+        setupTunnelStatusHandlers()
 
-        // Check cloudflared installation and auto-start server if enabled
+        // Check tunnel binary installations and auto-start server if enabled
         Task {
-            await checkCloudflaredInstallation()
+            await checkTunnelInstallations()
 
             if startAtLogin && !apiKey.isEmpty {
                 await startServer()
@@ -264,51 +276,105 @@ class AppState: ObservableObject {
         addLog(level: .debug, message: "API key copied to clipboard")
     }
 
-    // MARK: - Cloudflare Tunnel
+    // MARK: - Tunnel Management
 
-    func setupTunnelStatusHandler() {
+    func setupTunnelStatusHandlers() {
         Task {
             await cloudflaredManager.onStatusChange { [weak self] status in
                 Task { @MainActor in
-                    self?.tunnelStatus = status
+                    self?.cloudfareTunnelStatus = status
+                }
+            }
+            await ngrokManager.onStatusChange { [weak self] status in
+                Task { @MainActor in
+                    self?.ngrokTunnelStatus = status
                 }
             }
         }
     }
 
-    func checkCloudflaredInstallation() async {
-        let isInstalled = await cloudflaredManager.isInstalled()
-        if isInstalled {
+    func checkTunnelInstallations() async {
+        // Check cloudflared
+        let cloudflaredInstalled = await cloudflaredManager.isInstalled()
+        if cloudflaredInstalled {
             cloudflaredInfo = await cloudflaredManager.getInfo()
-            tunnelStatus = .stopped
+            cloudfareTunnelStatus = .stopped
         } else {
-            tunnelStatus = .notInstalled
+            cloudfareTunnelStatus = .notInstalled
             cloudflaredInfo = nil
         }
+
+        // Check ngrok
+        let ngrokInstalled = await ngrokManager.isInstalled()
+        if ngrokInstalled {
+            ngrokInfo = await ngrokManager.getInfo()
+            ngrokTunnelStatus = .stopped
+        } else {
+            ngrokTunnelStatus = .notInstalled
+            ngrokInfo = nil
+        }
     }
+
+    // MARK: - Cloudflare Tunnel
 
     func installCloudflared() async throws {
         addLog(level: .info, message: "Installing cloudflared...")
         try await cloudflaredManager.install()
         cloudflaredInfo = await cloudflaredManager.getInfo()
-        tunnelStatus = .stopped
+        cloudfareTunnelStatus = .stopped
         addLog(level: .info, message: "cloudflared installed successfully")
     }
 
-    func startTunnel() async throws {
+    func startCloudfareTunnel() async throws {
         guard serverStatus.isRunning else {
             throw CloudflaredError.failedToStart("Server must be running first")
         }
         addLog(level: .info, message: "Starting Cloudflare Tunnel...")
         let url = try await cloudflaredManager.startQuickTunnel(port: port)
-        addLog(level: .info, message: "Tunnel started: \(url)")
+        addLog(level: .info, message: "Cloudflare Tunnel started: \(url)")
+    }
+
+    func stopCloudfareTunnel() async {
+        addLog(level: .info, message: "Stopping Cloudflare Tunnel...")
+        await cloudflaredManager.stopTunnel()
+        addLog(level: .info, message: "Cloudflare Tunnel stopped")
+    }
+
+    // Legacy methods for backward compatibility
+    func startTunnel() async throws {
+        try await startCloudfareTunnel()
     }
 
     func stopTunnel() async {
-        addLog(level: .info, message: "Stopping Cloudflare Tunnel...")
-        await cloudflaredManager.stopTunnel()
-        addLog(level: .info, message: "Tunnel stopped")
+        await stopCloudfareTunnel()
     }
+
+    // MARK: - ngrok Tunnel
+
+    func installNgrok() async throws {
+        addLog(level: .info, message: "Installing ngrok...")
+        try await ngrokManager.install()
+        ngrokInfo = await ngrokManager.getInfo()
+        ngrokTunnelStatus = .stopped
+        addLog(level: .info, message: "ngrok installed successfully")
+    }
+
+    func startNgrokTunnel() async throws {
+        guard serverStatus.isRunning else {
+            throw NgrokError.failedToStart("Server must be running first")
+        }
+        addLog(level: .info, message: "Starting ngrok tunnel...")
+        let url = try await ngrokManager.startTunnel(port: port)
+        addLog(level: .info, message: "ngrok tunnel started: \(url)")
+    }
+
+    func stopNgrokTunnel() async {
+        addLog(level: .info, message: "Stopping ngrok tunnel...")
+        await ngrokManager.stopTunnel()
+        addLog(level: .info, message: "ngrok tunnel stopped")
+    }
+
+    // MARK: - Shared Tunnel Helpers
 
     func copyTunnelURL() {
         if let url = tunnelStatus.url {
@@ -338,6 +404,12 @@ class AppState: ObservableObject {
 
         startAtLogin = UserDefaults.standard.bool(forKey: "startAtLogin")
         debugLoggingEnabled = UserDefaults.standard.bool(forKey: "debugLoggingEnabled")
+
+        // Load tunnel provider
+        if let providerRaw = UserDefaults.standard.string(forKey: "tunnelProvider"),
+           let provider = TunnelProvider(rawValue: providerRaw) {
+            selectedTunnelProvider = provider
+        }
     }
 
     func saveSettings() {
@@ -348,6 +420,7 @@ class AppState: ObservableObject {
         UserDefaults.standard.set(port, forKey: "serverPort")
         UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
         UserDefaults.standard.set(debugLoggingEnabled, forKey: "debugLoggingEnabled")
+        UserDefaults.standard.set(selectedTunnelProvider.rawValue, forKey: "tunnelProvider")
 
         // Update login item
         updateLoginItem()

@@ -1,5 +1,7 @@
 name: CI
 
+# DISABLED: Using local builds to save GitHub Actions minutes
+# To re-enable, remove the 'if: false' line from the job below
 on:
   push:
     branches: [main]
@@ -8,6 +10,7 @@ on:
 
 jobs:
   build-and-test:
+    if: false  # Disabled to save Actions minutes - use ./mb build locally
     name: Build and Test
     runs-on: macos-14
 
