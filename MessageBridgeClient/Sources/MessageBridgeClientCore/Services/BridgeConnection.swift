@@ -6,6 +6,7 @@ public typealias NewMessageHandler = @Sendable (Message, String) -> Void
 /// Protocol defining the bridge service interface for testability
 public protocol BridgeServiceProtocol: Sendable {
     func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws
+    func disconnect() async
     func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation]
     func fetchMessages(conversationId: String, limit: Int, offset: Int) async throws -> [Message]
     func sendMessage(text: String, to recipient: String) async throws -> Message
@@ -60,6 +61,15 @@ public actor BridgeConnection: BridgeServiceProtocol {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         self.urlSession = URLSession(configuration: config)
+    }
+
+    public func disconnect() async {
+        await stopWebSocket()
+        serverURL = nil
+        apiKey = nil
+        e2eEnabled = false
+        encryption = nil
+        logDebug("Disconnected from server")
     }
 
     public func connect(to url: URL, apiKey: String, e2eEnabled: Bool = false) async throws {

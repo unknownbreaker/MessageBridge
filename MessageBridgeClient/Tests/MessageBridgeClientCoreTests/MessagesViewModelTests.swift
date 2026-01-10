@@ -4,6 +4,7 @@ import XCTest
 /// Mock implementation of BridgeServiceProtocol for testing
 actor MockBridgeService: BridgeServiceProtocol {
     var connectCalled = false
+    var disconnectCalled = false
     var fetchConversationsCalled = false
     var fetchMessagesCalled = false
     var sendMessageCalled = false
@@ -23,6 +24,10 @@ actor MockBridgeService: BridgeServiceProtocol {
         if shouldThrowError {
             throw BridgeError.connectionFailed
         }
+    }
+
+    func disconnect() async {
+        disconnectCalled = true
     }
 
     func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation] {

@@ -48,6 +48,29 @@ public class MessagesViewModel: ObservableObject {
         }
     }
 
+    public func disconnect() async {
+        await bridgeService.disconnect()
+        connectionStatus = .disconnected
+        conversations = []
+        messages = [:]
+        selectedConversationId = nil
+        logInfo("Disconnected from server")
+    }
+
+    public func reconnect() async {
+        // Disconnect first
+        await disconnect()
+
+        // Load saved config and reconnect
+        let keychainManager = KeychainManager()
+        guard let config = try? keychainManager.retrieveServerConfig() else {
+            logError("No saved server configuration found")
+            return
+        }
+
+        await connect(to: config.serverURL, apiKey: config.apiKey, e2eEnabled: config.e2eEnabled)
+    }
+
     private func startWebSocket() async {
         do {
             try await bridgeService.startWebSocket { [weak self] message, sender in

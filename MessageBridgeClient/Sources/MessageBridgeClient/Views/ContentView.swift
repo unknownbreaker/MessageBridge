@@ -30,6 +30,19 @@ struct ContentView: View {
         }
         .navigationTitle("MessageBridge")
         .navigationSubtitle(viewModel.connectionStatus.text)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task {
+                        await viewModel.reconnect()
+                    }
+                } label: {
+                    Label("Reconnect", systemImage: "arrow.clockwise")
+                }
+                .help("Reconnect to server")
+                .disabled(viewModel.connectionStatus == .connecting)
+            }
+        }
         .onChange(of: selectedConversationId) { newValue in
             viewModel.selectConversation(newValue)
         }
