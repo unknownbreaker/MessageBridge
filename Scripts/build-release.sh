@@ -134,6 +134,16 @@ build_server() {
 </plist>
 EOF
 
+    # Code sign the app with hardened runtime (required for notarization)
+    SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application}"
+    if security find-identity -v -p codesigning | grep -q "$SIGNING_IDENTITY"; then
+        echo -e "${YELLOW}Signing server app...${NC}"
+        codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$SERVER_APP"
+        echo -e "${GREEN}✓ Server app signed${NC}"
+    else
+        echo -e "${YELLOW}Warning: No signing identity found. App will not be notarizable.${NC}"
+    fi
+
     echo -e "${GREEN}✓ Server app built: $SERVER_APP${NC}"
 }
 
@@ -204,6 +214,16 @@ build_client() {
 </dict>
 </plist>
 EOF
+
+    # Code sign the app with hardened runtime (required for notarization)
+    SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application}"
+    if security find-identity -v -p codesigning | grep -q "$SIGNING_IDENTITY"; then
+        echo -e "${YELLOW}Signing client app...${NC}"
+        codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$CLIENT_APP"
+        echo -e "${GREEN}✓ Client app signed${NC}"
+    else
+        echo -e "${YELLOW}Warning: No signing identity found. App will not be notarizable.${NC}"
+    fi
 
     echo -e "${GREEN}✓ Client app built: $CLIENT_APP${NC}"
 }
