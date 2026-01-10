@@ -13,13 +13,19 @@ public protocol BridgeServiceProtocol: Sendable {
     func stopWebSocket() async
 }
 
-/// WebSocket message types matching server format
-struct WebSocketMessage: Codable {
+/// WebSocket message envelope - decode type first, then data based on type
+struct WebSocketEnvelope: Codable {
     let type: String
-    let data: WebSocketMessageData?
 }
 
-struct WebSocketMessageData: Codable {
+/// Full new_message WebSocket message
+struct NewMessageWebSocketMessage: Codable {
+    let type: String
+    let data: NewMessageData
+}
+
+/// Data payload for new_message type
+struct NewMessageData: Codable {
     let id: Int64
     let conversationId: String
     let text: String?
@@ -245,28 +251,36 @@ public actor BridgeConnection: BridgeServiceProtocol {
         decoder.dateDecodingStrategy = .iso8601
 
         do {
-            // Try to decrypt if E2E is enabled
-            let wsMessage: WebSocketMessage
+            // Get the actual data to decode (decrypt if E2E enabled)
+            let messageData: Data
             if e2eEnabled, let encryption {
-                // First decode as envelope
                 let envelope = try decoder.decode(EncryptedEnvelope.self, from: data)
-                wsMessage = try encryption.decrypt(envelope.payload, as: WebSocketMessage.self)
+                let decrypted = try encryption.decrypt(envelope.payload)
+                messageData = decrypted
             } else {
-                wsMessage = try decoder.decode(WebSocketMessage.self, from: data)
+                messageData = data
             }
 
-            if wsMessage.type == "new_message", let messageData = wsMessage.data {
+            // First decode just the type to determine message format
+            let envelope = try decoder.decode(WebSocketEnvelope.self, from: messageData)
+
+            // Only process new_message type - ignore connected, error, etc.
+            if envelope.type == "new_message" {
+                let wsMessage = try decoder.decode(NewMessageWebSocketMessage.self, from: messageData)
+                let msgData = wsMessage.data
                 let message = Message(
-                    id: messageData.id,
-                    guid: "ws-\(messageData.id)",
-                    text: messageData.text,
-                    date: messageData.date,
-                    isFromMe: messageData.isFromMe,
+                    id: msgData.id,
+                    guid: "ws-\(msgData.id)",
+                    text: msgData.text,
+                    date: msgData.date,
+                    isFromMe: msgData.isFromMe,
                     handleId: nil,
-                    conversationId: messageData.conversationId
+                    conversationId: msgData.conversationId
                 )
-                let sender = messageData.sender ?? "Unknown"
+                let sender = msgData.sender ?? "Unknown"
                 newMessageHandler?(message, sender)
+            } else {
+                logDebug("WebSocket received \(envelope.type) message")
             }
         } catch {
             logError("Failed to decode WebSocket message", error: error)
