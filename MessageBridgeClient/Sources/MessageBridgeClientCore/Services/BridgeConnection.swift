@@ -137,16 +137,28 @@ public actor BridgeConnection: BridgeServiceProtocol {
             throw BridgeError.notConnected
         }
 
+        // URL-encode the conversationId since it may contain special characters like + in phone numbers
+        guard let encodedConversationId = conversationId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            throw BridgeError.requestFailed
+        }
+
         var components = URLComponents(
-            url: serverURL.appendingPathComponent("conversations/\(conversationId)/messages"),
+            url: serverURL.appendingPathComponent("conversations/\(encodedConversationId)/messages"),
             resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = [
+        )
+        guard components != nil else {
+            throw BridgeError.requestFailed
+        }
+        components!.queryItems = [
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "offset", value: String(offset))
         ]
 
-        var request = URLRequest(url: components.url!)
+        guard let url = components!.url else {
+            throw BridgeError.requestFailed
+        }
+
+        var request = URLRequest(url: url)
         request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
         if e2eEnabled {
             request.addValue("enabled", forHTTPHeaderField: "X-E2E-Encryption")

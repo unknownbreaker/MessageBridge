@@ -91,6 +91,7 @@ public class MessagesViewModel: ObservableObject {
     }
 
     public func selectConversation(_ conversationId: String?) {
+        logDebug("Selecting conversation: \(conversationId ?? "nil")")
         selectedConversationId = conversationId
         // Clear notifications for this conversation when selected
         if let id = conversationId {
@@ -110,6 +111,7 @@ public class MessagesViewModel: ObservableObject {
     }
 
     public func loadMessages(for conversationId: String) async {
+        logDebug("Loading messages for conversation: \(conversationId)")
         do {
             let msgs = try await bridgeService.fetchMessages(conversationId: conversationId, limit: 50, offset: 0)
             messages[conversationId] = msgs

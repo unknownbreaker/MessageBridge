@@ -47,7 +47,7 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
 
 // MARK: - Conversation
 
-public struct Conversation: Codable, Identifiable, Hashable, Sendable {
+public struct Conversation: Codable, Identifiable, Sendable {
     public let id: String
     public let guid: String
     private let _displayName: String?
@@ -82,5 +82,17 @@ public struct Conversation: Codable, Identifiable, Hashable, Sendable {
         let names = participants.prefix(3).map { $0.displayAddress }
         let suffix = participants.count > 3 ? " +\(participants.count - 3)" : ""
         return names.joined(separator: ", ") + suffix
+    }
+}
+
+// Custom Hashable/Equatable based only on id to prevent SwiftUI identity issues
+// when lastMessage or other properties change
+extension Conversation: Hashable {
+    public static func == (lhs: Conversation, rhs: Conversation) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
