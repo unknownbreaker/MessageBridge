@@ -340,6 +340,33 @@ BREAKING CHANGE: rename API endpoint from /send to /messages
 - Prefer `async/await` over callbacks
 - Models should be `Codable`, `Identifiable`, and `Sendable` where applicable
 
+### Memory Management
+- **Always use `[weak self]` in closures** that outlive their scope (callbacks, timers, notifications, completion handlers)
+- **Use `[unowned self]` only** when you're certain `self` will always exist for the closure's lifetime
+- **Break retain cycles** in delegate patterns by making delegates `weak`
+- **Watch for closure capture lists** - explicitly capture only what's needed
+- **Clean up observers** - remove NotificationCenter observers, invalidate timers, and cancel subscriptions in `deinit`
+- **Avoid strong references in actors** - use `[weak self]` in `Task.detached` and callback handlers passed to external code
+- **Test for leaks** - use Instruments' Leaks tool and Memory Graph Debugger to verify no retain cycles exist
+
+```swift
+// GOOD: Weak self in async callback
+Task { [weak self] in
+    guard let self else { return }
+    await self.doWork()
+}
+
+// GOOD: Weak self in completion handler
+someAsyncOperation { [weak self] result in
+    self?.handleResult(result)
+}
+
+// BAD: Strong self captured - potential retain cycle
+Task {
+    await self.doWork()  // self strongly captured
+}
+```
+
 ### Server (MessageBridgeServer)
 - Database queries go in `Database/ChatDatabase.swift`
 - Keep models in `Models/` - they're shared with client via copy
