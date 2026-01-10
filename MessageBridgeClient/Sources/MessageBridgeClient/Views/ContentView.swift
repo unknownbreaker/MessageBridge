@@ -30,8 +30,8 @@ struct ContentView: View {
         }
         .navigationTitle("MessageBridge")
         .navigationSubtitle(viewModel.connectionStatus.text)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+        .toolbar(id: "main-toolbar") {
+            ToolbarItem(id: "reconnect", placement: .automatic) {
                 Button {
                     Task {
                         await viewModel.reconnect()
