@@ -144,4 +144,13 @@ cat > "${INSTALLER_PATH}/Contents/Info.plist" << PLIST
 </plist>
 PLIST
 
-echo "Created installer: ${INSTALLER_PATH}"
+# Code sign the installer app with hardened runtime (required for notarization)
+SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application}"
+if security find-identity -v -p codesigning | grep -q "$SIGNING_IDENTITY"; then
+    echo "Signing installer with: $SIGNING_IDENTITY"
+    codesign --force --deep --options runtime --sign "$SIGNING_IDENTITY" "$INSTALLER_PATH"
+    echo "Created and signed installer: ${INSTALLER_PATH}"
+else
+    echo "Warning: No signing identity found. Installer will trigger Gatekeeper warnings."
+    echo "Created unsigned installer: ${INSTALLER_PATH}"
+fi

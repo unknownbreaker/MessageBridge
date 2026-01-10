@@ -23,6 +23,32 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
 
+# Notarization profile name (set up with: xcrun notarytool store-credentials "MessageBridge")
+NOTARY_PROFILE="${NOTARY_PROFILE:-MessageBridge}"
+
+# Function to notarize a DMG
+notarize_dmg() {
+    local dmg_path="$1"
+    local dmg_name="$(basename "$dmg_path")"
+
+    echo -e "${YELLOW}Notarizing ${dmg_name}...${NC}"
+
+    # Submit for notarization
+    if ! xcrun notarytool submit "$dmg_path" --keychain-profile "$NOTARY_PROFILE" --wait; then
+        echo -e "${RED}Error: Notarization failed for ${dmg_name}${NC}"
+        return 1
+    fi
+
+    # Staple the notarization ticket
+    echo -e "${YELLOW}Stapling notarization ticket...${NC}"
+    if ! xcrun stapler staple "$dmg_path"; then
+        echo -e "${RED}Error: Failed to staple ${dmg_name}${NC}"
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ Notarization complete for ${dmg_name}${NC}"
+}
+
 # Parse arguments
 BUILD_TARGET="${1:-all}"
 VERSION_ARG="${2:-}"
@@ -68,6 +94,9 @@ create_server_dmg() {
     rm -rf "$SERVER_DMG_TEMP"
 
     echo -e "${GREEN}✓ Server DMG created: $SERVER_DMG_PATH${NC}"
+
+    # Notarize the DMG
+    notarize_dmg "$SERVER_DMG_PATH"
 }
 
 # Function to create client DMG
@@ -106,6 +135,9 @@ create_client_dmg() {
     rm -rf "$CLIENT_DMG_TEMP"
 
     echo -e "${GREEN}✓ Client DMG created: $CLIENT_DMG_PATH${NC}"
+
+    # Notarize the DMG
+    notarize_dmg "$CLIENT_DMG_PATH"
 }
 
 # Execute based on target
