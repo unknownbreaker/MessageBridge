@@ -55,8 +55,8 @@ create_server_dmg() {
     # Copy app to temp directory
     cp -R "$BUILD_DIR/MessageBridge Server.app" "$SERVER_DMG_TEMP/"
 
-    # Create symlink to Applications
-    ln -s /Applications "$SERVER_DMG_TEMP/Applications"
+    # Create installer app
+    "$SCRIPT_DIR/create-installer-app.sh" "MessageBridge Server" "$SERVER_DMG_TEMP"
 
     # Create DMG
     hdiutil create -volname "MessageBridge Server" \
@@ -93,8 +93,8 @@ create_client_dmg() {
     # Copy app to temp directory
     cp -R "$BUILD_DIR/MessageBridge.app" "$CLIENT_DMG_TEMP/"
 
-    # Create symlink to Applications
-    ln -s /Applications "$CLIENT_DMG_TEMP/Applications"
+    # Create installer app
+    "$SCRIPT_DIR/create-installer-app.sh" "MessageBridge" "$CLIENT_DMG_TEMP"
 
     # Create DMG
     hdiutil create -volname "MessageBridge" \
