@@ -36,6 +36,16 @@ struct MessageBridgeApp: App {
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
             }
+
+            CommandGroup(after: .toolbar) {
+                Button("Reconnect") {
+                    Task {
+                        await viewModel.reconnect()
+                    }
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(viewModel.connectionStatus == .connecting)
+            }
         }
 
         Window("Logs", id: "log-viewer") {
