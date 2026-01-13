@@ -57,22 +57,10 @@ struct ConversationRow: View {
     let conversation: Conversation
     @State private var showContactDetails = false
 
-    /// Get the photo data for the conversation avatar
-    /// For 1:1 conversations, use the participant's photo
-    /// For groups, we'll fall back to initials
-    private var avatarPhotoData: Data? {
-        guard !conversation.isGroup, conversation.participants.count == 1 else { return nil }
-        return conversation.participants.first?.photoData
-    }
-
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Avatar - uses contact photo if available
-            AvatarView(
-                name: conversation.displayName,
-                size: 40,
-                photoData: avatarPhotoData
-            )
+            // Avatar - show stacked avatars for groups, single avatar for 1:1
+            ConversationAvatarView(conversation: conversation, size: 40)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
@@ -107,6 +95,61 @@ struct ConversationRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// Avatar view for conversations - shows stacked avatars for groups
+struct ConversationAvatarView: View {
+    let conversation: Conversation
+    let size: CGFloat
+
+    var body: some View {
+        if conversation.isGroup && conversation.participants.count >= 2 {
+            // Group conversation - show stacked avatars
+            GroupAvatarView(participants: conversation.participants, size: size)
+        } else {
+            // 1:1 conversation - show single avatar
+            let participant = conversation.participants.first
+            AvatarView(
+                name: participant?.displayName ?? conversation.displayName,
+                size: size,
+                photoData: participant?.photoData
+            )
+        }
+    }
+}
+
+/// Stacked avatar view for group conversations (like Apple Messages)
+struct GroupAvatarView: View {
+    let participants: [Handle]
+    let size: CGFloat
+
+    // Size of individual avatars in the stack
+    private var smallSize: CGFloat { size * 0.7 }
+    // Offset for the second avatar
+    private var offset: CGFloat { size * 0.35 }
+
+    var body: some View {
+        ZStack {
+            // Second participant (back, top-left)
+            if participants.count > 1 {
+                AvatarView(
+                    name: participants[1].displayName,
+                    size: smallSize,
+                    photoData: participants[1].photoData
+                )
+                .offset(x: -offset / 2, y: -offset / 2)
+            }
+
+            // First participant (front, bottom-right)
+            AvatarView(
+                name: participants[0].displayName,
+                size: smallSize,
+                photoData: participants[0].photoData
+            )
+            .offset(x: offset / 2, y: offset / 2)
+        }
+        .frame(width: size, height: size)
     }
 }
 
