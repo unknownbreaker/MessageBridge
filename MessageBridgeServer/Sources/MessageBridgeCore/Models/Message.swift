@@ -51,24 +51,23 @@ extension Message {
 // MARK: - Attributed Body Text Extraction
 
 extension Message {
-    /// Extracts plain text from an attributedBody blob (NSKeyedArchiver-encoded NSAttributedString)
+    /// Extracts plain text from an attributedBody blob (NSArchiver streamtyped format)
     /// Used when the text field is NULL but attributedBody contains the message content
+    /// Note: Apple's Messages database uses the legacy streamtyped format, not NSKeyedArchiver
     public static func extractTextFromAttributedBody(_ data: Data) -> String? {
-        // The attributedBody is an NSKeyedArchiver-encoded NSAttributedString
-        // We need to unarchive it and extract the plain text
-        guard let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data) else {
+        // The attributedBody uses Apple's legacy "streamtyped" format (NSArchiver)
+        // NSUnarchiver is deprecated but is the only way to read this format
+        guard let unarchiver = NSUnarchiver(forReadingWith: data) else {
             return nil
         }
-        unarchiver.requiresSecureCoding = false
 
-        // Try to decode as NSAttributedString
-        if let attributedString = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? NSAttributedString {
-            unarchiver.finishDecoding()
-            let text = attributedString.string
-            return text.isEmpty ? nil : text
+        // Decode the root object (should be NSAttributedString or NSMutableAttributedString)
+        guard let obj = unarchiver.decodeObject(),
+              let attributedString = obj as? NSAttributedString else {
+            return nil
         }
 
-        unarchiver.finishDecoding()
-        return nil
+        let text = attributedString.string
+        return text.isEmpty ? nil : text
     }
 }
