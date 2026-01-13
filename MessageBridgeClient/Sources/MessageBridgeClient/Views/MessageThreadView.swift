@@ -24,34 +24,15 @@ struct MessageThreadView: View {
             Divider()
 
             // Messages
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(messages.reversed()) { message in
-                            MessageBubble(message: message)
-                                .id(message.id)
-                        }
-                    }
-                    .padding()
-                }
-                .onChange(of: messages.count) { _ in
-                    if let lastMessage = messages.first {
-                        withAnimation {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(messages.reversed()) { message in
+                        MessageBubble(message: message)
                     }
                 }
-                .onChange(of: conversation.id) { _ in
-                    // Scroll to bottom when conversation changes
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if let lastMessage = self.messages.first {
-                            withAnimation {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
+                .padding()
             }
+            .defaultScrollAnchor(.bottom)
 
             Divider()
 
