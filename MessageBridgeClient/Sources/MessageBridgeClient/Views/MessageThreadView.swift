@@ -34,8 +34,16 @@ struct MessageThreadView: View {
             // Messages
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    ForEach(messages.reversed()) { message in
-                        MessageBubble(message: message)
+                    let reversedMessages = messages.reversed()
+                    ForEach(Array(reversedMessages.enumerated()), id: \.element.id) { index, message in
+                        let previousMessage = index > 0 ? Array(reversedMessages)[index - 1] : nil
+                        let showSenderInfo = shouldShowSenderInfo(for: message, previousMessage: previousMessage)
+                        MessageBubble(
+                            message: message,
+                            isGroupConversation: conversation.isGroup,
+                            sender: senderForMessage(message),
+                            showSenderInfo: showSenderInfo
+                        )
                     }
                 }
                 .padding()
@@ -63,18 +71,55 @@ struct MessageThreadView: View {
         }
     }
 
+    /// Find the sender Handle for a message based on handleId
+    private func senderForMessage(_ message: Message) -> Handle? {
+        guard !message.isFromMe, let handleId = message.handleId else { return nil }
+        return conversation.participants.first { $0.id == handleId }
+    }
+
+    /// Determine if we should show sender info (avatar/name) for this message
+    /// Only show if it's a group conversation, not from me, and previous message was from different sender
+    private func shouldShowSenderInfo(for message: Message, previousMessage: Message?) -> Bool {
+        guard conversation.isGroup, !message.isFromMe else { return false }
+
+        // Always show for first message or if previous was from me
+        guard let previous = previousMessage else { return true }
+        if previous.isFromMe { return true }
+
+        // Show if sender changed
+        return message.handleId != previous.handleId
+    }
 }
 
 struct MessageBubble: View {
     let message: Message
+    let isGroupConversation: Bool
+    let sender: Handle?
+    var showSenderInfo: Bool = true
 
     var body: some View {
-        HStack {
+        HStack(alignment: .bottom, spacing: 8) {
             if message.isFromMe {
                 Spacer(minLength: 60)
+            } else if isGroupConversation {
+                // Avatar for group conversations - only show if sender info should be shown
+                if showSenderInfo {
+                    AvatarView(name: sender?.displayName ?? "?", size: 28)
+                } else {
+                    // Spacer to maintain alignment when avatar is hidden
+                    Spacer().frame(width: 28)
+                }
             }
 
             VStack(alignment: message.isFromMe ? .trailing : .leading, spacing: 2) {
+                // Show sender name in group conversations when sender changes
+                if isGroupConversation && !message.isFromMe && showSenderInfo {
+                    Text(sender?.displayName ?? "Unknown")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 4)
+                }
+
                 Text(message.text ?? "(attachment)")
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -91,6 +136,40 @@ struct MessageBubble: View {
                 Spacer(minLength: 60)
             }
         }
+    }
+}
+
+/// Avatar view showing initials in a colored circle
+struct AvatarView: View {
+    let name: String
+    let size: CGFloat
+
+    private var initials: String {
+        let components = name.split(separator: " ")
+        if components.count >= 2 {
+            let first = components[0].prefix(1)
+            let last = components[1].prefix(1)
+            return "\(first)\(last)".uppercased()
+        }
+        return String(name.prefix(2)).uppercased()
+    }
+
+    private var backgroundColor: Color {
+        // Generate a consistent color based on the name
+        let hash = abs(name.hashValue)
+        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .teal, .indigo, .mint]
+        return colors[hash % colors.count]
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(backgroundColor)
+            Text(initials)
+                .font(.system(size: size * 0.4, weight: .medium))
+                .foregroundStyle(.white)
+        }
+        .frame(width: size, height: size)
     }
 }
 
