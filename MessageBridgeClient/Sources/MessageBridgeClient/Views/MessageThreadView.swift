@@ -41,6 +41,16 @@ struct MessageThreadView: View {
                         }
                     }
                 }
+                .onChange(of: conversation.id) { _ in
+                    // Scroll to bottom when conversation changes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if let lastMessage = self.messages.first {
+                            withAnimation {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
+                }
             }
 
             Divider()
@@ -50,7 +60,8 @@ struct MessageThreadView: View {
                 sendMessage()
             }
         }
-        .task {
+        .task(id: conversation.id) {
+            // Re-run when conversation changes
             await viewModel.loadMessages(for: conversation.id)
         }
     }
@@ -62,6 +73,7 @@ struct MessageThreadView: View {
             messageText = ""
         }
     }
+
 }
 
 struct MessageBubble: View {
