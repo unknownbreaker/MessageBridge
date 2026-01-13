@@ -76,7 +76,7 @@ public struct AppVersion: Sendable, CustomStringConvertible {
 
 /// Current application version
 /// This is updated automatically during the release process
-public let appVersion = AppVersion(major: 0, minor: 3, patch: 16)
+public let appVersion = AppVersion(major: 0, minor: 3, patch: 17)
 
 /// Version string for display
 public let versionString = appVersion.description

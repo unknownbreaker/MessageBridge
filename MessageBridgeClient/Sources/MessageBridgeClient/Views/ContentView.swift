@@ -19,7 +19,6 @@ struct ContentView: View {
                 searchText: $searchText
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 350)
-            .searchable(text: $searchText, prompt: "Search conversations")
         } detail: {
             if let conversation = selectedConversation {
                 MessageThreadView(conversation: conversation)

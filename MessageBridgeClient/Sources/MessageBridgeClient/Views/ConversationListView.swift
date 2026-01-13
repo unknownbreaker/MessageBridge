@@ -17,12 +17,34 @@ struct ConversationListView: View {
     }
 
     var body: some View {
-        List(filteredConversations, id: \.id, selection: $selection) { conversation in
-            ConversationRow(conversation: conversation)
-                .tag(conversation.id)
+        VStack(spacing: 0) {
+            // Search field at top of sidebar (not in toolbar)
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search", text: $searchText)
+                    .textFieldStyle(.plain)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(8)
+            .background(Color(nsColor: .controlBackgroundColor))
+
+            Divider()
+
+            List(filteredConversations, id: \.id, selection: $selection) { conversation in
+                ConversationRow(conversation: conversation)
+                    .tag(conversation.id)
+            }
+            .listStyle(.sidebar)
         }
-        .listStyle(.sidebar)
-        .searchable(text: $searchText, prompt: "Search")
     }
 }
 
