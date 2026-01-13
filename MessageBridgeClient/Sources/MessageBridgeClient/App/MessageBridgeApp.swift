@@ -21,6 +21,7 @@ struct MessageBridgeApp: App {
                     await autoConnect()
                 }
         }
+        .defaultSize(width: 950, height: 680)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Message") {
