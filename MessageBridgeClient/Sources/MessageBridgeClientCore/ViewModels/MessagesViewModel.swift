@@ -152,10 +152,20 @@ public class MessagesViewModel: ObservableObject {
         // Clear any previous error
         lastError = nil
 
-        // Get recipient address from first participant (for group chats, server handles routing)
-        guard let recipient = conversation.participants.first?.address else {
-            lastError = BridgeError.sendFailed
-            return
+        // Determine the recipient:
+        // - For 1:1 conversations: use the participant's address
+        // - For group conversations: use the conversation ID (chat_identifier)
+        let recipient: String
+        if conversation.isGroup {
+            // Group chats: send to the chat ID directly
+            recipient = conversation.id
+        } else {
+            // 1:1 chats: send to the participant's address
+            guard let participantAddress = conversation.participants.first?.address else {
+                lastError = BridgeError.sendFailed
+                return
+            }
+            recipient = participantAddress
         }
 
         let conversationId = conversation.id
@@ -173,11 +183,10 @@ public class MessagesViewModel: ObservableObject {
         messages[conversationId, default: []].insert(optimisticMessage, at: 0)
 
         do {
-            let sentMessage = try await bridgeService.sendMessage(text: text, to: recipient)
-            // Replace optimistic message with real one
-            if let index = messages[conversationId]?.firstIndex(where: { $0.guid == optimisticMessage.guid }) {
-                messages[conversationId]?[index] = sentMessage
-            }
+            try await bridgeService.sendMessage(text: text, to: recipient)
+            // Send succeeded - keep the optimistic message
+            // The real message will arrive via WebSocket and replace it
+            logDebug("Message sent successfully to \(recipient)")
         } catch {
             // Remove optimistic message on failure
             messages[conversationId]?.removeAll { $0.guid == optimisticMessage.guid }

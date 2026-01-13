@@ -1,7 +1,8 @@
 import Foundation
 
 /// Sends messages via AppleScript to Messages.app
-public actor AppleScriptMessageSender: MessageSenderProtocol {
+/// Uses @unchecked Sendable since it has no mutable state
+public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked Sendable {
 
     public init() {}
 
@@ -27,9 +28,21 @@ public actor AppleScriptMessageSender: MessageSenderProtocol {
         )
     }
 
-    // MARK: - Private Methods
+    // MARK: - Internal Methods (accessible for testing)
 
-    private func buildAppleScript(recipient: String, text: String, service: String) -> String {
+    /// Determine if the recipient is a group chat ID rather than an individual recipient
+    /// Group chat IDs typically start with "chat" or contain the pattern for group chats
+    func isGroupChatId(_ recipient: String) -> Bool {
+        // Group chat IDs in Messages database:
+        // - Start with "chat" followed by digits (e.g., "chat123456789")
+        // - May have prefix like "iMessage;+;chat123456789"
+        let lowercased = recipient.lowercased()
+        return lowercased.hasPrefix("chat") || lowercased.contains(";chat")
+    }
+
+    /// Build the AppleScript to send a message
+    /// Uses different approaches for individual recipients vs group chats
+    func buildAppleScript(recipient: String, text: String, service: String) -> String {
         // Escape special characters in the text for AppleScript
         let escapedText = text
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -39,16 +52,36 @@ public actor AppleScriptMessageSender: MessageSenderProtocol {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
 
-        // Build the AppleScript
-        // Note: This uses the buddy-based approach which works for iMessage
-        // For SMS, the recipient would need to be in the user's contacts
-        return """
-        tell application "Messages"
-            set targetService to 1st account whose service type = \(service)
-            set targetBuddy to participant "\(escapedRecipient)" of targetService
-            send "\(escapedText)" to targetBuddy
-        end tell
-        """
+        if isGroupChatId(recipient) {
+            // Group chat: find the chat by matching its ID suffix
+            // AppleScript chat IDs have format "service;+;chatXXX" but database has just "chatXXX"
+            // We search for a chat whose ID ends with the chat identifier
+            return """
+            tell application "Messages"
+                set targetChat to missing value
+                repeat with aChat in chats
+                    if id of aChat ends with "\(escapedRecipient)" then
+                        set targetChat to aChat
+                        exit repeat
+                    end if
+                end repeat
+                if targetChat is not missing value then
+                    send "\(escapedText)" to targetChat
+                else
+                    error "Chat not found: \(escapedRecipient)"
+                end if
+            end tell
+            """
+        } else {
+            // Individual recipient: send to participant
+            return """
+            tell application "Messages"
+                set targetService to 1st account whose service type = \(service)
+                set targetBuddy to participant "\(escapedRecipient)" of targetService
+                send "\(escapedText)" to targetBuddy
+            end tell
+            """
+        }
     }
 
     private func executeAppleScript(_ source: String) async throws {

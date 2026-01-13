@@ -9,7 +9,7 @@ public protocol BridgeServiceProtocol: Sendable {
     func disconnect() async
     func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation]
     func fetchMessages(conversationId: String, limit: Int, offset: Int) async throws -> [Message]
-    func sendMessage(text: String, to recipient: String) async throws -> Message
+    func sendMessage(text: String, to recipient: String) async throws
     func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws
     func stopWebSocket() async
     func fetchAttachment(id: Int64) async throws -> Data
@@ -25,6 +25,14 @@ struct ConversationsResponse: Codable {
 struct MessagesResponse: Codable {
     let messages: [Message]
     let nextCursor: String?
+}
+
+/// Response from POST /send endpoint
+struct SendResponse: Codable {
+    let success: Bool
+    let recipient: String
+    let service: String
+    let timestamp: Date
 }
 
 /// WebSocket message envelope - decode type first, then data based on type
@@ -186,7 +194,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
         return messagesResponse.messages
     }
 
-    public func sendMessage(text: String, to recipient: String) async throws -> Message {
+    public func sendMessage(text: String, to recipient: String) async throws {
         guard let serverURL, let apiKey else {
             throw BridgeError.notConnected
         }
@@ -215,7 +223,11 @@ public actor BridgeConnection: BridgeServiceProtocol {
             throw BridgeError.sendFailed
         }
 
-        return try decryptResponse(data, as: Message.self)
+        // Verify the response is valid (server returns SendResponse)
+        let sendResponse = try decryptResponse(data, as: SendResponse.self)
+        if !sendResponse.success {
+            throw BridgeError.sendFailed
+        }
     }
 
     public func fetchAttachment(id: Int64) async throws -> Data {

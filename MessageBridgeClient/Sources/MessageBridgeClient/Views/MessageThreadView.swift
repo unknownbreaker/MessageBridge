@@ -135,6 +135,11 @@ struct MessageBubble: View {
                         .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
                         .foregroundStyle(message.isFromMe ? .white : .primary)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                    // Show link preview for first URL in message (like Apple Messages)
+                    if let firstURL = URLDetector.firstURL(in: text) {
+                        LinkPreviewView(url: firstURL)
+                    }
                 }
 
                 Text(message.date, style: .time)

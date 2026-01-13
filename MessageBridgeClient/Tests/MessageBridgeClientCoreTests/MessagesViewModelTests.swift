@@ -13,7 +13,6 @@ actor MockBridgeService: BridgeServiceProtocol {
 
     var conversationsToReturn: [Conversation] = []
     var messagesToReturn: [Message] = []
-    var messageToReturn: Message?
     var shouldThrowError = false
     var lastRecipient: String?
     var lastMessageText: String?
@@ -46,14 +45,13 @@ actor MockBridgeService: BridgeServiceProtocol {
         return messagesToReturn
     }
 
-    func sendMessage(text: String, to recipient: String) async throws -> Message {
+    func sendMessage(text: String, to recipient: String) async throws {
         sendMessageCalled = true
         lastRecipient = recipient
         lastMessageText = text
         if shouldThrowError {
             throw BridgeError.sendFailed
         }
-        return messageToReturn!
     }
 
     func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws {
@@ -212,17 +210,6 @@ final class MessagesViewModelTests: XCTestCase {
 
     func testSendMessage_success_addsMessageToList() async {
         let mockService = MockBridgeService()
-        let sentMessage = Message(
-            id: 100,
-            guid: "sent-msg-guid",
-            text: "Hello!",
-            date: Date(),
-            isFromMe: true,
-            handleId: nil,
-            conversationId: "chat-1"
-        )
-        await mockService.setMessageToReturn(sentMessage)
-
         let viewModel = createViewModel(mockService: mockService)
 
         // Set up a conversation with a participant to send to
@@ -241,24 +228,12 @@ final class MessagesViewModelTests: XCTestCase {
 
         let sendCalled = await mockService.sendMessageCalled
         XCTAssertTrue(sendCalled)
+        // Optimistic message should be in the list
         XCTAssertEqual(viewModel.messages["chat-1"]?.first?.text, "Hello!")
     }
 
     func testSendMessage_optimisticUpdate_showsMessageImmediately() async {
         let mockService = MockBridgeService()
-
-        // Make the service slow by adding delay in test
-        let sentMessage = Message(
-            id: 100,
-            guid: "sent-msg-guid",
-            text: "Hello!",
-            date: Date(),
-            isFromMe: true,
-            handleId: nil,
-            conversationId: "chat-1"
-        )
-        await mockService.setMessageToReturn(sentMessage)
-
         let viewModel = createViewModel(mockService: mockService)
 
         let conversation = Conversation(
@@ -307,17 +282,6 @@ final class MessagesViewModelTests: XCTestCase {
 
     func testSendMessage_passesRecipientToService() async {
         let mockService = MockBridgeService()
-        let sentMessage = Message(
-            id: 100,
-            guid: "sent-msg-guid",
-            text: "Hello!",
-            date: Date(),
-            isFromMe: true,
-            handleId: nil,
-            conversationId: "chat-1"
-        )
-        await mockService.setMessageToReturn(sentMessage)
-
         let viewModel = createViewModel(mockService: mockService)
 
         let conversation = Conversation(
@@ -336,6 +300,162 @@ final class MessagesViewModelTests: XCTestCase {
         let lastRecipient = await mockService.lastRecipient
         XCTAssertEqual(lastRecipient, "+15551234567")
     }
+
+    // MARK: - Group Conversation Message Routing Tests
+
+    func testSendMessage_toOneOnOneConversation_sendsToParticipantAddress() async {
+        let mockService = MockBridgeService()
+        let viewModel = createViewModel(mockService: mockService)
+
+        // 1:1 conversation with single participant
+        let conversation = Conversation(
+            id: "iMessage;-;+15551234567",
+            guid: "guid-1",
+            displayName: "John Doe",
+            participants: [Handle(id: 1, address: "+15551234567", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+
+        await viewModel.sendMessage("Hello!", toConversation: conversation)
+
+        let lastRecipient = await mockService.lastRecipient
+        // For 1:1 conversations, we send to the participant's address
+        XCTAssertEqual(lastRecipient, "+15551234567")
+    }
+
+    func testSendMessage_toGroupConversation_sendsToChatId() async {
+        let mockService = MockBridgeService()
+        let groupChatId = "chat123456789"
+        let viewModel = createViewModel(mockService: mockService)
+
+        // Group conversation with multiple participants
+        let groupConversation = Conversation(
+            id: groupChatId,
+            guid: "guid-group",
+            displayName: "Team Chat",
+            participants: [
+                Handle(id: 1, address: "+15551234567", service: "iMessage"),
+                Handle(id: 2, address: "+15559876543", service: "iMessage"),
+                Handle(id: 3, address: "+15555555555", service: "iMessage")
+            ],
+            lastMessage: nil,
+            isGroup: true
+        )
+
+        await viewModel.sendMessage("Hello group!", toConversation: groupConversation)
+
+        let lastRecipient = await mockService.lastRecipient
+        // For group conversations, we should send to the chat ID, not the first participant
+        XCTAssertEqual(lastRecipient, groupChatId)
+    }
+
+    func testSendMessage_toGroupConversation_doesNotSendToFirstParticipant() async {
+        let mockService = MockBridgeService()
+        let groupChatId = "chat123456789"
+        let viewModel = createViewModel(mockService: mockService)
+
+        let groupConversation = Conversation(
+            id: groupChatId,
+            guid: "guid-group",
+            displayName: "Team Chat",
+            participants: [
+                Handle(id: 1, address: "+15551234567", service: "iMessage"),
+                Handle(id: 2, address: "+15559876543", service: "iMessage")
+            ],
+            lastMessage: nil,
+            isGroup: true
+        )
+
+        await viewModel.sendMessage("Hello group!", toConversation: groupConversation)
+
+        let lastRecipient = await mockService.lastRecipient
+        // Verify it does NOT send to the first participant's address
+        XCTAssertNotEqual(lastRecipient, "+15551234567")
+        XCTAssertNotEqual(lastRecipient, "+15559876543")
+    }
+
+    func testSendMessage_addsMessageToCorrectConversation() async {
+        let mockService = MockBridgeService()
+
+        let viewModel = createViewModel(mockService: mockService)
+
+        // Set up two conversations
+        let conversation1 = Conversation(
+            id: "chat-1",
+            guid: "guid-1",
+            displayName: "Alice",
+            participants: [Handle(id: 1, address: "+15551111111", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        let conversation2 = Conversation(
+            id: "chat-2",
+            guid: "guid-2",
+            displayName: "Bob",
+            participants: [Handle(id: 2, address: "+15552222222", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        await mockService.setConversationsToReturn([conversation1, conversation2])
+        await viewModel.loadConversations()
+
+        // Send message to conversation 1
+        await viewModel.sendMessage("Hello Alice!", toConversation: conversation1)
+
+        // Verify message is in conversation 1, not conversation 2
+        XCTAssertEqual(viewModel.messages["chat-1"]?.count, 1)
+        XCTAssertEqual(viewModel.messages["chat-1"]?.first?.text, "Hello Alice!")
+        XCTAssertNil(viewModel.messages["chat-2"])
+    }
+
+    func testReceiveMessage_addsToCorrectConversation() async {
+        let mockService = MockBridgeService()
+
+        let viewModel = createViewModel(mockService: mockService)
+
+        // Set up two conversations
+        let conversation1 = Conversation(
+            id: "chat-1",
+            guid: "guid-1",
+            displayName: "Alice",
+            participants: [Handle(id: 1, address: "+15551111111", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        let conversation2 = Conversation(
+            id: "chat-2",
+            guid: "guid-2",
+            displayName: "Bob",
+            participants: [Handle(id: 2, address: "+15552222222", service: "iMessage")],
+            lastMessage: nil,
+            isGroup: false
+        )
+        await mockService.setConversationsToReturn([conversation1, conversation2])
+
+        // Connect to set up WebSocket
+        await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+        // Simulate receiving a message for conversation 1
+        let incomingMessage = Message(
+            id: 200,
+            guid: "msg-200",
+            text: "Hey there!",
+            date: Date(),
+            isFromMe: false,
+            handleId: 1,
+            conversationId: "chat-1"
+        )
+        await mockService.simulateNewMessage(incomingMessage, sender: "Alice")
+
+        // Give the async handler time to process
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+
+        // Verify message is in conversation 1, not conversation 2
+        XCTAssertEqual(viewModel.messages["chat-1"]?.count, 1)
+        XCTAssertEqual(viewModel.messages["chat-1"]?.first?.text, "Hey there!")
+        XCTAssertNil(viewModel.messages["chat-2"])
+    }
 }
 
 // MARK: - MockBridgeService Helpers
@@ -347,9 +467,5 @@ extension MockBridgeService {
 
     func setConversationsToReturn(_ conversations: [Conversation]) {
         conversationsToReturn = conversations
-    }
-
-    func setMessageToReturn(_ message: Message) {
-        messageToReturn = message
     }
 }
