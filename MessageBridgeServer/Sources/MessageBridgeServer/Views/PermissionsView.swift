@@ -51,7 +51,7 @@ struct PermissionsView: View {
             HStack {
                 Button("Refresh") {
                     Task {
-                        await checkPermissions()
+                        await checkPermissions(showLoading: true)
                     }
                 }
 
@@ -71,9 +71,16 @@ struct PermissionsView: View {
             }
             .padding()
         }
-        .frame(width: 450, height: 400)
+        .frame(width: 450, height: 500)
         .task {
-            await checkPermissions()
+            await checkPermissions(showLoading: true)
+            // Poll for permission changes every 2 seconds while window is open
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if !Task.isCancelled {
+                    await checkPermissions(showLoading: false)
+                }
+            }
         }
     }
 
@@ -81,10 +88,14 @@ struct PermissionsView: View {
         permissions.allSatisfy { $0.isGranted }
     }
 
-    private func checkPermissions() async {
-        isLoading = true
+    private func checkPermissions(showLoading: Bool = true) async {
+        if showLoading {
+            isLoading = true
+        }
         permissions = await permissionsManager.checkAllPermissions()
-        isLoading = false
+        if showLoading {
+            isLoading = false
+        }
     }
 }
 
@@ -107,6 +118,13 @@ struct PermissionRow: View {
                 Text(permission.description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                // Show manual setup note if required and not granted
+                if permission.requiresManualSetup && !permission.isGranted {
+                    Text("⚠️ Must be added manually via + button in Settings")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
 
             Spacer()

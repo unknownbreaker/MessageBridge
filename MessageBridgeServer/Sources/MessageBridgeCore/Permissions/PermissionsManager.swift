@@ -9,13 +9,15 @@ public struct PermissionStatus: Identifiable, Sendable {
     public let description: String
     public let isGranted: Bool
     public let settingsURL: URL?
+    public let requiresManualSetup: Bool
 
-    public init(id: String, name: String, description: String, isGranted: Bool, settingsURL: URL?) {
+    public init(id: String, name: String, description: String, isGranted: Bool, settingsURL: URL?, requiresManualSetup: Bool = false) {
         self.id = id
         self.name = name
         self.description = description
         self.isGranted = isGranted
         self.settingsURL = settingsURL
+        self.requiresManualSetup = requiresManualSetup
     }
 }
 
@@ -44,7 +46,8 @@ public actor PermissionsManager {
             name: "Full Disk Access",
             description: "Required to read the Messages database (chat.db)",
             isGranted: fullDiskAccess,
-            settingsURL: fullDiskAccessURL
+            settingsURL: fullDiskAccessURL,
+            requiresManualSetup: true
         ))
 
         // Contacts - required to look up contact names
@@ -87,13 +90,21 @@ public actor PermissionsManager {
     /// Check if Full Disk Access is granted by trying to read the Messages database
     private nonisolated func checkFullDiskAccess() -> Bool {
         let chatDBPath = NSHomeDirectory() + "/Library/Messages/chat.db"
-        return FileManager.default.isReadableFile(atPath: chatDBPath)
+        // Actually try to open the file - isReadableFile can be cached
+        guard let handle = FileHandle(forReadingAtPath: chatDBPath) else {
+            return false
+        }
+        handle.closeFile()
+        return true
     }
 
     /// Check if Contacts access is granted
     private func checkContactsAccess() async -> Bool {
         let status = CNContactStore.authorizationStatus(for: .contacts)
 
+        // Handle all possible authorization statuses
+        // .notDetermined = 0, .restricted = 1, .denied = 2, .authorized = 3
+        // On macOS 15+ / iOS 18+: .fullAccess, .limitedAccess may also be present
         switch status {
         case .authorized:
             return true
@@ -105,8 +116,12 @@ public actor PermissionsManager {
             } catch {
                 return false
             }
-        default:
+        case .restricted, .denied:
             return false
+        @unknown default:
+            // Handle future cases (like .fullAccess, .limitedAccess on newer OS)
+            // If rawValue >= 3, treat as some form of access granted
+            return status.rawValue >= 3
         }
     }
 

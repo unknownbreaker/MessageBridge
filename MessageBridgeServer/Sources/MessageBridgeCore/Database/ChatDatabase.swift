@@ -89,6 +89,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                     m.ROWID as message_id,
                     m.guid as message_guid,
                     m.text,
+                    m.attributedBody,
                     m.date as message_date,
                     m.is_from_me,
                     m.handle_id
@@ -122,6 +123,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                     m.ROWID as id,
                     m.guid,
                     m.text,
+                    m.attributedBody,
                     m.date,
                     m.is_from_me,
                     m.handle_id
@@ -136,10 +138,23 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             let rows = try Row.fetchAll(db, sql: sql, arguments: [conversationId, limit, offset])
 
             return rows.map { row in
-                Message(
+                let text: String? = row["text"]
+                let attributedBody: Data? = row["attributedBody"]
+
+                // Use text if available, otherwise try to extract from attributedBody
+                let messageText: String?
+                if let text = text, !text.isEmpty {
+                    messageText = text
+                } else if let attributedBody = attributedBody {
+                    messageText = Message.extractTextFromAttributedBody(attributedBody)
+                } else {
+                    messageText = nil
+                }
+
+                return Message(
                     id: row["id"],
                     guid: row["guid"],
-                    text: row["text"],
+                    text: messageText,
                     date: Message.dateFromAppleTimestamp(row["date"]),
                     isFromMe: (row["is_from_me"] as Int?) == 1,
                     handleId: row["handle_id"],
@@ -158,6 +173,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                     m.ROWID as id,
                     m.guid,
                     m.text,
+                    m.attributedBody,
                     m.date,
                     m.is_from_me,
                     m.handle_id,
@@ -176,10 +192,24 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                 guard let conversationId: String = row["conversation_id"] else {
                     return nil
                 }
+
+                let text: String? = row["text"]
+                let attributedBody: Data? = row["attributedBody"]
+
+                // Use text if available, otherwise try to extract from attributedBody
+                let messageText: String?
+                if let text = text, !text.isEmpty {
+                    messageText = text
+                } else if let attributedBody = attributedBody {
+                    messageText = Message.extractTextFromAttributedBody(attributedBody)
+                } else {
+                    messageText = nil
+                }
+
                 return Message(
                     id: row["id"],
                     guid: row["guid"],
-                    text: row["text"],
+                    text: messageText,
                     date: Message.dateFromAppleTimestamp(row["date"]),
                     isFromMe: (row["is_from_me"] as Int?) == 1,
                     handleId: row["handle_id"],
@@ -257,10 +287,23 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             return nil
         }
 
+        let text: String? = row["text"]
+        let attributedBody: Data? = row["attributedBody"]
+
+        // Use text if available, otherwise try to extract from attributedBody
+        let messageText: String?
+        if let text = text, !text.isEmpty {
+            messageText = text
+        } else if let attributedBody = attributedBody {
+            messageText = Message.extractTextFromAttributedBody(attributedBody)
+        } else {
+            messageText = nil
+        }
+
         return Message(
             id: messageId,
             guid: messageGuid,
-            text: row["text"],
+            text: messageText,
             date: Message.dateFromAppleTimestamp(messageDate),
             isFromMe: (row["is_from_me"] as Int?) == 1,
             handleId: row["handle_id"],

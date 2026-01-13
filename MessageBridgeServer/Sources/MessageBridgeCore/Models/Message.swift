@@ -47,3 +47,28 @@ extension Message {
         return Date(timeIntervalSinceReferenceDate: seconds)
     }
 }
+
+// MARK: - Attributed Body Text Extraction
+
+extension Message {
+    /// Extracts plain text from an attributedBody blob (NSKeyedArchiver-encoded NSAttributedString)
+    /// Used when the text field is NULL but attributedBody contains the message content
+    public static func extractTextFromAttributedBody(_ data: Data) -> String? {
+        // The attributedBody is an NSKeyedArchiver-encoded NSAttributedString
+        // We need to unarchive it and extract the plain text
+        guard let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data) else {
+            return nil
+        }
+        unarchiver.requiresSecureCoding = false
+
+        // Try to decode as NSAttributedString
+        if let attributedString = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? NSAttributedString {
+            unarchiver.finishDecoding()
+            let text = attributedString.string
+            return text.isEmpty ? nil : text
+        }
+
+        unarchiver.finishDecoding()
+        return nil
+    }
+}

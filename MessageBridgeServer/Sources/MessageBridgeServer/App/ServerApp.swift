@@ -224,6 +224,12 @@ struct MenuContentView: View {
             WindowManager.shared.openSettings()
         }
 
+        Button("Permissions...") {
+            debugLog("Permissions clicked")
+            WindowManager.shared.appState = appState
+            WindowManager.shared.openPermissions()
+        }
+
         Divider()
 
         Button("About MessageBridge Server") {

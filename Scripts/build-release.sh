@@ -130,15 +130,34 @@ build_server() {
     <true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>MessageBridge needs to send messages via Messages.app</string>
+    <key>NSContactsUsageDescription</key>
+    <string>MessageBridge needs access to Contacts to display contact names for conversations</string>
 </dict>
 </plist>
 EOF
 
+    # Create entitlements file for hardened runtime
+    ENTITLEMENTS_FILE="$BUILD_DIR/server-entitlements.plist"
+    cat > "$ENTITLEMENTS_FILE" << 'ENTEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.personal-information.addressbook</key>
+    <true/>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>
+ENTEOF
+
     # Code sign the app with hardened runtime (required for notarization)
     SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application}"
     if security find-identity -v -p codesigning | grep -q "$SIGNING_IDENTITY"; then
-        echo -e "${YELLOW}Signing server app...${NC}"
-        codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$SERVER_APP"
+        echo -e "${YELLOW}Signing server app with entitlements...${NC}"
+        codesign --force --deep --options runtime --timestamp --entitlements "$ENTITLEMENTS_FILE" --sign "$SIGNING_IDENTITY" "$SERVER_APP"
+        # Clear extended attributes that can interfere with permissions
+        xattr -cr "$SERVER_APP"
         echo -e "${GREEN}✓ Server app signed${NC}"
     else
         echo -e "${YELLOW}Warning: No signing identity found. App will not be notarizable.${NC}"
