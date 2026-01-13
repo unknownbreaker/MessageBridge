@@ -9,14 +9,16 @@ public struct Conversation: Content, Identifiable, Sendable {
     public let participants: [Handle]   // Contacts in this conversation
     public let lastMessage: Message?    // Most recent message
     public let isGroup: Bool            // True if more than one participant
+    public let groupPhotoBase64: String? // Group photo as base64-encoded image (PNG)
 
-    public init(id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?, isGroup: Bool) {
+    public init(id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?, isGroup: Bool, groupPhotoBase64: String? = nil) {
         self.id = id
         self.guid = guid
         self.displayName = displayName
         self.participants = participants
         self.lastMessage = lastMessage
         self.isGroup = isGroup
+        self.groupPhotoBase64 = groupPhotoBase64
     }
 
     /// Best display name for this conversation

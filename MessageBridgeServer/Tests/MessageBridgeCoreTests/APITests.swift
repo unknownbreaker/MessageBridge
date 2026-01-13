@@ -47,6 +47,19 @@ final class MockChatDatabase: ChatDatabaseProtocol, @unchecked Sendable {
         }
         return searchResultsToReturn
     }
+
+    var attachmentToReturn: (attachment: Attachment, filePath: String)?
+    var fetchAttachmentCalled = false
+    var lastAttachmentId: Int64?
+
+    func fetchAttachment(id: Int64) async throws -> (attachment: Attachment, filePath: String)? {
+        fetchAttachmentCalled = true
+        lastAttachmentId = id
+        if shouldThrowError {
+            throw DatabaseError.queryFailed
+        }
+        return attachmentToReturn
+    }
 }
 
 enum DatabaseError: Error {
@@ -345,6 +358,125 @@ final class APITests: XCTestCase {
             try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello"))
         }) { response in
             XCTAssertEqual(response.status, .internalServerError)
+        }
+    }
+
+    // MARK: - Attachments Endpoint Tests
+
+    func testAttachments_withValidId_returnsFile() throws {
+        let mockDb = MockChatDatabase()
+        let testAttachment = Attachment(
+            id: 123,
+            guid: "test-guid",
+            filename: "test.txt",
+            mimeType: "text/plain",
+            uti: nil,
+            size: 11,
+            isOutgoing: false,
+            isSticker: false
+        )
+
+        // Create a temporary test file
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFilePath = tempDir.appendingPathComponent("test-attachment.txt").path
+        try "Hello World".write(toFile: testFilePath, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: testFilePath) }
+
+        mockDb.attachmentToReturn = (testAttachment, testFilePath)
+
+        let app = try createTestApp(database: mockDb)
+        defer { app.shutdown() }
+
+        try app.test(.GET, "attachments/123", headers: ["X-API-Key": "test-api-key"]) { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertEqual(response.headers.contentType?.type, "text")
+            XCTAssertEqual(response.headers.contentType?.subType, "plain")
+        }
+
+        XCTAssertTrue(mockDb.fetchAttachmentCalled)
+        XCTAssertEqual(mockDb.lastAttachmentId, 123)
+    }
+
+    func testAttachments_withInvalidId_returnsBadRequest() throws {
+        let app = try createTestApp()
+        defer { app.shutdown() }
+
+        try app.test(.GET, "attachments/invalid", headers: ["X-API-Key": "test-api-key"]) { response in
+            XCTAssertEqual(response.status, .badRequest)
+        }
+    }
+
+    func testAttachments_withNonexistentId_returnsNotFound() throws {
+        let mockDb = MockChatDatabase()
+        mockDb.attachmentToReturn = nil  // Attachment not found
+
+        let app = try createTestApp(database: mockDb)
+        defer { app.shutdown() }
+
+        try app.test(.GET, "attachments/999", headers: ["X-API-Key": "test-api-key"]) { response in
+            XCTAssertEqual(response.status, .notFound)
+        }
+    }
+
+    func testAttachments_withMissingFile_returnsNotFound() throws {
+        let mockDb = MockChatDatabase()
+        let testAttachment = Attachment(
+            id: 123,
+            guid: "test-guid",
+            filename: "missing.txt",
+            mimeType: "text/plain",
+            uti: nil,
+            size: 100,
+            isOutgoing: false,
+            isSticker: false
+        )
+        mockDb.attachmentToReturn = (testAttachment, "/nonexistent/path/to/file.txt")
+
+        let app = try createTestApp(database: mockDb)
+        defer { app.shutdown() }
+
+        try app.test(.GET, "attachments/123", headers: ["X-API-Key": "test-api-key"]) { response in
+            XCTAssertEqual(response.status, .notFound)
+        }
+    }
+
+    func testAttachments_withoutAPIKey_returnsUnauthorized() throws {
+        let app = try createTestApp()
+        defer { app.shutdown() }
+
+        try app.test(.GET, "attachments/123") { response in
+            XCTAssertEqual(response.status, .unauthorized)
+        }
+    }
+
+    func testAttachments_withImageMimeType_setsCorrectContentType() throws {
+        let mockDb = MockChatDatabase()
+        let testAttachment = Attachment(
+            id: 456,
+            guid: "img-guid",
+            filename: "photo.jpg",
+            mimeType: "image/jpeg",
+            uti: nil,
+            size: 1000,
+            isOutgoing: false,
+            isSticker: false
+        )
+
+        // Create a temporary test file (just use text for testing, content doesn't matter)
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFilePath = tempDir.appendingPathComponent("test-image.jpg").path
+        try "fake image data".write(toFile: testFilePath, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: testFilePath) }
+
+        mockDb.attachmentToReturn = (testAttachment, testFilePath)
+
+        let app = try createTestApp(database: mockDb)
+        defer { app.shutdown() }
+
+        try app.test(.GET, "attachments/456", headers: ["X-API-Key": "test-api-key"]) { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertEqual(response.headers.contentType?.type, "image")
+            XCTAssertEqual(response.headers.contentType?.subType, "jpeg")
         }
     }
 

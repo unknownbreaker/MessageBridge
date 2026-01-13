@@ -59,6 +59,49 @@ public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, 
         }
     }
 
+    // GET /attachments/:id - Serve attachment file
+    protected.get("attachments", ":id") { req async throws -> Response in
+        guard let idString = req.parameters.get("id"),
+              let attachmentId = Int64(idString) else {
+            throw Abort(.badRequest, reason: "Invalid attachment ID")
+        }
+
+        do {
+            guard let result = try await database.fetchAttachment(id: attachmentId) else {
+                throw Abort(.notFound, reason: "Attachment not found")
+            }
+
+            let (attachment, filePath) = result
+
+            // Check if file exists
+            guard FileManager.default.fileExists(atPath: filePath) else {
+                throw Abort(.notFound, reason: "Attachment file not found")
+            }
+
+            // Determine content type
+            let contentType: HTTPMediaType
+            if let mimeType = attachment.mimeType {
+                contentType = HTTPMediaType(
+                    type: String(mimeType.split(separator: "/").first ?? "application"),
+                    subType: String(mimeType.split(separator: "/").last ?? "octet-stream")
+                )
+            } else {
+                contentType = .binary
+            }
+
+            // Stream the file
+            let response = req.fileio.streamFile(at: filePath)
+            response.headers.contentType = contentType
+            response.headers.add(name: .contentDisposition, value: "inline; filename=\"\(attachment.filename)\"")
+
+            return response
+        } catch let abort as Abort {
+            throw abort
+        } catch {
+            throw Abort(.internalServerError, reason: "Failed to fetch attachment")
+        }
+    }
+
     // POST /send - Send a message
     protected.post("send") { req async throws -> SendResponse in
         let sendRequest: SendMessageRequest

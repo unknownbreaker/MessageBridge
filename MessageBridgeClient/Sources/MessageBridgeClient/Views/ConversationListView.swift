@@ -58,11 +58,19 @@ struct ConversationRow: View {
     @State private var showContactDetails = false
 
     /// Get the photo data for the conversation avatar
+    /// For groups with custom photos, use the group photo
     /// For 1:1 conversations, use the participant's photo
-    /// For groups, show initials only (custom group photos are in CloudKit, not accessible)
+    /// For groups without photos, show initials
     private var avatarPhotoData: Data? {
-        guard !conversation.isGroup, conversation.participants.count == 1 else { return nil }
-        return conversation.participants.first?.photoData
+        // Group conversations - prefer group photo
+        if conversation.isGroup {
+            return conversation.groupPhotoData
+        }
+        // 1:1 conversations - use participant's contact photo
+        if conversation.participants.count == 1 {
+            return conversation.participants.first?.photoData
+        }
+        return nil
     }
 
     var body: some View {

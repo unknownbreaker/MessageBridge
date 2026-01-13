@@ -10,8 +10,9 @@ public struct Message: Content, Identifiable, Sendable {
     public let isFromMe: Bool
     public let handleId: Int64?
     public let conversationId: String
+    public let attachments: [Attachment]
 
-    public init(id: Int64, guid: String, text: String?, date: Date, isFromMe: Bool, handleId: Int64?, conversationId: String) {
+    public init(id: Int64, guid: String, text: String?, date: Date, isFromMe: Bool, handleId: Int64?, conversationId: String, attachments: [Attachment] = []) {
         self.id = id
         self.guid = guid
         self.text = text
@@ -19,12 +20,18 @@ public struct Message: Content, Identifiable, Sendable {
         self.isFromMe = isFromMe
         self.handleId = handleId
         self.conversationId = conversationId
+        self.attachments = attachments
     }
 
     /// Whether this message has text content (vs attachment-only or reaction)
     public var hasText: Bool {
         guard let text = text else { return false }
         return !text.isEmpty
+    }
+
+    /// Whether this message has any attachments
+    public var hasAttachments: Bool {
+        !attachments.isEmpty
     }
 }
 

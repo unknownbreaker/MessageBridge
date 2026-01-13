@@ -12,6 +12,7 @@ public protocol BridgeServiceProtocol: Sendable {
     func sendMessage(text: String, to recipient: String) async throws -> Message
     func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws
     func stopWebSocket() async
+    func fetchAttachment(id: Int64) async throws -> Data
 }
 
 /// Response wrapper for conversations endpoint
@@ -217,6 +218,33 @@ public actor BridgeConnection: BridgeServiceProtocol {
         return try decryptResponse(data, as: Message.self)
     }
 
+    public func fetchAttachment(id: Int64) async throws -> Data {
+        guard let serverURL, let apiKey else {
+            throw BridgeError.notConnected
+        }
+
+        let url = serverURL.appendingPathComponent("attachments/\(id)")
+        var request = URLRequest(url: url)
+        request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        // Note: Attachments are served as raw binary, not encrypted
+        // E2E encryption only applies to JSON API responses
+
+        let (data, response) = try await urlSession.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BridgeError.requestFailed
+        }
+
+        switch httpResponse.statusCode {
+        case 200:
+            return data
+        case 404:
+            throw BridgeError.attachmentNotFound
+        default:
+            throw BridgeError.requestFailed
+        }
+    }
+
     public func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws {
         guard let serverURL, let apiKey else {
             throw BridgeError.notConnected
@@ -345,6 +373,7 @@ public enum BridgeError: LocalizedError {
     case connectionFailed
     case requestFailed
     case sendFailed
+    case attachmentNotFound
 
     public var errorDescription: String? {
         switch self {
@@ -356,6 +385,8 @@ public enum BridgeError: LocalizedError {
             return "Request failed"
         case .sendFailed:
             return "Failed to send message"
+        case .attachmentNotFound:
+            return "Attachment not found"
         }
     }
 }

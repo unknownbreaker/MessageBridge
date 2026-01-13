@@ -120,12 +120,22 @@ struct MessageBubble: View {
                         .padding(.leading, 4)
                 }
 
-                Text(message.text ?? "(attachment)")
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
-                    .foregroundStyle(message.isFromMe ? .white : .primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                // Display attachments first (like Apple Messages)
+                if message.hasAttachments {
+                    ForEach(message.attachments) { attachment in
+                        AttachmentView(attachment: attachment)
+                    }
+                }
+
+                // Display text if present
+                if let text = message.text, !text.isEmpty {
+                    Text(text)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
+                        .foregroundStyle(message.isFromMe ? .white : .primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
 
                 Text(message.date, style: .time)
                     .font(.caption2)

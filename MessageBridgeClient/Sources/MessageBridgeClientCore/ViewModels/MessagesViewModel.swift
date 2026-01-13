@@ -144,6 +144,10 @@ public class MessagesViewModel: ObservableObject {
         }
     }
 
+    public func fetchAttachment(id: Int64) async throws -> Data {
+        return try await bridgeService.fetchAttachment(id: id)
+    }
+
     public func sendMessage(_ text: String, toConversation conversation: Conversation) async {
         // Clear any previous error
         lastError = nil

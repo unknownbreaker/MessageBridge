@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import AppKit
 
 /// Provides read-only access to the macOS Messages database (chat.db)
 public actor ChatDatabase: ChatDatabaseProtocol {
@@ -55,7 +56,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         // Look up contact info (name and photo) for all addresses at once
         let contactInfo = await contactManager.lookupContactInfo(for: Array(allAddresses))
 
-        // Enrich conversations with contact names and photos
+        // Enrich conversations with contact names, photos, and group photos
         return conversations.map { conversation in
             let enrichedParticipants = conversation.participants.map { handle in
                 let info = contactInfo[handle.address]
@@ -67,13 +68,23 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                     photoBase64: info?.photoData?.base64EncodedString()
                 )
             }
+
+            // Look up group photo for group conversations
+            var groupPhotoBase64: String? = nil
+            if conversation.isGroup {
+                if let photoData = lookupGroupPhoto(for: conversation.guid) {
+                    groupPhotoBase64 = photoData.base64EncodedString()
+                }
+            }
+
             return Conversation(
                 id: conversation.id,
                 guid: conversation.guid,
                 displayName: conversation.displayName,
                 participants: enrichedParticipants,
                 lastMessage: conversation.lastMessage,
-                isGroup: conversation.isGroup
+                isGroup: conversation.isGroup,
+                groupPhotoBase64: groupPhotoBase64
             )
         }
     }
@@ -119,7 +130,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
     // MARK: - Messages
 
     public func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) throws -> [Message] {
-        try dbPool.read { db in
+        return try dbPool.read { db in
             let sql = """
                 SELECT
                     m.ROWID as id,
@@ -139,7 +150,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
             let rows = try Row.fetchAll(db, sql: sql, arguments: [conversationId, limit, offset])
 
-            return rows.map { row in
+            return try rows.map { row in
+                let messageId: Int64 = row["id"]
                 let text: String? = row["text"]
                 let attributedBody: Data? = row["attributedBody"]
 
@@ -153,14 +165,18 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                     messageText = nil
                 }
 
+                // Fetch attachments for this message
+                let attachments = try self.fetchAttachmentsForMessage(db: db, messageId: messageId)
+
                 return Message(
-                    id: row["id"],
+                    id: messageId,
                     guid: row["guid"],
                     text: messageText,
                     date: Message.dateFromAppleTimestamp(row["date"]),
                     isFromMe: (row["is_from_me"] as Int?) == 1,
                     handleId: row["handle_id"],
-                    conversationId: conversationId
+                    conversationId: conversationId,
+                    attachments: attachments
                 )
             }
         }
@@ -260,6 +276,203 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                 )
             }
         }
+    }
+
+    // MARK: - Attachments
+
+    /// Fetch all attachments for a specific message
+    private nonisolated func fetchAttachmentsForMessage(db: Database, messageId: Int64) throws -> [Attachment] {
+        let sql = """
+            SELECT
+                a.ROWID as id,
+                a.guid,
+                a.transfer_name as filename,
+                a.mime_type,
+                a.uti,
+                a.total_bytes as size,
+                a.is_outgoing,
+                a.is_sticker,
+                a.filename as file_path
+            FROM attachment a
+            JOIN message_attachment_join maj ON a.ROWID = maj.attachment_id
+            WHERE maj.message_id = ?
+            """
+
+        let rows = try Row.fetchAll(db, sql: sql, arguments: [messageId])
+
+        return rows.compactMap { row -> Attachment? in
+            guard let id: Int64 = row["id"],
+                  let guid: String = row["guid"] else {
+                return nil
+            }
+
+            // Get the filename - prefer transfer_name, fallback to extracting from file_path
+            let transferName: String? = row["filename"]
+            let filePath: String? = row["file_path"]
+            let filename = transferName ?? filePath?.components(separatedBy: "/").last ?? "attachment"
+
+            // Generate thumbnail for images (if small enough)
+            var thumbnailBase64: String? = nil
+            let mimeType: String? = row["mime_type"]
+            if let mimeType = mimeType, mimeType.hasPrefix("image/"), let filePath = filePath {
+                thumbnailBase64 = generateThumbnail(forFilePath: filePath)
+            }
+
+            return Attachment(
+                id: id,
+                guid: guid,
+                filename: filename,
+                mimeType: mimeType,
+                uti: row["uti"],
+                size: row["size"] ?? 0,
+                isOutgoing: (row["is_outgoing"] as Int?) == 1,
+                isSticker: (row["is_sticker"] as Int?) == 1,
+                thumbnailBase64: thumbnailBase64
+            )
+        }
+    }
+
+    /// Fetch a single attachment by ID (for serving files)
+    public func fetchAttachment(id: Int64) throws -> (attachment: Attachment, filePath: String)? {
+        try dbPool.read { db in
+            let sql = """
+                SELECT
+                    a.ROWID as id,
+                    a.guid,
+                    a.transfer_name as filename,
+                    a.mime_type,
+                    a.uti,
+                    a.total_bytes as size,
+                    a.is_outgoing,
+                    a.is_sticker,
+                    a.filename as file_path
+                FROM attachment a
+                WHERE a.ROWID = ?
+                """
+
+            guard let row = try Row.fetchOne(db, sql: sql, arguments: [id]) else {
+                return nil
+            }
+
+            guard let guid: String = row["guid"],
+                  let filePath: String = row["file_path"] else {
+                return nil
+            }
+
+            let transferName: String? = row["filename"]
+            let filename = transferName ?? filePath.components(separatedBy: "/").last ?? "attachment"
+
+            let attachment = Attachment(
+                id: id,
+                guid: guid,
+                filename: filename,
+                mimeType: row["mime_type"],
+                uti: row["uti"],
+                size: row["size"] ?? 0,
+                isOutgoing: (row["is_outgoing"] as Int?) == 1,
+                isSticker: (row["is_sticker"] as Int?) == 1,
+                thumbnailBase64: nil  // Don't include thumbnail when serving file
+            )
+
+            // Expand ~ to home directory
+            let expandedPath = filePath.replacingOccurrences(of: "~", with: NSHomeDirectory())
+
+            return (attachment, expandedPath)
+        }
+    }
+
+    /// Generate a thumbnail for an image file (max 300x300)
+    private nonisolated func generateThumbnail(forFilePath path: String) -> String? {
+        // Expand ~ to home directory
+        let expandedPath = path.replacingOccurrences(of: "~", with: NSHomeDirectory())
+
+        guard FileManager.default.fileExists(atPath: expandedPath) else {
+            return nil
+        }
+
+        guard let image = NSImage(contentsOfFile: expandedPath) else {
+            return nil
+        }
+
+        // Calculate thumbnail size (max 300x300, maintaining aspect ratio)
+        let maxSize: CGFloat = 300
+        let originalSize = image.size
+        var thumbnailSize = originalSize
+
+        if originalSize.width > maxSize || originalSize.height > maxSize {
+            let widthRatio = maxSize / originalSize.width
+            let heightRatio = maxSize / originalSize.height
+            let ratio = min(widthRatio, heightRatio)
+            thumbnailSize = CGSize(width: originalSize.width * ratio, height: originalSize.height * ratio)
+        }
+
+        // Create thumbnail
+        let thumbnail = NSImage(size: thumbnailSize)
+        thumbnail.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: thumbnailSize),
+                   from: NSRect(origin: .zero, size: originalSize),
+                   operation: .copy,
+                   fraction: 1.0)
+        thumbnail.unlockFocus()
+
+        // Convert to JPEG data
+        guard let tiffData = thumbnail.tiffRepresentation,
+              let bitmapRep = NSBitmapImageRep(data: tiffData),
+              let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else {
+            return nil
+        }
+
+        return jpegData.base64EncodedString()
+    }
+
+    // MARK: - Group Photos
+
+    /// Look up group photo for a conversation by its guid
+    /// Group photos are stored at ~/Library/Messages/Attachments/*/*/<guid>/GroupPhotoImage
+    private nonisolated func lookupGroupPhoto(for guid: String) -> Data? {
+        let fileManager = FileManager.default
+        let attachmentsPath = NSHomeDirectory() + "/Library/Messages/Attachments"
+
+        // The guid in the path may have special characters URL-encoded or replaced
+        // Search for directories matching the pattern
+        guard let level1 = try? fileManager.contentsOfDirectory(atPath: attachmentsPath) else {
+            return nil
+        }
+
+        for dir1 in level1 {
+            let level1Path = attachmentsPath + "/" + dir1
+            guard let level2 = try? fileManager.contentsOfDirectory(atPath: level1Path) else {
+                continue
+            }
+
+            for dir2 in level2 {
+                let level2Path = level1Path + "/" + dir2
+
+                // Check if this directory contains the guid
+                if dir2.contains(guid) || dir2 == guid {
+                    let photoPath = level2Path + "/GroupPhotoImage"
+                    if fileManager.fileExists(atPath: photoPath) {
+                        return try? Data(contentsOf: URL(fileURLWithPath: photoPath))
+                    }
+                }
+
+                // Also check subdirectories (some photos are in at_0_<uuid>/<guid>/)
+                guard let level3 = try? fileManager.contentsOfDirectory(atPath: level2Path) else {
+                    continue
+                }
+
+                for dir3 in level3 {
+                    if dir3.contains(guid) || dir3 == guid {
+                        let photoPath = level2Path + "/" + dir3 + "/GroupPhotoImage"
+                        if fileManager.fileExists(atPath: photoPath) {
+                            return try? Data(contentsOf: URL(fileURLWithPath: photoPath))
+                        }
+                    }
+                }
+            }
+        }
+
+        return nil
     }
 
     // MARK: - Private Helpers

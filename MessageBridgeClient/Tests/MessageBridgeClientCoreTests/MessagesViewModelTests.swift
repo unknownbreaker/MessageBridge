@@ -66,6 +66,19 @@ actor MockBridgeService: BridgeServiceProtocol {
         newMessageHandler = nil
     }
 
+    var attachmentDataToReturn: Data = Data()
+    var fetchAttachmentCalled = false
+    var lastAttachmentId: Int64?
+
+    func fetchAttachment(id: Int64) async throws -> Data {
+        fetchAttachmentCalled = true
+        lastAttachmentId = id
+        if shouldThrowError {
+            throw BridgeError.attachmentNotFound
+        }
+        return attachmentDataToReturn
+    }
+
     // Helper to simulate receiving a new message
     func simulateNewMessage(_ message: Message, sender: String) {
         newMessageHandler?(message, sender)

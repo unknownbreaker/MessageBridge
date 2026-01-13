@@ -894,15 +894,157 @@ public struct PermissionStatus: Identifiable, Sendable {
 
 ---
 
+## Milestone 18: Attachment Support
+
+**Goal:** Display and download message attachments (images, videos, files) like Apple Messages.
+
+### Problem Statement
+Currently, messages with attachments only show "(attachment)" placeholder text. Users cannot view or download images, videos, or files that were sent in conversations.
+
+### Deliverables
+
+#### Server Side
+- [ ] `Attachment.swift` - Model with id, guid, filename, mimeType, size, thumbnailBase64
+- [ ] Update `Message` model with `attachments: [Attachment]` array
+- [ ] Database queries to fetch attachments via `message_attachment_join` table
+- [ ] Thumbnail generation for images (max 300x300, base64 encoded)
+- [ ] `GET /attachments/:id` endpoint to serve full attachment files
+- [ ] Support streaming for large files (videos)
+- [ ] Unit tests for attachment functionality
+
+#### Client Side
+- [ ] `Attachment` model mirroring server (with computed properties: isImage, isVideo, formattedSize)
+- [ ] Update `Message` model with `attachments` array
+- [ ] `AttachmentView.swift` - Component that renders different attachment types
+- [ ] `ImageAttachmentView` - Inline thumbnail, tap to view full resolution
+- [ ] `VideoAttachmentView` - Thumbnail with play button, tap to play
+- [ ] `AudioAttachmentView` - Audio player widget
+- [ ] `DocumentAttachmentView` - File icon with name/size, tap to download
+- [ ] `AttachmentService.swift` - Fetch full attachments from server
+- [ ] Integrate attachments into `MessageBubble`
+- [ ] Unit tests for attachment views and service
+
+### Database Schema
+```sql
+-- attachment table (read-only, part of chat.db)
+CREATE TABLE attachment (
+    ROWID INTEGER PRIMARY KEY,
+    guid TEXT UNIQUE NOT NULL,
+    filename TEXT,              -- Full path with ~ prefix
+    mime_type TEXT,
+    uti TEXT,                   -- Uniform Type Identifier
+    transfer_name TEXT,         -- Original filename
+    total_bytes INTEGER,
+    is_outgoing INTEGER,
+    is_sticker INTEGER
+);
+
+-- Links messages to attachments
+CREATE TABLE message_attachment_join (
+    message_id INTEGER,
+    attachment_id INTEGER
+);
+```
+
+### Attachment Types
+| Type | MIME Types | Display |
+|------|------------|---------|
+| Image | image/jpeg, image/png, image/gif, image/heic | Inline thumbnail, tap for full |
+| Video | video/mp4, video/quicktime | Thumbnail with play icon |
+| Audio | audio/mpeg, audio/m4a | Audio player widget |
+| Document | application/pdf, etc. | File icon + name + size |
+| Other | * | Generic file icon |
+
+### API Changes
+```
+GET /attachments/:id
+Headers: X-API-Key (required), X-E2E-Encryption (optional)
+Response: File stream with appropriate Content-Type
+```
+
+### Success Criteria
+- Images display inline in message bubbles
+- Tapping an image opens full-resolution view
+- Videos play in native player
+- Files can be downloaded and opened
+- Attachments work with E2E encryption enabled
+
+---
+
+## Milestone 19: URL Link Previews
+
+**Goal:** Display rich link previews for URLs in messages, matching Apple Messages behavior.
+
+### Problem Statement
+When messages contain URLs, they display as plain text. Apple Messages shows rich previews with title, description, and image extracted from the linked page.
+
+### Deliverables
+- [ ] `URLDetector.swift` - Utility to extract URLs from message text using NSDataDetector
+- [ ] `LinkPreviewView.swift` - SwiftUI view using LinkPresentation framework
+- [ ] `LinkPreviewCard.swift` - NSViewRepresentable wrapper for LPLinkView
+- [ ] `LinkPreviewCache.swift` - Actor to cache fetched metadata
+- [ ] Integrate link previews into `MessageBubble` (show first URL only)
+- [ ] Unit tests for URL detection
+
+### Implementation Approach
+Use Apple's built-in `LinkPresentation` framework:
+
+```swift
+import LinkPresentation
+
+// Fetch metadata
+let provider = LPMetadataProvider()
+let metadata = try await provider.startFetchingMetadata(for: url)
+
+// Display with native view
+LPLinkView(metadata: metadata)
+```
+
+### URLDetector Interface
+```swift
+struct URLDetector {
+    /// Extract all URLs from text using NSDataDetector
+    static func detectURLs(in text: String) -> [URL]
+}
+```
+
+### LinkPreviewCache Interface
+```swift
+actor LinkPreviewCache {
+    static let shared = LinkPreviewCache()
+
+    /// Get cached metadata for URL
+    func metadata(for url: URL) -> LPLinkMetadata?
+
+    /// Store metadata in cache
+    func store(_ metadata: LPLinkMetadata, for url: URL)
+}
+```
+
+### UI Behavior
+- Link previews appear below message text
+- Only first URL in message gets a preview (like Apple Messages)
+- Preview shows: title, description, domain, image (if available)
+- Clicking preview opens URL in default browser
+- Previews are fetched lazily when message becomes visible
+- Cached to avoid refetching on scroll
+
+### Success Criteria
+- URLs in messages show rich previews with title and image
+- Previews match native Apple Messages appearance
+- Clicking preview opens the link
+- Previews are cached for performance
+- Works with E2E encryption (URLs visible in decrypted text)
+
+---
+
 ## Future Enhancements (Out of Scope)
 
 These are not part of the current implementation:
 
-- [ ] Attachment support (images, files)
 - [ ] Group chat management
 - [ ] Reactions/tapbacks
 - [ ] Read receipts
-- [ ] Contact photo sync
 - [ ] Multiple client support
 - [ ] Message encryption at rest
 - [ ] Code signing and notarization (requires Apple Developer account)
@@ -950,7 +1092,8 @@ MessageBridge/
 │   │   │   ├── Models/
 │   │   │   │   ├── Handle.swift
 │   │   │   │   ├── Message.swift
-│   │   │   │   └── Conversation.swift
+│   │   │   │   ├── Conversation.swift
+│   │   │   │   └── Attachment.swift      # NEW (Milestone 18)
 │   │   │   ├── Database/
 │   │   │   │   └── ChatDatabase.swift
 │   │   │   ├── Contacts/
@@ -984,7 +1127,11 @@ MessageBridge/
 │   │   │   │   └── Models.swift
 │   │   │   ├── Services/
 │   │   │   │   ├── BridgeConnection.swift
-│   │   │   │   └── TailscaleManager.swift
+│   │   │   │   ├── TailscaleManager.swift
+│   │   │   │   └── AttachmentService.swift   # NEW (Milestone 18)
+│   │   │   ├── Utilities/
+│   │   │   │   ├── URLDetector.swift         # NEW (Milestone 19)
+│   │   │   │   └── LinkPreviewCache.swift    # NEW (Milestone 19)
 │   │   │   ├── ViewModels/
 │   │   │   │   └── MessagesViewModel.swift
 │   │   │   ├── Security/
@@ -1003,7 +1150,12 @@ MessageBridge/
 │   │           ├── MessageThreadView.swift
 │   │           ├── ContactDetailsView.swift
 │   │           ├── LogViewerView.swift
-│   │           └── TailscaleStatusView.swift
+│   │           ├── TailscaleStatusView.swift
+│   │           ├── AttachmentView.swift          # NEW (Milestone 18)
+│   │           ├── ImageAttachmentView.swift     # NEW (Milestone 18)
+│   │           ├── VideoAttachmentView.swift     # NEW (Milestone 18)
+│   │           ├── DocumentAttachmentView.swift  # NEW (Milestone 18)
+│   │           └── LinkPreviewView.swift         # NEW (Milestone 19)
 │   └── Tests/
 │       └── MessageBridgeClientCoreTests/
 │
