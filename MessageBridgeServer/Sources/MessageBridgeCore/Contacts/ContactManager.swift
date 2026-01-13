@@ -1,12 +1,24 @@
 import Foundation
 import Contacts
 
+/// Contact information including name and photo
+public struct ContactInfo: Sendable {
+    public let name: String?
+    public let photoData: Data?
+
+    public init(name: String?, photoData: Data?) {
+        self.name = name
+        self.photoData = photoData
+    }
+}
+
 /// Manages contact lookups from the macOS Contacts app
 public actor ContactManager {
     public static let shared = ContactManager()
 
     private let store = CNContactStore()
-    private var cache: [String: String] = [:]  // address -> contact name
+    private var nameCache: [String: String] = [:]  // address -> contact name
+    private var photoCache: [String: Data] = [:]   // address -> photo data
     private var authorizationStatus: CNAuthorizationStatus = .notDetermined
 
     private init() {}
@@ -37,7 +49,7 @@ public actor ContactManager {
     /// Returns nil if not found or not authorized
     public func lookupContactName(for address: String) async -> String? {
         // Check cache first
-        if let cached = cache[address] {
+        if let cached = nameCache[address] {
             return cached
         }
 
@@ -96,7 +108,7 @@ public actor ContactManager {
             if let contact = matchingContact {
                 let name = formatContactName(contact)
                 if let name = name {
-                    cache[address] = name
+                    nameCache[address] = name
                 }
                 return name
             }
@@ -114,7 +126,7 @@ public actor ContactManager {
         // First check cache
         var uncached: [String] = []
         for address in addresses {
-            if let cached = cache[address] {
+            if let cached = nameCache[address] {
                 results[address] = cached
             } else {
                 uncached.append(address)
@@ -176,7 +188,7 @@ public actor ContactManager {
                             // Find original address (preserve case)
                             for address in uncached where address.lowercased() == email {
                                 results[address] = name
-                                cache[address] = name
+                                nameCache[address] = name
                             }
                         }
                     }
@@ -193,8 +205,121 @@ public actor ContactManager {
                                 // Find original address
                                 for address in uncached where normalizePhoneNumber(address) == phoneAddr {
                                     results[address] = name
-                                    cache[address] = name
+                                    nameCache[address] = name
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch {
+            print("ContactManager: Failed to fetch contacts: \(error)")
+        }
+
+        return results
+    }
+
+    /// Look up contact info (name and photo) for multiple addresses at once
+    public func lookupContactInfo(for addresses: [String]) async -> [String: ContactInfo] {
+        var results: [String: ContactInfo] = [:]
+
+        // First check caches
+        var uncached: [String] = []
+        for address in addresses {
+            let cachedName = nameCache[address]
+            let cachedPhoto = photoCache[address]
+            if cachedName != nil || cachedPhoto != nil {
+                results[address] = ContactInfo(name: cachedName, photoData: cachedPhoto)
+            } else {
+                uncached.append(address)
+            }
+        }
+
+        // If all cached, return early
+        if uncached.isEmpty {
+            return results
+        }
+
+        // Ensure we have authorization
+        if authorizationStatus != .authorized {
+            let authorized = await requestAuthorization()
+            if !authorized {
+                return results
+            }
+        }
+
+        // Fetch all contacts with photos
+        let keysToFetch: [CNKeyDescriptor] = [
+            CNContactGivenNameKey as CNKeyDescriptor,
+            CNContactFamilyNameKey as CNKeyDescriptor,
+            CNContactNicknameKey as CNKeyDescriptor,
+            CNContactOrganizationNameKey as CNKeyDescriptor,
+            CNContactPhoneNumbersKey as CNKeyDescriptor,
+            CNContactEmailAddressesKey as CNKeyDescriptor,
+            CNContactThumbnailImageDataKey as CNKeyDescriptor
+        ]
+
+        do {
+            // Fetch contacts from ALL containers
+            var allContacts: [CNContact] = []
+            let containers = try store.containers(matching: nil)
+            for container in containers {
+                let predicate = CNContact.predicateForContactsInContainer(withIdentifier: container.identifier)
+                let contactsInContainer = try store.unifiedContacts(matching: predicate, keysToFetch: keysToFetch)
+                allContacts.append(contentsOf: contactsInContainer)
+            }
+
+            // Separate emails and phone numbers
+            var emailAddresses = Set<String>()
+            var phoneAddresses = Set<String>()
+
+            for address in uncached {
+                if address.contains("@") {
+                    emailAddresses.insert(address.lowercased())
+                } else {
+                    phoneAddresses.insert(normalizePhoneNumber(address))
+                }
+            }
+
+            // Match against all contacts
+            for contact in allContacts {
+                // Check emails
+                for emailValue in contact.emailAddresses {
+                    let email = (emailValue.value as String).lowercased()
+                    if emailAddresses.contains(email) {
+                        let name = formatContactName(contact)
+                        let photo = contact.thumbnailImageData
+                        // Find original address (preserve case)
+                        for address in uncached where address.lowercased() == email {
+                            if let name = name {
+                                nameCache[address] = name
+                            }
+                            if let photo = photo {
+                                photoCache[address] = photo
+                            }
+                            results[address] = ContactInfo(name: name, photoData: photo)
+                        }
+                    }
+                }
+
+                // Check phone numbers
+                for phoneNumber in contact.phoneNumbers {
+                    let contactNumber = normalizePhoneNumber(phoneNumber.value.stringValue)
+                    for phoneAddr in phoneAddresses {
+                        if contactNumber == phoneAddr ||
+                           contactNumber.hasSuffix(phoneAddr) ||
+                           phoneAddr.hasSuffix(contactNumber) {
+                            let name = formatContactName(contact)
+                            let photo = contact.thumbnailImageData
+                            // Find original address
+                            for address in uncached where normalizePhoneNumber(address) == phoneAddr {
+                                if let name = name {
+                                    nameCache[address] = name
+                                }
+                                if let photo = photo {
+                                    photoCache[address] = photo
+                                }
+                                results[address] = ContactInfo(name: name, photoData: photo)
                             }
                         }
                     }
@@ -209,7 +334,8 @@ public actor ContactManager {
 
     /// Clear the contact name cache
     public func clearCache() {
-        cache.removeAll()
+        nameCache.removeAll()
+        photoCache.removeAll()
     }
 
     // MARK: - Private Helpers

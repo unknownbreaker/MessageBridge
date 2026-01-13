@@ -7,12 +7,14 @@ public struct Handle: Codable, Identifiable, Hashable, Sendable {
     public let address: String
     public let service: String
     public let contactName: String?
+    public let photoBase64: String?   // Contact photo as base64-encoded data
 
-    public init(id: Int64, address: String, service: String, contactName: String? = nil) {
+    public init(id: Int64, address: String, service: String, contactName: String? = nil, photoBase64: String? = nil) {
         self.id = id
         self.address = address
         self.service = service
         self.contactName = contactName
+        self.photoBase64 = photoBase64
     }
 
     /// Display name - prefers contact name, falls back to address
@@ -22,6 +24,12 @@ public struct Handle: Codable, Identifiable, Hashable, Sendable {
 
     public var displayAddress: String {
         address
+    }
+
+    /// Decoded photo data from base64
+    public var photoData: Data? {
+        guard let photoBase64 = photoBase64 else { return nil }
+        return Data(base64Encoded: photoBase64)
     }
 }
 

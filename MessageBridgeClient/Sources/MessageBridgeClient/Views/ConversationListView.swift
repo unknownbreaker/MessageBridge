@@ -57,17 +57,22 @@ struct ConversationRow: View {
     let conversation: Conversation
     @State private var showContactDetails = false
 
+    /// Get the photo data for the conversation avatar
+    /// For 1:1 conversations, use the participant's photo
+    /// For groups, we'll fall back to initials
+    private var avatarPhotoData: Data? {
+        guard !conversation.isGroup, conversation.participants.count == 1 else { return nil }
+        return conversation.participants.first?.photoData
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Avatar
-            Circle()
-                .fill(Color.blue.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    Text(conversation.displayName.prefix(1).uppercased())
-                        .font(.headline)
-                        .foregroundStyle(.blue)
-                }
+            // Avatar - uses contact photo if available
+            AvatarView(
+                name: conversation.displayName,
+                size: 40,
+                photoData: avatarPhotoData
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {

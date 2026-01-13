@@ -52,17 +52,19 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             }
         }
 
-        // Look up contact names for all addresses at once
-        let contactNames = await contactManager.lookupContactNames(for: Array(allAddresses))
+        // Look up contact info (name and photo) for all addresses at once
+        let contactInfo = await contactManager.lookupContactInfo(for: Array(allAddresses))
 
-        // Enrich conversations with contact names
+        // Enrich conversations with contact names and photos
         return conversations.map { conversation in
             let enrichedParticipants = conversation.participants.map { handle in
-                Handle(
+                let info = contactInfo[handle.address]
+                return Handle(
                     id: handle.id,
                     address: handle.address,
                     service: handle.service,
-                    contactName: contactNames[handle.address]
+                    contactName: info?.name,
+                    photoBase64: info?.photoData?.base64EncodedString()
                 )
             }
             return Conversation(
@@ -224,17 +226,19 @@ public actor ChatDatabase: ChatDatabaseProtocol {
     public func fetchAllHandles() async throws -> [Handle] {
         let handles = try fetchAllHandlesFromDB()
 
-        // Look up contact names for all addresses
+        // Look up contact info (name and photo) for all addresses
         let addresses = handles.map { $0.address }
-        let contactNames = await contactManager.lookupContactNames(for: addresses)
+        let contactInfo = await contactManager.lookupContactInfo(for: addresses)
 
-        // Enrich handles with contact names
+        // Enrich handles with contact names and photos
         return handles.map { handle in
-            Handle(
+            let info = contactInfo[handle.address]
+            return Handle(
                 id: handle.id,
                 address: handle.address,
                 service: handle.service,
-                contactName: contactNames[handle.address]
+                contactName: info?.name,
+                photoBase64: info?.photoData?.base64EncodedString()
             )
         }
     }

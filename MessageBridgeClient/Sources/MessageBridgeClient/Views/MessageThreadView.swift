@@ -104,7 +104,7 @@ struct MessageBubble: View {
             } else if isGroupConversation {
                 // Avatar for group conversations - only show if sender info should be shown
                 if showSenderInfo {
-                    AvatarView(name: sender?.displayName ?? "?", size: 28)
+                    AvatarView(name: sender?.displayName ?? "?", size: 28, photoData: sender?.photoData)
                 } else {
                     // Spacer to maintain alignment when avatar is hidden
                     Spacer().frame(width: 28)
@@ -139,10 +139,11 @@ struct MessageBubble: View {
     }
 }
 
-/// Avatar view showing initials in a colored circle
+/// Avatar view showing contact photo or initials in a colored circle
 struct AvatarView: View {
     let name: String
     let size: CGFloat
+    var photoData: Data? = nil
 
     private var initials: String {
         let components = name.split(separator: " ")
@@ -162,14 +163,26 @@ struct AvatarView: View {
     }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(backgroundColor)
-            Text(initials)
-                .font(.system(size: size * 0.4, weight: .medium))
-                .foregroundStyle(.white)
+        Group {
+            if let photoData = photoData, let nsImage = NSImage(data: photoData) {
+                // Show contact photo
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                // Show initials avatar
+                ZStack {
+                    Circle()
+                        .fill(backgroundColor)
+                    Text(initials)
+                        .font(.system(size: size * 0.4, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: size, height: size)
+            }
         }
-        .frame(width: size, height: size)
     }
 }
 

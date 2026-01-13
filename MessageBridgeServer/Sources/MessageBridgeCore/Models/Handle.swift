@@ -7,12 +7,14 @@ public struct Handle: Content, Identifiable, Sendable {
     public let address: String        // Phone number or email
     public let service: String        // "iMessage" or "SMS"
     public let contactName: String?   // Name from Contacts app (if found)
+    public let photoBase64: String?   // Contact photo as base64-encoded JPEG (if found)
 
-    public init(id: Int64, address: String, service: String, contactName: String? = nil) {
+    public init(id: Int64, address: String, service: String, contactName: String? = nil, photoBase64: String? = nil) {
         self.id = id
         self.address = address
         self.service = service
         self.contactName = contactName
+        self.photoBase64 = photoBase64
     }
 
     /// Display name - prefers contact name, falls back to address
