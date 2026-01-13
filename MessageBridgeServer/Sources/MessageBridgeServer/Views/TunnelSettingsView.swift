@@ -233,6 +233,12 @@ struct TunnelSettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear {
+            // Refresh tunnel status when view appears to detect externally running tunnels
+            Task {
+                await appState.refreshTunnelStatus()
+            }
+        }
     }
 
     // MARK: - Computed Properties

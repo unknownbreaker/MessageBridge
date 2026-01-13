@@ -55,6 +55,7 @@ struct MessageBridgeApp: App {
 
         Settings {
             SettingsView()
+                .environmentObject(viewModel)
         }
     }
 

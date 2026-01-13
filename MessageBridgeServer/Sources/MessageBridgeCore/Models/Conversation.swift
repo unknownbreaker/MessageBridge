@@ -25,13 +25,13 @@ public struct Conversation: Content, Identifiable, Sendable {
             return name
         }
         if participants.count == 1 {
-            return participants[0].displayAddress
+            return participants[0].displayName
         }
         if participants.isEmpty {
             return "Unknown"
         }
         // Group without name: show first few participants
-        let names = participants.prefix(3).map { $0.displayAddress }
+        let names = participants.prefix(3).map { $0.displayName }
         let suffix = participants.count > 3 ? " +\(participants.count - 3)" : ""
         return names.joined(separator: ", ") + suffix
     }

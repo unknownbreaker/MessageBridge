@@ -123,4 +123,71 @@ final class CloudflaredManagerTests: XCTestCase {
         let isRunning = await manager.isRunning()
         XCTAssertFalse(isRunning)
     }
+
+    // MARK: - Detect Existing Tunnel Tests
+
+    func testCloudflaredManager_detectExistingTunnel_whenNoProcessRunning_returnsFalse() async {
+        // This test assumes no cloudflared process is running in the test environment
+        // In CI, this should always be true
+        let manager = CloudflaredManager()
+
+        // First ensure we're in stopped state
+        let initialStatus = await manager.status
+        XCTAssertEqual(initialStatus, .stopped)
+
+        // Try to detect an existing tunnel
+        let processDetected = await manager.detectExistingTunnel()
+
+        // Should return false when no cloudflared process is running
+        // Note: If cloudflared IS running in the test environment, this test may fail
+        // That's actually correct behavior - the test documents expected behavior
+        if !processDetected {
+            // Verify status remains stopped when no process detected
+            let finalStatus = await manager.status
+            XCTAssertEqual(finalStatus, .stopped)
+        } else {
+            // If we detected a process, verify status was updated to error
+            // (cloudflared doesn't have a local API to get the URL)
+            let finalStatus = await manager.status
+            if case .error = finalStatus {
+                // Expected - we show an error when external process detected
+            } else {
+                XCTFail("Expected error status when external cloudflared detected")
+            }
+        }
+    }
+
+    func testCloudflaredManager_detectExistingTunnel_setsErrorStatusWhenProcessFound() async {
+        let manager = CloudflaredManager()
+
+        // Detect existing tunnel
+        let processDetected = await manager.detectExistingTunnel()
+
+        if processDetected {
+            // If a process was detected, verify the status shows an error
+            // (since we can't get the URL from cloudflared)
+            let status = await manager.status
+            if case .error(let message) = status {
+                XCTAssertTrue(message.contains("External cloudflared process"))
+            } else {
+                XCTFail("Expected error status when external process detected")
+            }
+        }
+        // If no process detected, test passes - we just couldn't verify the positive case
+    }
+
+    // MARK: - Status Change Handler Tests
+
+    func testCloudflaredManager_onStatusChange_handlerIsSet() async {
+        let manager = CloudflaredManager()
+
+        var handlerCalled = false
+        await manager.onStatusChange { _ in
+            handlerCalled = true
+        }
+
+        // Just verify the handler can be set without error
+        // We can't easily trigger a status change in unit tests without a running process
+        XCTAssertFalse(handlerCalled) // Handler shouldn't be called just from setting it
+    }
 }

@@ -11,8 +11,13 @@ struct ConversationListView: View {
             return conversations
         }
         return conversations.filter { conversation in
+            // Search by display name (which includes contact names)
             conversation.displayName.localizedCaseInsensitiveContains(searchText) ||
-            conversation.participants.contains { $0.address.localizedCaseInsensitiveContains(searchText) }
+            // Also search by raw address (phone number/email)
+            conversation.participants.contains(where: { participant in
+                participant.address.localizedCaseInsensitiveContains(searchText) ||
+                (participant.contactName?.localizedCaseInsensitiveContains(searchText) ?? false)
+            })
         }
     }
 
@@ -50,6 +55,7 @@ struct ConversationListView: View {
 
 struct ConversationRow: View {
     let conversation: Conversation
+    @State private var showContactDetails = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -65,9 +71,18 @@ struct ConversationRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
+                    // Name is selectable (Cmd+C to copy) and double-click shows contact details
                     Text(conversation.displayName)
                         .font(.headline)
                         .lineLimit(1)
+                        .textSelection(.enabled)
+                        .onTapGesture(count: 2) {
+                            showContactDetails = true
+                        }
+                        .help("Double-click to view contact details")
+                        .popover(isPresented: $showContactDetails) {
+                            ContactDetailsView(handles: conversation.participants)
+                        }
 
                     Spacer()
 

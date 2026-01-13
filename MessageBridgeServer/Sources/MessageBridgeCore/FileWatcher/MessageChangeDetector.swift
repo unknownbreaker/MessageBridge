@@ -71,10 +71,11 @@ public actor MessageChangeDetector {
 
             for message in messages {
                 if message.id > lastMessageId {
-                    // Find sender address from participants
-                    let sender = conversation.participants.first { participant in
+                    // Find sender from participants - prefer display name (contact name)
+                    let senderHandle = conversation.participants.first { participant in
                         participant.id == message.handleId
-                    }?.address
+                    }
+                    let sender = senderHandle?.displayName
 
                     newMessages.append((message, sender))
                 }

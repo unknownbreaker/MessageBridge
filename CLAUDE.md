@@ -128,6 +128,14 @@ The status indicator in the toolbar shows:
 - 🟡 **Connecting** - Connection in progress
 - 🔴 **Disconnected** - Not connected to server
 
+#### Contact Names
+
+- Conversations display contact names from your Contacts app instead of phone numbers
+- The server requires **Contacts** permission to look up names (System Settings > Privacy & Security > Contacts)
+- If a contact isn't found, the phone number or email address is displayed as fallback
+- **Double-click** on a contact name in the message header to view contact details (phone number, email, service type)
+- You can copy the phone number or email from the contact details popover
+
 #### Viewing Logs
 
 Access application logs via the menu: **MessageBridge > View Logs** (or `Cmd+Shift+L`)
@@ -267,6 +275,12 @@ All endpoints require `X-API-Key` header.
 - **Documentation updates required** - Whenever any user-facing or external-facing part of the app is changed (UI, settings, API, CLI, installation, etc.), all related documentation must be updated to reflect the change. This includes README.md, CLAUDE.md (User Guide section), spec.md, and any relevant guides in Scripts/.
 - **Automate repetitive tasks** - Create CI/CD pipelines and scripts to automate repetitive tasks such as building, testing, releasing, and deployment. Manual processes should be automated when performed more than once.
 - **Versioning and releases** - Server and Client are versioned independently. Each has its own VERSION file (`MessageBridgeServer/VERSION` and `MessageBridgeClient/VERSION`). Use prefixed git tags: `server-v1.2.3` or `client-v1.2.3`. Bump version numbers according to conventional commits (feat = minor, fix = patch, breaking change = major).
+- **New functionality requires spec updates and tests-first development** - Whenever new functionality is introduced:
+  1. Update `spec.md` with new milestones and requirements describing the feature
+  2. **Write tests FIRST** that define the expected behavior of the new functionality (tests should initially fail)
+  3. Implement the functionality to make the tests pass
+  4. Run all tests after implementation is complete to check for regressions
+  5. If regressions occur, review the failures, identify what the new functionality broke, and make corrections before considering the feature complete
 
 ### Versioning
 

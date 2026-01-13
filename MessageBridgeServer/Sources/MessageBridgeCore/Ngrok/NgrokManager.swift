@@ -24,6 +24,9 @@ public actor NgrokManager {
     /// Output pipe for reading tunnel URL
     private var outputPipe: Pipe?
 
+    /// Error pipe for reading tunnel errors
+    private var errorPipe: Pipe?
+
     /// Accumulated output for URL detection
     private var outputBuffer: String = ""
 
@@ -37,6 +40,82 @@ public actor NgrokManager {
     /// Get current tunnel status
     public var status: TunnelStatus {
         _status
+    }
+
+    /// Check if an ngrok process is already running externally (not managed by this instance)
+    /// and update status accordingly. Returns the tunnel URL if found.
+    public func detectExistingTunnel() async -> String? {
+        // First check if there's an ngrok process running
+        let processRunning = isNgrokProcessRunning()
+
+        if !processRunning {
+            return nil
+        }
+
+        // Query ngrok's local API to get tunnel info
+        // ngrok runs a local API server on port 4040 (or 4041, etc. if 4040 is busy)
+        for port in [4040, 4041, 4042, 4043] {
+            if let url = await queryNgrokAPI(port: port) {
+                updateStatus(.running(url: url, isQuickTunnel: true))
+                return url
+            }
+        }
+
+        // Process is running but we couldn't get the URL
+        // This might happen if ngrok is still starting or has an issue
+        updateStatus(.error("ngrok process detected but unable to get tunnel URL"))
+        return nil
+    }
+
+    /// Check if an ngrok process is running on the system
+    private nonisolated func isNgrokProcessRunning() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        process.arguments = ["-x", "ngrok"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
+    /// Query ngrok's local API to get tunnel information
+    private func queryNgrokAPI(port: Int) async -> String? {
+        guard let url = URL(string: "http://127.0.0.1:\(port)/api/tunnels") else {
+            return nil
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 2 // Short timeout since it's localhost
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return nil
+            }
+
+            // Parse the JSON response to extract the public_url
+            // Response format: {"tunnels":[{"public_url":"https://xxx.ngrok-free.app",...}],...}
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let tunnels = json["tunnels"] as? [[String: Any]],
+               let firstTunnel = tunnels.first,
+               let publicURL = firstTunnel["public_url"] as? String {
+                return publicURL
+            }
+        } catch {
+            // API not available on this port
+        }
+
+        return nil
     }
 
     /// Set a handler to be called when status changes
@@ -108,6 +187,7 @@ public actor NgrokManager {
         process.standardError = errorPipe
 
         self.outputPipe = outputPipe
+        self.errorPipe = errorPipe
         self.outputBuffer = ""
         self.tunnelProcess = process
 
@@ -118,21 +198,31 @@ public actor NgrokManager {
             }
         }
 
-        // Start reading output asynchronously
-        let outputHandle = outputPipe.fileHandleForReading
-        let errorHandle = errorPipe.fileHandleForReading
-
-        // Read from both stdout and stderr
-        Task.detached { [weak self] in
-            self?.readOutputSync(from: outputHandle)
+        // Set up non-blocking output reading using readabilityHandler
+        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            if !data.isEmpty, let text = String(data: data, encoding: .utf8) {
+                Task { [weak self] in
+                    await self?.processOutput(text)
+                }
+            }
         }
-        Task.detached { [weak self] in
-            self?.readOutputSync(from: errorHandle)
+
+        errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            if !data.isEmpty, let text = String(data: data, encoding: .utf8) {
+                Task { [weak self] in
+                    await self?.processOutput(text)
+                }
+            }
         }
 
         do {
             try process.run()
         } catch {
+            // Clean up handlers on failure
+            outputPipe.fileHandleForReading.readabilityHandler = nil
+            errorPipe.fileHandleForReading.readabilityHandler = nil
             updateStatus(.error("Failed to start: \(error.localizedDescription)"))
             throw NgrokError.failedToStart(error.localizedDescription)
         }
@@ -144,7 +234,15 @@ public actor NgrokManager {
 
     /// Stop the running tunnel
     public func stopTunnel() async {
+        // Clean up readability handlers first to prevent any new callbacks
+        outputPipe?.fileHandleForReading.readabilityHandler = nil
+        errorPipe?.fileHandleForReading.readabilityHandler = nil
+
         guard let process = tunnelProcess, process.isRunning else {
+            tunnelProcess = nil
+            outputPipe = nil
+            errorPipe = nil
+            outputBuffer = ""
             updateStatus(.stopped)
             return
         }
@@ -160,6 +258,7 @@ public actor NgrokManager {
 
         tunnelProcess = nil
         outputPipe = nil
+        errorPipe = nil
         outputBuffer = ""
         updateStatus(.stopped)
     }
@@ -247,46 +346,43 @@ public actor NgrokManager {
         }
     }
 
-    /// Read output from file handle synchronously (runs on detached task)
-    private nonisolated func readOutputSync(from handle: FileHandle) {
-        while true {
-            let data = handle.availableData
-            if data.isEmpty { break }
-
-            if let text = String(data: data, encoding: .utf8) {
-                Task { [weak self] in
-                    await self?.processOutput(text)
-                }
-            }
-        }
-    }
-
     /// Process output text and look for tunnel URL or errors
     private func processOutput(_ text: String) {
         outputBuffer += text
 
         // Check for errors first - ngrok outputs JSON logs with "err" field
         // Example: {"err":"authentication failed: The account ... email address is verified...","lvl":"eror","msg":"failed to reconnect session"}
+        // Note: ngrok also outputs {"err":"<nil>"} or {"err":null} for non-error log entries, so we need to filter those out
         if let errRange = outputBuffer.range(of: #""err"\s*:\s*"([^"]+)"#, options: .regularExpression) {
             let errMatch = String(outputBuffer[errRange])
             // Extract the error message from the JSON field
             if let msgStart = errMatch.range(of: ":\""),
                let msgEnd = errMatch.range(of: "\"", range: errMatch.index(after: msgStart.upperBound)..<errMatch.endIndex) {
                 var errorMsg = String(errMatch[msgStart.upperBound..<msgEnd.lowerBound])
-                // Clean up escaped characters
-                errorMsg = errorMsg.replacingOccurrences(of: "\\r\\n", with: " ")
-                    .replacingOccurrences(of: "\\n", with: " ")
-                    .trimmingCharacters(in: .whitespaces)
 
-                // Check for specific error types
-                if errorMsg.contains("email address is verified") {
-                    updateStatus(.error("Email verification required. Visit: dashboard.ngrok.com/user/settings"))
-                } else if errorMsg.contains("authentication failed") || errorMsg.contains("auth") {
-                    updateStatus(.error("Authentication failed: \(errorMsg)"))
+                // Ignore null/nil error values - these are not actual errors
+                // ngrok outputs these as "<nil>" or "\u003cnil\u003e" (escaped <nil>)
+                let normalizedError = errorMsg.lowercased()
+                if normalizedError == "<nil>" || normalizedError == "\\u003cnil\\u003e" || normalizedError == "null" || normalizedError.isEmpty {
+                    // Not a real error, continue looking for URL
                 } else {
-                    updateStatus(.error(errorMsg))
+                    // Clean up escaped characters
+                    errorMsg = errorMsg.replacingOccurrences(of: "\\r\\n", with: " ")
+                        .replacingOccurrences(of: "\\n", with: " ")
+                        .trimmingCharacters(in: .whitespaces)
+
+                    // Check for specific error types
+                    if errorMsg.contains("email address is verified") {
+                        updateStatus(.error("Email verification required. Visit: dashboard.ngrok.com/user/settings"))
+                    } else if errorMsg.contains("authentication failed") || errorMsg.contains("auth") {
+                        updateStatus(.error("Authentication failed: \(errorMsg)"))
+                    } else if errorMsg.contains("simultaneous") || errorMsg.contains("ERR_NGROK_108") {
+                        updateStatus(.error("Too many sessions: \(errorMsg)"))
+                    } else {
+                        updateStatus(.error(errorMsg))
+                    }
+                    return
                 }
-                return
             }
         }
 
@@ -322,9 +418,18 @@ public actor NgrokManager {
                 throw NgrokError.tunnelFailed(message)
             }
 
-            // Check if process died
+            // Check if process died or stopped
+            if case .stopped = _status {
+                throw NgrokError.tunnelFailed("Tunnel stopped unexpectedly")
+            }
+
             if let process = tunnelProcess, !process.isRunning {
                 throw NgrokError.tunnelFailed("Process terminated unexpectedly")
+            }
+
+            // Also check if tunnelProcess became nil (process terminated and was cleaned up)
+            if tunnelProcess == nil {
+                throw NgrokError.tunnelFailed("Tunnel process terminated")
             }
 
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -335,8 +440,13 @@ public actor NgrokManager {
 
     /// Handle tunnel process termination
     private func handleProcessTermination(exitCode: Int32) {
-        if exitCode != 0 && _status.isRunning {
-            updateStatus(.error("Tunnel exited with code \(exitCode)"))
+        // If process exited with error and we haven't successfully connected yet, report the error
+        if exitCode != 0 {
+            if case .error = _status {
+                // Already have an error status with more details, keep it
+            } else {
+                updateStatus(.error("Tunnel exited with code \(exitCode)"))
+            }
         } else if !_status.isRunning {
             updateStatus(.stopped)
         }

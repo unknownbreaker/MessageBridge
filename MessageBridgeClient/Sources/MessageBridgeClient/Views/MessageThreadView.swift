@@ -5,6 +5,7 @@ struct MessageThreadView: View {
     let conversation: Conversation
     @EnvironmentObject var viewModel: MessagesViewModel
     @State private var messageText = ""
+    @State private var showContactDetails = false
 
     var messages: [Message] {
         viewModel.messages[conversation.id] ?? []
@@ -12,14 +13,21 @@ struct MessageThreadView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header - double-click to show contact details
             HStack {
                 Text(conversation.displayName)
                     .font(.headline)
+                    .onTapGesture(count: 2) {
+                        showContactDetails = true
+                    }
+                    .help("Double-click to view contact details")
                 Spacer()
             }
             .padding()
             .background(.bar)
+            .popover(isPresented: $showContactDetails) {
+                ContactDetailsView(handles: conversation.participants)
+            }
 
             Divider()
 

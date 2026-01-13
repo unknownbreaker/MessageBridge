@@ -3,6 +3,36 @@ import AppKit
 import MessageBridgeCore
 import ServiceManagement
 
+// App delegate to handle lifecycle events like termination
+class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var appState: AppState?
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Clean up any running tunnels when app quits
+        guard let appState = appState else { return }
+
+        // Use a semaphore to wait for async cleanup to complete
+        let semaphore = DispatchSemaphore(value: 0)
+
+        Task {
+            // Stop ngrok tunnel if running
+            if appState.ngrokTunnelStatus.isRunning {
+                await appState.stopNgrokTunnel()
+            }
+
+            // Stop cloudflare tunnel if running
+            if appState.cloudfareTunnelStatus.isRunning {
+                await appState.stopCloudfareTunnel()
+            }
+
+            semaphore.signal()
+        }
+
+        // Wait up to 2 seconds for cleanup
+        _ = semaphore.wait(timeout: .now() + 2)
+    }
+}
+
 // Window manager to handle opening windows from menu bar
 class WindowManager: ObservableObject {
     static let shared = WindowManager()
@@ -10,6 +40,7 @@ class WindowManager: ObservableObject {
     var settingsWindow: NSWindow?
     var logsWindow: NSWindow?
     var aboutWindow: NSWindow?
+    var permissionsWindow: NSWindow?
     weak var appState: AppState?
 
     func openSettings() {
@@ -78,10 +109,50 @@ class WindowManager: ObservableObject {
 
         self.aboutWindow = window
     }
+
+    func openPermissions(onDismiss: @escaping () -> Void = {}) {
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let window = permissionsWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        // Create a binding that closes the window when set to false
+        class BindingHolder {
+            var onDismiss: () -> Void = {}
+        }
+        let holder = BindingHolder()
+        holder.onDismiss = onDismiss
+
+        let isPresented = Binding<Bool>(
+            get: { true },
+            set: { [weak self] newValue in
+                if !newValue {
+                    self?.permissionsWindow?.close()
+                    self?.permissionsWindow = nil
+                    holder.onDismiss()
+                }
+            }
+        )
+
+        let permissionsView = PermissionsView(isPresented: isPresented)
+        let hostingController = NSHostingController(rootView: permissionsView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Permissions Required"
+        window.styleMask = [.titled, .closable]
+        window.setContentSize(NSSize(width: 450, height: 400))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        self.permissionsWindow = window
+    }
 }
 
 @main
 struct ServerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
 
     init() {
@@ -91,6 +162,10 @@ struct ServerApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuContentView(appState: appState)
+                .onAppear {
+                    // Set appState reference for cleanup on termination
+                    appDelegate.appState = appState
+                }
         } label: {
             Image(systemName: appState.menuBarIcon)
         }
@@ -227,10 +302,22 @@ class AppState: ObservableObject {
         loadSettings()
         setupTunnelStatusHandlers()
 
-        // Check tunnel binary installations and auto-start server if enabled
-        Task {
+        // Check permissions and tunnel installations on startup
+        Task { @MainActor in
+            // Check if all permissions are granted
+            let permissionsManager = PermissionsManager.shared
+            let allGranted = await permissionsManager.allPermissionsGranted()
+
+            if !allGranted {
+                // Show permissions window if any permission is missing
+                WindowManager.shared.appState = self
+                WindowManager.shared.openPermissions()
+            }
+
+            // Check tunnel binary installations
             await checkTunnelInstallations()
 
+            // Auto-start server if enabled
             if startAtLogin && !apiKey.isEmpty {
                 await startServer()
             }
@@ -305,7 +392,12 @@ class AppState: ObservableObject {
         let cloudflaredInstalled = await cloudflaredManager.isInstalled()
         if cloudflaredInstalled {
             cloudflaredInfo = await cloudflaredManager.getInfo()
-            cloudfareTunnelStatus = .stopped
+            // Check if there's an existing cloudflared process running
+            let externalProcessDetected = await cloudflaredManager.detectExistingTunnel()
+            if !externalProcessDetected {
+                cloudfareTunnelStatus = .stopped
+            }
+            // If external process detected, status is already set by detectExistingTunnel()
         } else {
             cloudfareTunnelStatus = .notInstalled
             cloudflaredInfo = nil
@@ -315,11 +407,22 @@ class AppState: ObservableObject {
         let ngrokInstalled = await ngrokManager.isInstalled()
         if ngrokInstalled {
             ngrokInfo = await ngrokManager.getInfo()
-            ngrokTunnelStatus = .stopped
+            // Check if there's an existing ngrok process running and try to get its URL
+            if let url = await ngrokManager.detectExistingTunnel() {
+                addLog(level: .info, message: "Detected existing ngrok tunnel: \(url)")
+            } else {
+                ngrokTunnelStatus = .stopped
+            }
+            // If external process detected, status is already set by detectExistingTunnel()
         } else {
             ngrokTunnelStatus = .notInstalled
             ngrokInfo = nil
         }
+    }
+
+    /// Refresh tunnel status - can be called when the settings view appears
+    func refreshTunnelStatus() async {
+        await checkTunnelInstallations()
     }
 
     // MARK: - Cloudflare Tunnel

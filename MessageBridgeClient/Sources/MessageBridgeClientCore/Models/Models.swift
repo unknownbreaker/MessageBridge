@@ -6,11 +6,18 @@ public struct Handle: Codable, Identifiable, Hashable, Sendable {
     public let id: Int64
     public let address: String
     public let service: String
+    public let contactName: String?
 
-    public init(id: Int64, address: String, service: String) {
+    public init(id: Int64, address: String, service: String, contactName: String? = nil) {
         self.id = id
         self.address = address
         self.service = service
+        self.contactName = contactName
+    }
+
+    /// Display name - prefers contact name, falls back to address
+    public var displayName: String {
+        contactName ?? address
     }
 
     public var displayAddress: String {
@@ -74,12 +81,12 @@ public struct Conversation: Codable, Identifiable, Sendable {
             return name
         }
         if participants.count == 1 {
-            return participants[0].displayAddress
+            return participants[0].displayName
         }
         if participants.isEmpty {
             return "Unknown"
         }
-        let names = participants.prefix(3).map { $0.displayAddress }
+        let names = participants.prefix(3).map { $0.displayName }
         let suffix = participants.count > 3 ? " +\(participants.count - 3)" : ""
         return names.joined(separator: ", ") + suffix
     }

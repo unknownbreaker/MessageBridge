@@ -749,6 +749,151 @@ public enum TunnelStatus {
 
 ---
 
+## Milestone 16: Contact Name Integration ✅
+
+**Goal:** Display contact names from the macOS Contacts app instead of raw phone numbers/emails.
+
+### Problem Statement
+Currently, conversations and messages display raw phone numbers (+15551234567) or email addresses instead of contact names. Users have to mentally map numbers to names, making it difficult to quickly identify conversations.
+
+### Deliverables
+- [x] `ContactManager.swift` - Actor to look up contact names from macOS Contacts framework
+- [x] Handle model updated with `contactName: String?` field
+- [x] Handle model updated with `displayName` computed property (returns contactName ?? address)
+- [x] Conversation `resolvedDisplayName` uses contact names when available
+- [x] ChatDatabase enriches handles with contact names via batch lookup
+- [x] `ContactDetailsView.swift` - Popover showing full contact details
+- [x] Double-click on contact name to show details popover
+- [x] Copy-to-clipboard button for phone numbers/emails
+- [x] Search includes contact names in filters
+- [x] Unit tests for Handle and Conversation with contact names (9 tests)
+
+### ContactManager Interface
+```swift
+public actor ContactManager {
+    /// Look up contact name for a phone number or email
+    func lookupContactName(for address: String) async -> String?
+
+    /// Batch lookup for efficiency (reduces database reads)
+    func lookupContactNames(for addresses: [String]) async -> [String: String]
+}
+```
+
+### Handle Model Changes
+```swift
+public struct Handle: Content, Identifiable, Sendable {
+    public let id: Int64
+    public let address: String
+    public let service: String
+    public let contactName: String?  // NEW
+
+    public var displayName: String {  // NEW
+        contactName ?? address
+    }
+}
+```
+
+### UI Changes
+- Conversation list shows contact names instead of phone numbers
+- Message thread header shows contact name with double-click hint
+- Contact details popover shows:
+  - Contact name (or "Unknown Contact" if not found)
+  - Phone number or email address
+  - Service type (iMessage, SMS)
+  - Copy button for each address
+
+### Permissions Required
+- **Contacts** permission on server (System Settings > Privacy & Security > Contacts)
+- If permission denied, falls back to displaying addresses
+
+### Success Criteria
+- Conversations display "John Doe" instead of "+15551234567"
+- Double-clicking contact name shows phone number in popover
+- Search works with both contact names and phone numbers
+- 81 tests pass (including 9 new contact name tests)
+
+---
+
+## Milestone 17: Permissions Check on Startup ✅
+
+**Goal:** Show a permissions status window on app startup if any required permissions are missing, with direct links to System Settings.
+
+### Problem Statement
+The server app requires several system permissions (Full Disk Access, Contacts, Automation) to function properly. Users may not realize which permissions are missing or how to grant them, leading to confusing errors.
+
+### Deliverables
+- [x] `PermissionsManager.swift` - Actor to check all required permissions
+- [x] `PermissionStatus` struct with id, name, description, isGranted, and settingsURL
+- [x] Check Full Disk Access by testing chat.db readability
+- [x] Check Contacts access via CNContactStore.authorizationStatus
+- [x] Check Automation access by running a test AppleScript
+- [x] `PermissionsView.swift` - Window showing all permissions with status
+- [x] "Open Settings" button for each missing permission (opens exact settings pane)
+- [x] Refresh button to re-check permissions after user makes changes
+- [x] Show window on startup only if any permission is missing
+- [x] Unit tests for PermissionsManager (10 tests)
+
+### PermissionsManager Interface
+```swift
+public actor PermissionsManager {
+    public static let shared: PermissionsManager
+
+    /// Check all required permissions and return their status
+    func checkAllPermissions() async -> [PermissionStatus]
+
+    /// Check if all required permissions are granted
+    func allPermissionsGranted() async -> Bool
+
+    /// Open System Settings to the specified URL
+    func openSettings(url: URL?)
+}
+
+public struct PermissionStatus: Identifiable, Sendable {
+    public let id: String
+    public let name: String
+    public let description: String
+    public let isGranted: Bool
+    public let settingsURL: URL?
+}
+```
+
+### Permissions Checked
+| Permission | Purpose | Settings URL |
+|------------|---------|--------------|
+| Full Disk Access | Read Messages database (chat.db) | Privacy_AllFiles |
+| Contacts | Look up contact names | Privacy_Contacts |
+| Automation (Messages.app) | Send messages via AppleScript | Privacy_Automation |
+
+### UI Design
+```
+┌─────────────────────────────────────────────┐
+│           🔒 Permissions Required            │
+├─────────────────────────────────────────────┤
+│ MessageBridge Server needs the following    │
+│ permissions to function properly.           │
+├─────────────────────────────────────────────┤
+│ ✅ Full Disk Access                         │
+│    Required to read the Messages database   │
+├─────────────────────────────────────────────┤
+│ ❌ Contacts               [Open Settings]   │
+│    Required to display contact names        │
+├─────────────────────────────────────────────┤
+│ ✅ Automation (Messages.app)                │
+│    Required to send messages                │
+├─────────────────────────────────────────────┤
+│ [Refresh]                  [Continue Anyway]│
+└─────────────────────────────────────────────┘
+```
+
+### Success Criteria
+- On startup, if all permissions granted → no popup, app starts normally
+- On startup, if any permission missing → popup shows with status of all permissions
+- Clicking "Open Settings" opens the correct System Settings pane
+- After granting permission and clicking "Refresh", status updates correctly
+- 109 tests pass (including 10 new permissions tests)
+
+---
+
 ## Future Enhancements (Out of Scope)
 
 These are not part of the current implementation:
@@ -808,6 +953,8 @@ MessageBridge/
 │   │   │   │   └── Conversation.swift
 │   │   │   ├── Database/
 │   │   │   │   └── ChatDatabase.swift
+│   │   │   ├── Contacts/
+│   │   │   │   └── ContactManager.swift
 │   │   │   ├── API/
 │   │   │   │   ├── Routes.swift
 │   │   │   │   ├── E2EMiddleware.swift
@@ -854,6 +1001,7 @@ MessageBridge/
 │   │           ├── ContentView.swift
 │   │           ├── ConversationListView.swift
 │   │           ├── MessageThreadView.swift
+│   │           ├── ContactDetailsView.swift
 │   │           ├── LogViewerView.swift
 │   │           └── TailscaleStatusView.swift
 │   └── Tests/

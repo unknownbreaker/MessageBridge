@@ -45,8 +45,13 @@ struct ContentView: View {
     private var filteredConversations: [Conversation] {
         guard !searchText.isEmpty else { return viewModel.conversations }
         return viewModel.conversations.filter { conversation in
+            // Search by display name (which includes contact names)
             conversation.displayName.localizedCaseInsensitiveContains(searchText) ||
-            conversation.participants.contains { $0.address.localizedCaseInsensitiveContains(searchText) }
+            // Also search by raw address (phone number/email)
+            conversation.participants.contains(where: { participant in
+                participant.address.localizedCaseInsensitiveContains(searchText) ||
+                (participant.contactName?.localizedCaseInsensitiveContains(searchText) ?? false)
+            })
         }
     }
 }

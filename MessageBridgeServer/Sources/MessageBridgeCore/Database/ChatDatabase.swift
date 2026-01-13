@@ -3,7 +3,8 @@ import GRDB
 
 /// Provides read-only access to the macOS Messages database (chat.db)
 public actor ChatDatabase: ChatDatabaseProtocol {
-    private let dbPool: DatabasePool
+    private nonisolated let dbPool: DatabasePool
+    private let contactManager: ContactManager
 
     public struct Stats {
         public let conversationCount: Int
@@ -11,7 +12,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         public let handleCount: Int
     }
 
-    public init(path: String) throws {
+    public init(path: String, contactManager: ContactManager = .shared) throws {
         // Open in read-only mode - we never write to chat.db
         var config = Configuration()
         config.readonly = true
@@ -19,6 +20,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         config.defaultTransactionKind = .deferred
 
         self.dbPool = try DatabasePool(path: path, configuration: config)
+        self.contactManager = contactManager
     }
 
     // MARK: - Stats
@@ -38,7 +40,43 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
     // MARK: - Conversations
 
-    public func fetchRecentConversations(limit: Int = 50, offset: Int = 0) throws -> [Conversation] {
+    public func fetchRecentConversations(limit: Int = 50, offset: Int = 0) async throws -> [Conversation] {
+        // First fetch conversations from database (synchronously)
+        let conversations = try fetchRecentConversationsFromDB(limit: limit, offset: offset)
+
+        // Collect all unique addresses from participants
+        var allAddresses = Set<String>()
+        for conversation in conversations {
+            for participant in conversation.participants {
+                allAddresses.insert(participant.address)
+            }
+        }
+
+        // Look up contact names for all addresses at once
+        let contactNames = await contactManager.lookupContactNames(for: Array(allAddresses))
+
+        // Enrich conversations with contact names
+        return conversations.map { conversation in
+            let enrichedParticipants = conversation.participants.map { handle in
+                Handle(
+                    id: handle.id,
+                    address: handle.address,
+                    service: handle.service,
+                    contactName: contactNames[handle.address]
+                )
+            }
+            return Conversation(
+                id: conversation.id,
+                guid: conversation.guid,
+                displayName: conversation.displayName,
+                participants: enrichedParticipants,
+                lastMessage: conversation.lastMessage,
+                isGroup: conversation.isGroup
+            )
+        }
+    }
+
+    private nonisolated func fetchRecentConversationsFromDB(limit: Int, offset: Int) throws -> [Conversation] {
         try dbPool.read { db in
             // Get chats with their most recent message
             let sql = """
@@ -70,7 +108,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             let rows = try Row.fetchAll(db, sql: sql, arguments: [limit, offset])
 
             return try rows.map { row in
-                try conversationFromRow(row, db: db)
+                try self.conversationFromRow(row, db: db)
             }
         }
     }
@@ -153,7 +191,25 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
     // MARK: - Handles
 
-    public func fetchAllHandles() throws -> [Handle] {
+    public func fetchAllHandles() async throws -> [Handle] {
+        let handles = try fetchAllHandlesFromDB()
+
+        // Look up contact names for all addresses
+        let addresses = handles.map { $0.address }
+        let contactNames = await contactManager.lookupContactNames(for: addresses)
+
+        // Enrich handles with contact names
+        return handles.map { handle in
+            Handle(
+                id: handle.id,
+                address: handle.address,
+                service: handle.service,
+                contactName: contactNames[handle.address]
+            )
+        }
+    }
+
+    private nonisolated func fetchAllHandlesFromDB() throws -> [Handle] {
         try dbPool.read { db in
             let sql = """
                 SELECT ROWID as id, id as address, service
@@ -174,7 +230,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
     // MARK: - Private Helpers
 
-    private func conversationFromRow(_ row: Row, db: Database) throws -> Conversation {
+    private nonisolated func conversationFromRow(_ row: Row, db: Database) throws -> Conversation {
         let chatId: Int64 = row["chat_id"]
         let chatIdentifier: String = row["chat_identifier"]
 
@@ -194,7 +250,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         )
     }
 
-    private func messageFromRow(_ row: Row, conversationId: String) -> Message? {
+    private nonisolated func messageFromRow(_ row: Row, conversationId: String) -> Message? {
         guard let messageId: Int64 = row["message_id"],
               let messageGuid: String = row["message_guid"],
               let messageDate: Int64 = row["message_date"] else {
@@ -212,7 +268,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         )
     }
 
-    private func fetchHandlesForChat(db: Database, chatId: Int64) throws -> [Handle] {
+    private nonisolated func fetchHandlesForChat(db: Database, chatId: Int64) throws -> [Handle] {
         let sql = """
             SELECT h.ROWID as id, h.id as address, h.service
             FROM handle h

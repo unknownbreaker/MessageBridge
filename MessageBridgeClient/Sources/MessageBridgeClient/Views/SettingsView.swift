@@ -3,9 +3,12 @@ import AppKit
 import MessageBridgeClientCore
 
 struct SettingsView: View {
+    @EnvironmentObject var viewModel: MessagesViewModel
+
     var body: some View {
         TabView {
             ConnectionSettingsView()
+                .environmentObject(viewModel)
                 .tabItem {
                     Label("Connection", systemImage: "network")
                 }
@@ -22,6 +25,7 @@ struct SettingsView: View {
 // MARK: - Connection Settings
 
 struct ConnectionSettingsView: View {
+    @EnvironmentObject var viewModel: MessagesViewModel
     @State private var serverURLString: String = ""
     @State private var apiKey: String = ""
     @State private var e2eEnabled: Bool = false
@@ -34,6 +38,36 @@ struct ConnectionSettingsView: View {
     @State private var originalE2eEnabled: Bool = false
 
     private let keychainManager = KeychainManager()
+
+    private var isConnected: Bool {
+        viewModel.connectionStatus == .connected
+    }
+
+    private var isConnecting: Bool {
+        viewModel.connectionStatus == .connecting
+    }
+
+    private var connectionStatusColor: Color {
+        switch viewModel.connectionStatus {
+        case .connected:
+            return .green
+        case .connecting:
+            return .yellow
+        case .disconnected:
+            return .red
+        }
+    }
+
+    private var connectionStatusText: String {
+        switch viewModel.connectionStatus {
+        case .connected:
+            return "Connected"
+        case .connecting:
+            return "Connecting..."
+        case .disconnected:
+            return "Disconnected"
+        }
+    }
 
     private var hasChanges: Bool {
         serverURLString != originalServerURLString ||
@@ -87,14 +121,32 @@ struct ConnectionSettingsView: View {
             }
 
             Section {
-                HStack {
+                HStack(spacing: 8) {
+                    // Connection status indicator
+                    Circle()
+                        .fill(connectionStatusColor)
+                        .frame(width: 8, height: 8)
+                    Text(connectionStatusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     if let status = saveStatus {
+                        Text("•")
+                            .foregroundStyle(.secondary)
                         Text(status)
                             .font(.caption)
                             .foregroundStyle(status.contains("Error") ? .red : .green)
                     }
 
                     Spacer()
+
+                    Button("Connect") {
+                        Task {
+                            await viewModel.reconnect()
+                        }
+                    }
+                    .disabled(isConnected || isConnecting || serverURLString.isEmpty || apiKey.isEmpty)
+                    .help(isConnected ? "Already connected" : "Connect to server")
 
                     Button("Save") {
                         saveSettings()
@@ -181,4 +233,5 @@ struct AboutView: View {
 
 #Preview {
     SettingsView()
+        .environmentObject(MessagesViewModel())
 }
