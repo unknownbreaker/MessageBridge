@@ -10,8 +10,9 @@ public struct Conversation: Content, Identifiable, Sendable {
     public let lastMessage: Message?    // Most recent message
     public let isGroup: Bool            // True if more than one participant
     public let groupPhotoBase64: String? // Group photo as base64-encoded image (PNG)
+    public let unreadCount: Int         // Number of unread messages
 
-    public init(id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?, isGroup: Bool, groupPhotoBase64: String? = nil) {
+    public init(id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?, isGroup: Bool, groupPhotoBase64: String? = nil, unreadCount: Int = 0) {
         self.id = id
         self.guid = guid
         self.displayName = displayName
@@ -19,6 +20,7 @@ public struct Conversation: Content, Identifiable, Sendable {
         self.lastMessage = lastMessage
         self.isGroup = isGroup
         self.groupPhotoBase64 = groupPhotoBase64
+        self.unreadCount = unreadCount
     }
 
     /// Best display name for this conversation

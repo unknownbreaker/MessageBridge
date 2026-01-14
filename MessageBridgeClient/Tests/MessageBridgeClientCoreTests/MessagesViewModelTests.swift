@@ -77,6 +77,17 @@ actor MockBridgeService: BridgeServiceProtocol {
         return attachmentDataToReturn
     }
 
+    var markAsReadCalled = false
+    var lastMarkedConversationId: String?
+
+    func markConversationAsRead(_ conversationId: String) async throws {
+        markAsReadCalled = true
+        lastMarkedConversationId = conversationId
+        if shouldThrowError {
+            throw BridgeError.requestFailed
+        }
+    }
+
     // Helper to simulate receiving a new message
     func simulateNewMessage(_ message: Message, sender: String) {
         newMessageHandler?(message, sender)

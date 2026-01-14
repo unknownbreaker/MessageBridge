@@ -2,15 +2,15 @@ import SwiftUI
 import MessageBridgeClientCore
 
 struct ConversationListView: View {
-    let conversations: [Conversation]
+    @EnvironmentObject var viewModel: MessagesViewModel
     @Binding var selection: String?
     @Binding var searchText: String
 
     var filteredConversations: [Conversation] {
         if searchText.isEmpty {
-            return conversations
+            return viewModel.conversations
         }
-        return conversations.filter { conversation in
+        return viewModel.conversations.filter { conversation in
             // Search by display name (which includes contact names)
             conversation.displayName.localizedCaseInsensitiveContains(searchText) ||
             // Also search by raw address (phone number/email)
@@ -74,7 +74,20 @@ struct ConversationRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 8) {
+            // Unread indicator (blue dot)
+            if conversation.hasUnread {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 10, height: 10)
+                    .padding(.top, 6)
+            } else {
+                // Spacer to maintain alignment
+                Color.clear
+                    .frame(width: 10, height: 10)
+                    .padding(.top, 6)
+            }
+
             // Avatar - contact photo for 1:1, initials for groups
             AvatarView(
                 name: conversation.displayName,
@@ -87,6 +100,7 @@ struct ConversationRow: View {
                     // Name is selectable (Cmd+C to copy) and double-click shows contact details
                     Text(conversation.displayName)
                         .font(.headline)
+                        .fontWeight(conversation.hasUnread ? .bold : .regular)
                         .lineLimit(1)
                         .textSelection(.enabled)
                         .onTapGesture(count: 2) {
@@ -109,7 +123,7 @@ struct ConversationRow: View {
                 if let lastMessage = conversation.lastMessage {
                     Text(lastMessage.text ?? "(attachment)")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(conversation.hasUnread ? .primary : .secondary)
                         .lineLimit(2)
                 }
             }
@@ -120,26 +134,9 @@ struct ConversationRow: View {
 
 #Preview {
     ConversationListView(
-        conversations: [
-            Conversation(
-                id: "1",
-                guid: "guid-1",
-                displayName: "John Doe",
-                participants: [],
-                lastMessage: Message(
-                    id: 1,
-                    guid: "msg-1",
-                    text: "Hey, how are you doing today?",
-                    date: Date(),
-                    isFromMe: false,
-                    handleId: 1,
-                    conversationId: "1"
-                ),
-                isGroup: false
-            )
-        ],
         selection: .constant(nil as String?),
         searchText: .constant("")
     )
+    .environmentObject(MessagesViewModel())
     .frame(width: 280)
 }

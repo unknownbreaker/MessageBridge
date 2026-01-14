@@ -43,6 +43,20 @@ public func configureRoutes(_ app: Application, database: ChatDatabaseProtocol, 
         }
     }
 
+    // POST /conversations/:id/read - Mark conversation as read
+    protected.post("conversations", ":id", "read") { req async throws -> HTTPStatus in
+        guard let conversationId = req.parameters.get("id") else {
+            throw Abort(.badRequest, reason: "Missing conversation ID")
+        }
+
+        do {
+            try await database.markConversationAsRead(conversationId: conversationId)
+            return .ok
+        } catch {
+            throw Abort(.internalServerError, reason: "Failed to mark conversation as read")
+        }
+    }
+
     // GET /search?q= - Search messages by content
     protected.get("search") { req async throws -> SearchResponse in
         guard let query = req.query[String.self, at: "q"], !query.isEmpty else {

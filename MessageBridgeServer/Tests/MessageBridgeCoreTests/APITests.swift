@@ -60,6 +60,26 @@ final class MockChatDatabase: ChatDatabaseProtocol, @unchecked Sendable {
         }
         return attachmentToReturn
     }
+
+    var markAsReadCalled = false
+    var lastMarkedConversationId: String?
+
+    func markConversationAsRead(conversationId: String) async throws {
+        markAsReadCalled = true
+        lastMarkedConversationId = conversationId
+        if shouldThrowError {
+            throw DatabaseError.queryFailed
+        }
+    }
+
+    var newMessagesToReturn: [(message: Message, conversationId: String, senderAddress: String?)] = []
+
+    func fetchMessagesNewerThan(id: Int64, limit: Int) throws -> [(message: Message, conversationId: String, senderAddress: String?)] {
+        if shouldThrowError {
+            throw DatabaseError.queryFailed
+        }
+        return newMessagesToReturn
+    }
 }
 
 enum DatabaseError: Error {

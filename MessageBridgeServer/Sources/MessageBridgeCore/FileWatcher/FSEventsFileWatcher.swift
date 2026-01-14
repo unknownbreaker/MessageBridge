@@ -26,6 +26,11 @@ public actor FSEventsFileWatcher: FileWatcherProtocol {
         self.handler = handler
         self.isWatching = true
 
+        // Watch the directory containing the file, not just the file itself
+        // This is needed for SQLite WAL mode which writes to .db-wal files
+        let directoryPath = (path as NSString).deletingLastPathComponent
+        serverLog("Starting to watch directory \(directoryPath) for changes to \((path as NSString).lastPathComponent)")
+
         // Start FSEvents stream on a background queue
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .utility).async { [weak self] in
@@ -34,7 +39,7 @@ public actor FSEventsFileWatcher: FileWatcherProtocol {
                     return
                 }
 
-                let pathsToWatch = [self.path] as CFArray
+                let pathsToWatch = [directoryPath] as CFArray
 
                 // Create context with pointer to self for callback
                 var context = FSEventStreamContext(
@@ -68,7 +73,7 @@ public actor FSEventsFileWatcher: FileWatcherProtocol {
                     &context,
                     pathsToWatch,
                     FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-                    1.0, // Latency in seconds
+                    0.05, // Latency in seconds (50ms for faster updates)
                     FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
                 )
 
@@ -110,6 +115,7 @@ public actor FSEventsFileWatcher: FileWatcherProtocol {
     }
 
     private func notifyChange() {
+        serverLogDebug("File change detected")
         handler?()
     }
 }

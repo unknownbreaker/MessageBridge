@@ -13,6 +13,7 @@ public protocol BridgeServiceProtocol: Sendable {
     func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws
     func stopWebSocket() async
     func fetchAttachment(id: Int64) async throws -> Data
+    func markConversationAsRead(_ conversationId: String) async throws
 }
 
 /// Response wrapper for conversations endpoint
@@ -230,6 +231,28 @@ public actor BridgeConnection: BridgeServiceProtocol {
         }
     }
 
+    public func markConversationAsRead(_ conversationId: String) async throws {
+        guard let serverURL, let apiKey else {
+            throw BridgeError.notConnected
+        }
+
+        // URL-encode the conversationId since it may contain special characters like + in phone numbers
+        guard let encodedConversationId = conversationId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            throw BridgeError.requestFailed
+        }
+
+        var request = URLRequest(url: serverURL.appendingPathComponent("conversations/\(encodedConversationId)/read"))
+        request.httpMethod = "POST"
+        request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+
+        let (_, response) = try await urlSession.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw BridgeError.requestFailed
+        }
+    }
+
     public func fetchAttachment(id: Int64) async throws -> Data {
         guard let serverURL, let apiKey else {
             throw BridgeError.notConnected
@@ -277,11 +300,13 @@ public actor BridgeConnection: BridgeServiceProtocol {
             throw BridgeError.connectionFailed
         }
 
+        logInfo("Starting WebSocket connection to \(wsURL.absoluteString)")
         webSocketTask = urlSession.webSocketTask(with: wsURL)
         webSocketTask?.resume()
 
         // Start receiving messages
         receiveWebSocketMessage()
+        logDebug("WebSocket receive loop started")
     }
 
     public func stopWebSocket() async {
@@ -301,14 +326,18 @@ public actor BridgeConnection: BridgeServiceProtocol {
     private func handleWebSocketResult(_ result: Result<URLSessionWebSocketTask.Message, Error>) {
         switch result {
         case .success(let message):
+            logDebug("WebSocket received message")
             switch message {
             case .string(let text):
+                logDebug("WebSocket received text: \(text.prefix(100))...")
                 handleWebSocketText(text)
             case .data(let data):
+                logDebug("WebSocket received data: \(data.count) bytes")
                 if let text = String(data: data, encoding: .utf8) {
                     handleWebSocketText(text)
                 }
             @unknown default:
+                logDebug("WebSocket received unknown message type")
                 break
             }
             // Continue receiving
@@ -354,6 +383,11 @@ public actor BridgeConnection: BridgeServiceProtocol {
                     conversationId: msgData.conversationId
                 )
                 let sender = msgData.sender ?? "Unknown"
+
+                // Log message age (time since message was created)
+                let messageAge = Date().timeIntervalSince(msgData.date) * 1000
+                logInfo("WebSocket: new_message received, age: \(Int(messageAge))ms, id: \(msgData.id)")
+
                 newMessageHandler?(message, sender)
             } else {
                 logDebug("WebSocket received \(envelope.type) message")

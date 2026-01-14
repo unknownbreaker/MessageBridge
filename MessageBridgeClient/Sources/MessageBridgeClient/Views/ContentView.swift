@@ -14,7 +14,6 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             ConversationListView(
-                conversations: filteredConversations,
                 selection: $selectedConversationId,
                 searchText: $searchText
             )
@@ -29,7 +28,7 @@ struct ContentView: View {
         }
         .navigationTitle("MessageBridge")
         .navigationSubtitle(viewModel.connectionStatus.text)
-        .onChange(of: selectedConversationId) { newValue in
+        .onChange(of: selectedConversationId) { _, newValue in
             viewModel.selectConversation(newValue)
         }
         .task {
@@ -42,18 +41,6 @@ struct ContentView: View {
         }
     }
 
-    private var filteredConversations: [Conversation] {
-        guard !searchText.isEmpty else { return viewModel.conversations }
-        return viewModel.conversations.filter { conversation in
-            // Search by display name (which includes contact names)
-            conversation.displayName.localizedCaseInsensitiveContains(searchText) ||
-            // Also search by raw address (phone number/email)
-            conversation.participants.contains(where: { participant in
-                participant.address.localizedCaseInsensitiveContains(searchText) ||
-                (participant.contactName?.localizedCaseInsensitiveContains(searchText) ?? false)
-            })
-        }
-    }
 }
 
 struct ConnectionStatusView: View {

@@ -1,5 +1,7 @@
 import Foundation
 import SwiftUI
+import AppKit
+import Combine
 
 public enum ConnectionStatus: Sendable {
     case connected
@@ -17,6 +19,12 @@ public class MessagesViewModel: ObservableObject {
 
     private let bridgeService: any BridgeServiceProtocol
     private let notificationManager: NotificationManager
+    private var cancellables = Set<AnyCancellable>()
+
+    /// Total unread message count across all conversations
+    public var totalUnreadCount: Int {
+        conversations.reduce(0) { $0 + $1.unreadCount }
+    }
 
     public init(
         bridgeService: any BridgeServiceProtocol = BridgeConnection(),
@@ -24,6 +32,27 @@ public class MessagesViewModel: ObservableObject {
     ) {
         self.bridgeService = bridgeService
         self.notificationManager = notificationManager
+
+        // Observe conversations changes and update dock badge automatically
+        $conversations
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateDockBadge()
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Updates the dock badge to show total unread count
+    public func updateDockBadge() {
+        // Guard against nil NSApp in test environments
+        guard let app = NSApp else { return }
+
+        let count = totalUnreadCount
+        if count > 0 {
+            app.dockTile.badgeLabel = "\(count)"
+        } else {
+            app.dockTile.badgeLabel = nil
+        }
     }
 
     public func requestNotificationPermission() async {
@@ -54,6 +83,7 @@ public class MessagesViewModel: ObservableObject {
         conversations = []
         messages = [:]
         selectedConversationId = nil
+        updateDockBadge()  // Clear badge on disconnect
         logInfo("Disconnected from server")
     }
 
@@ -87,20 +117,67 @@ public class MessagesViewModel: ObservableObject {
     private func handleNewMessage(_ message: Message, sender: String) async {
         // Add message to the conversation
         let conversationId = message.conversationId
-        messages[conversationId, default: []].insert(message, at: 0)
+        logDebug("handleNewMessage: received message for conversation \(conversationId), text: \(message.text ?? "nil"), isFromMe: \(message.isFromMe)")
 
-        // Update conversation's last message
+        // Create new array to trigger @Published update (mutating in place doesn't trigger SwiftUI refresh)
+        var updatedMessages = messages[conversationId, default: []]
+
+        // If this is a message from me, check if we have an optimistic version (negative ID) to replace
+        if message.isFromMe {
+            // Look for an optimistic message with matching text (optimistic messages have negative IDs)
+            if let optimisticIndex = updatedMessages.firstIndex(where: { $0.id < 0 && $0.text == message.text }) {
+                // Replace optimistic message with the real one
+                updatedMessages.remove(at: optimisticIndex)
+                updatedMessages.insert(message, at: optimisticIndex)
+                logDebug("handleNewMessage: replaced optimistic message with real message ID \(message.id)")
+            } else {
+                // No optimistic message found - this might be from another device, so add it
+                updatedMessages.insert(message, at: 0)
+                logDebug("handleNewMessage: added message from me (no optimistic version found)")
+            }
+        } else {
+            // Message from someone else - always add it
+            updatedMessages.insert(message, at: 0)
+        }
+
+        messages[conversationId] = updatedMessages
+        logDebug("handleNewMessage: updated messages array, now has \(updatedMessages.count) messages")
+
+        // Update conversation's last message and unread count
         if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
-            var updatedConversation = conversations[index]
-            updatedConversation = Conversation(
-                id: updatedConversation.id,
-                guid: updatedConversation.guid,
-                displayName: updatedConversation.displayName,
-                participants: updatedConversation.participants,
+            logDebug("handleNewMessage: found conversation at index \(index)")
+            let existingConversation = conversations[index]
+
+            // Increment unread count if message is not from me AND conversation is not currently selected
+            let newUnreadCount: Int
+            if !message.isFromMe && selectedConversationId != conversationId {
+                newUnreadCount = existingConversation.unreadCount + 1
+            } else {
+                newUnreadCount = existingConversation.unreadCount
+            }
+
+            let updatedConversation = Conversation(
+                id: existingConversation.id,
+                guid: existingConversation.guid,
+                displayName: existingConversation.rawDisplayName,
+                participants: existingConversation.participants,
                 lastMessage: message,
-                isGroup: updatedConversation.isGroup
+                isGroup: existingConversation.isGroup,
+                groupPhotoBase64: existingConversation.groupPhotoBase64,
+                unreadCount: newUnreadCount
             )
-            conversations[index] = updatedConversation
+            // Force SwiftUI to detect change by creating a new array
+            var newConversations = conversations
+            newConversations[index] = updatedConversation
+            conversations = newConversations
+            logDebug("handleNewMessage: updated conversation lastMessage to: \(message.text ?? "nil")")
+
+            // Update dock badge if unread count changed
+            if newUnreadCount != existingConversation.unreadCount {
+                updateDockBadge()
+            }
+        } else {
+            logWarning("handleNewMessage: conversation not found for id \(conversationId)")
         }
 
         // Show notification if message is not from me and conversation is not selected
@@ -116,10 +193,46 @@ public class MessagesViewModel: ObservableObject {
     public func selectConversation(_ conversationId: String?) {
         logDebug("Selecting conversation: \(conversationId ?? "nil")")
         selectedConversationId = conversationId
-        // Clear notifications for this conversation when selected
+
+        // Handle conversation selection
         if let id = conversationId {
+            // Clear notifications for this conversation
             Task {
                 await notificationManager.clearNotifications(for: id)
+            }
+
+            // Update local unread count if needed
+            if let index = conversations.firstIndex(where: { $0.id == id }),
+               conversations[index].unreadCount > 0 {
+                // Reset local unread count immediately for responsive UI
+                let existingConversation = conversations[index]
+                let updatedConversation = Conversation(
+                    id: existingConversation.id,
+                    guid: existingConversation.guid,
+                    displayName: existingConversation.rawDisplayName,
+                    participants: existingConversation.participants,
+                    lastMessage: existingConversation.lastMessage,
+                    isGroup: existingConversation.isGroup,
+                    groupPhotoBase64: existingConversation.groupPhotoBase64,
+                    unreadCount: 0
+                )
+                // Force SwiftUI to detect change by creating a new array
+                var newConversations = conversations
+                newConversations[index] = updatedConversation
+                conversations = newConversations
+
+                // Update dock badge after clearing unread count
+                updateDockBadge()
+            }
+
+            // Always call server to mark as read in database (syncs with Messages.app)
+            Task {
+                do {
+                    try await bridgeService.markConversationAsRead(id)
+                    logDebug("Marked conversation \(id) as read on server")
+                } catch {
+                    logWarning("Failed to mark conversation as read: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -128,6 +241,7 @@ public class MessagesViewModel: ObservableObject {
         do {
             conversations = try await bridgeService.fetchConversations(limit: 50, offset: 0)
             logDebug("Loaded \(conversations.count) conversations")
+            updateDockBadge()
         } catch {
             logError("Failed to load conversations", error: error)
         }

@@ -1,6 +1,11 @@
 import Foundation
 import UserNotifications
 
+/// Notification for when user taps a notification to open a conversation
+public extension Notification.Name {
+    static let openConversation = Notification.Name("openConversation")
+}
+
 /// Protocol for wrapping UNUserNotificationCenter for testability
 public protocol NotificationCenterProtocol: Sendable {
     func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
@@ -34,6 +39,45 @@ public final class SystemNotificationCenter: NotificationCenterProtocol, @unchec
     }
 }
 
+/// Delegate to handle notification presentation and user interactions
+public final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    public static let shared = NotificationDelegate()
+
+    private override init() {
+        super.init()
+    }
+
+    /// Handle notification presentation when app is in foreground
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Don't show notifications when app is active - user can already see messages
+        completionHandler([])
+    }
+
+    /// Handle user tapping on a notification
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+
+        if let conversationId = userInfo["conversationId"] as? String {
+            // Post notification to open the conversation
+            NotificationCenter.default.post(
+                name: .openConversation,
+                object: nil,
+                userInfo: ["conversationId": conversationId]
+            )
+        }
+
+        completionHandler()
+    }
+}
+
 /// Protocol for notification management
 public protocol NotificationManagerProtocol: Sendable {
     func requestAuthorization() async throws -> Bool
@@ -51,7 +95,9 @@ public actor NotificationManager: NotificationManagerProtocol {
 
     /// Request authorization to show notifications
     public func requestAuthorization() async throws -> Bool {
-        try await notificationCenter.requestAuthorization(options: [.alert, .sound, .badge])
+        // Set delegate to allow foreground notifications and handle taps
+        notificationCenter.setDelegate(NotificationDelegate.shared)
+        return try await notificationCenter.requestAuthorization(options: [.alert, .sound, .badge])
     }
 
     /// Show a notification for a new message

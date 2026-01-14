@@ -69,24 +69,22 @@ final class MessageChangeDetectorTests: XCTestCase {
     func testFileChange_queriesDatabase() async throws {
         let mockDb = MockChatDatabase()
         // Start with no messages
-        mockDb.conversationsToReturn = []
+        mockDb.newMessagesToReturn = []
 
         let mockWatcher = MockFileWatcher()
         let detector = MessageChangeDetector(database: mockDb, fileWatcher: mockWatcher)
 
-        try await detector.startDetecting { _, _ in }
+        var queryCalled = false
+        mockDb.newMessagesToReturn = []
 
-        // Reset the flag after initial query
-        mockDb.fetchConversationsCalled = false
+        try await detector.startDetecting { _, _ in
+            queryCalled = true
+        }
 
-        // Now set up conversations for when file change triggers
-        mockDb.conversationsToReturn = [
-            Conversation(
-                id: "chat1",
-                guid: "guid-1",
-                displayName: "Test",
-                participants: [],
-                lastMessage: Message(
+        // Set up new message for when file change triggers
+        mockDb.newMessagesToReturn = [
+            (
+                message: Message(
                     id: 100,
                     guid: "msg-100",
                     text: "Hello",
@@ -95,7 +93,8 @@ final class MessageChangeDetectorTests: XCTestCase {
                     handleId: nil,
                     conversationId: "chat1"
                 ),
-                isGroup: false
+                conversationId: "chat1",
+                senderAddress: "+15551234567"
             )
         ]
 
@@ -105,33 +104,14 @@ final class MessageChangeDetectorTests: XCTestCase {
         // Give async task time to run
         try await Task.sleep(nanoseconds: 100_000_000) // 100ms
 
-        XCTAssertTrue(mockDb.fetchConversationsCalled)
+        XCTAssertTrue(queryCalled)
     }
 
     func testNewMessage_callsHandler() async throws {
         let mockDb = MockChatDatabase()
 
-        // Start with an old message (lower ID)
-        let oldMessage = Message(
-            id: 50,
-            guid: "msg-50",
-            text: "Old message",
-            date: Date().addingTimeInterval(-3600),
-            isFromMe: false,
-            handleId: 1,
-            conversationId: "chat1"
-        )
-
-        mockDb.conversationsToReturn = [
-            Conversation(
-                id: "chat1",
-                guid: "guid-1",
-                displayName: "Test",
-                participants: [Handle(id: 1, address: "+15551234567", service: "iMessage")],
-                lastMessage: oldMessage,
-                isGroup: false
-            )
-        ]
+        // Start with no new messages
+        mockDb.newMessagesToReturn = []
 
         let mockWatcher = MockFileWatcher()
         let detector = MessageChangeDetector(database: mockDb, fileWatcher: mockWatcher)
@@ -144,7 +124,7 @@ final class MessageChangeDetectorTests: XCTestCase {
             receivedSender = sender
         }
 
-        // Now update mock to return a new message (higher ID)
+        // Now update mock to return a new message
         let newMessage = Message(
             id: 200,
             guid: "msg-200",
@@ -155,17 +135,9 @@ final class MessageChangeDetectorTests: XCTestCase {
             conversationId: "chat1"
         )
 
-        mockDb.conversationsToReturn = [
-            Conversation(
-                id: "chat1",
-                guid: "guid-1",
-                displayName: "Test",
-                participants: [Handle(id: 1, address: "+15551234567", service: "iMessage")],
-                lastMessage: newMessage,
-                isGroup: false
-            )
+        mockDb.newMessagesToReturn = [
+            (message: newMessage, conversationId: "chat1", senderAddress: "+15551234567")
         ]
-        mockDb.messagesToReturn = [newMessage]
 
         // Simulate file change
         mockWatcher.simulateChange()

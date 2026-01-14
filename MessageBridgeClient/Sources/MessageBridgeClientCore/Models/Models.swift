@@ -168,13 +168,14 @@ public struct Conversation: Codable, Identifiable, Sendable {
     public let lastMessage: Message?
     public let isGroup: Bool
     public let groupPhotoBase64: String?   // Group photo as base64-encoded image (PNG)
+    public let unreadCount: Int            // Number of unread messages
 
     enum CodingKeys: String, CodingKey {
-        case id, guid, participants, lastMessage, isGroup, groupPhotoBase64
+        case id, guid, participants, lastMessage, isGroup, groupPhotoBase64, unreadCount
         case _displayName = "displayName"
     }
 
-    public init(id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?, isGroup: Bool, groupPhotoBase64: String? = nil) {
+    public init(id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?, isGroup: Bool, groupPhotoBase64: String? = nil, unreadCount: Int = 0) {
         self.id = id
         self.guid = guid
         self._displayName = displayName
@@ -182,6 +183,17 @@ public struct Conversation: Codable, Identifiable, Sendable {
         self.lastMessage = lastMessage
         self.isGroup = isGroup
         self.groupPhotoBase64 = groupPhotoBase64
+        self.unreadCount = unreadCount
+    }
+
+    /// Whether this conversation has unread messages
+    public var hasUnread: Bool {
+        unreadCount > 0
+    }
+
+    /// Raw display name value (nil if not set, used when recreating conversation)
+    public var rawDisplayName: String? {
+        _displayName
     }
 
     public var displayName: String {
@@ -206,14 +218,18 @@ public struct Conversation: Codable, Identifiable, Sendable {
     }
 }
 
-// Custom Hashable/Equatable based only on id to prevent SwiftUI identity issues
-// when lastMessage or other properties change
+// Custom Hashable/Equatable that includes id, unreadCount, and lastMessage
+// to ensure SwiftUI detects changes to the conversation preview
 extension Conversation: Hashable {
     public static func == (lhs: Conversation, rhs: Conversation) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.unreadCount == rhs.unreadCount &&
+        lhs.lastMessage?.id == rhs.lastMessage?.id
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+        hasher.combine(unreadCount)
+        hasher.combine(lastMessage?.id)
     }
 }

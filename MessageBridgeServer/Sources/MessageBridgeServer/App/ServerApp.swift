@@ -307,6 +307,7 @@ class AppState: ObservableObject {
     init() {
         loadSettings()
         setupTunnelStatusHandlers()
+        setupCoreLogging()
 
         // Check permissions and tunnel installations on startup
         Task { @MainActor in
@@ -374,6 +375,35 @@ class AppState: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(apiKey, forType: .string)
         addLog(level: .debug, message: "API key copied to clipboard")
+    }
+
+    // MARK: - Core Logging
+
+    private func setupCoreLogging() {
+        // Subscribe to logs from MessageBridgeCore
+        ServerLogger.shared.subscribe { [weak self] entry in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let level: LogLevel
+                switch entry.level {
+                case .debug: level = .debug
+                case .info: level = .info
+                case .warning: level = .warning
+                case .error: level = .error
+                }
+                let logEntry = LogEntry(
+                    level: level,
+                    message: entry.message,
+                    file: entry.file,
+                    function: entry.function,
+                    line: entry.line
+                )
+                self.logs.insert(logEntry, at: 0)
+                if self.logs.count > 1000 {
+                    self.logs = Array(self.logs.prefix(1000))
+                }
+            }
+        }
     }
 
     // MARK: - Tunnel Management

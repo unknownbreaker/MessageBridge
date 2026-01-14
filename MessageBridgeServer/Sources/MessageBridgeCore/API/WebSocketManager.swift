@@ -1,4 +1,7 @@
 import Vapor
+import os.log
+
+private let logger = OSLog(subsystem: "com.messagebridge.server", category: "WebSocket")
 
 /// Connection info including WebSocket and encryption settings
 private struct ConnectionInfo: Sendable {
@@ -26,12 +29,14 @@ public actor WebSocketManager {
         let id = UUID()
         let encryption = (e2eEnabled && apiKey != nil) ? E2EEncryption(apiKey: apiKey!) : nil
         connections[id] = ConnectionInfo(webSocket: ws, e2eEncryption: encryption)
+        os_log("Added connection, total: %d", log: logger, type: .info, connections.count)
         return id
     }
 
     /// Remove a WebSocket connection
     public func removeConnection(_ id: UUID) {
         connections.removeValue(forKey: id)
+        os_log("Removed connection, total: %d", log: logger, type: .info, connections.count)
     }
 
     /// Get the number of active connections
@@ -41,6 +46,7 @@ public actor WebSocketManager {
 
     /// Broadcast a new message to all connected clients
     public func broadcastNewMessage(_ message: Message, sender: String?) async {
+        os_log("Broadcasting message ID %lld to %d client(s)", log: logger, type: .info, message.id, connections.count)
         let data = NewMessageData(from: message, sender: sender)
         let wsMessage = WebSocketMessage(type: .newMessage, data: data)
 
