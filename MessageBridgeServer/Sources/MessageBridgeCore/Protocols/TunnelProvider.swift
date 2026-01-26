@@ -21,23 +21,23 @@ import Foundation
 /// ```
 public protocol TunnelProvider: Actor, Identifiable, Sendable {
   /// Unique identifier for this provider (e.g., "tailscale", "cloudflare", "ngrok")
-  var id: String { get }
+  nonisolated var id: String { get }
 
   /// Human-readable name for UI display
-  var displayName: String { get }
+  nonisolated var displayName: String { get }
 
   /// Short description of the tunnel type and its characteristics
-  var description: String { get }
+  nonisolated var description: String { get }
 
   /// SF Symbol name for the provider icon in UI
-  var iconName: String { get }
+  nonisolated var iconName: String { get }
 
   /// Current status of the tunnel
   var status: TunnelStatus { get async }
 
   /// Whether the underlying tunnel tool is installed on the system
   /// - Returns: `true` if the tool is available, `false` otherwise
-  func isInstalled() -> Bool
+  nonisolated func isInstalled() -> Bool
 
   /// Connect or activate the tunnel.
   ///

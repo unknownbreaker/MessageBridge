@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "swift-format format --in-place \"$CLAUDE_FILE\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(swift build*)",
+      "Bash(swift test*)",
+      "Bash(swift-format *)",
+      "Bash(./Scripts/*)",
+      "Bash(cd MessageBridgeServer*)",
+      "Bash(cd MessageBridgeClient*)",
+      "Bash(xcodebuild*)"
+    ]
+  }
+}

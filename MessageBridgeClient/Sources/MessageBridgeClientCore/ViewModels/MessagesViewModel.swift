@@ -1,312 +1,318 @@
-import Foundation
-import SwiftUI
 import AppKit
 import Combine
+import Foundation
+import SwiftUI
 
 public enum ConnectionStatus: Sendable {
-    case connected
-    case connecting
-    case disconnected
+  case connected
+  case connecting
+  case disconnected
 }
 
 @MainActor
 public class MessagesViewModel: ObservableObject {
-    @Published public var conversations: [Conversation] = []
-    @Published public var messages: [String: [Message]] = [:]
-    @Published public var connectionStatus: ConnectionStatus = .disconnected
-    @Published public var lastError: Error?
-    @Published public var selectedConversationId: String?
+  @Published public var conversations: [Conversation] = []
+  @Published public var messages: [String: [Message]] = [:]
+  @Published public var connectionStatus: ConnectionStatus = .disconnected
+  @Published public var lastError: Error?
+  @Published public var selectedConversationId: String?
 
-    private let bridgeService: any BridgeServiceProtocol
-    private let notificationManager: NotificationManager
-    private var cancellables = Set<AnyCancellable>()
+  private let bridgeService: any BridgeServiceProtocol
+  private let notificationManager: NotificationManager
+  private var cancellables = Set<AnyCancellable>()
 
-    /// Total unread message count across all conversations
-    public var totalUnreadCount: Int {
-        conversations.reduce(0) { $0 + $1.unreadCount }
+  /// Total unread message count across all conversations
+  public var totalUnreadCount: Int {
+    conversations.reduce(0) { $0 + $1.unreadCount }
+  }
+
+  public init(
+    bridgeService: any BridgeServiceProtocol = BridgeConnection(),
+    notificationManager: NotificationManager = NotificationManager()
+  ) {
+    self.bridgeService = bridgeService
+    self.notificationManager = notificationManager
+
+    // Observe conversations changes and update dock badge automatically
+    $conversations
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in
+        self?.updateDockBadge()
+      }
+      .store(in: &cancellables)
+  }
+
+  /// Updates the dock badge to show total unread count
+  public func updateDockBadge() {
+    // Guard against nil NSApp in test environments
+    guard let app = NSApp else { return }
+
+    let count = totalUnreadCount
+    if count > 0 {
+      app.dockTile.badgeLabel = "\(count)"
+    } else {
+      app.dockTile.badgeLabel = nil
+    }
+  }
+
+  public func requestNotificationPermission() async {
+    do {
+      _ = try await notificationManager.requestAuthorization()
+    } catch {
+      logWarning("Failed to request notification permission: \(error.localizedDescription)")
+    }
+  }
+
+  public func connect(to serverURL: URL, apiKey: String, e2eEnabled: Bool = false) async {
+    connectionStatus = .connecting
+    do {
+      try await bridgeService.connect(to: serverURL, apiKey: apiKey, e2eEnabled: e2eEnabled)
+      connectionStatus = .connected
+      logInfo("Connected to server\(e2eEnabled ? " with E2E encryption" : "")")
+      await loadConversations()
+      await startWebSocket()
+    } catch {
+      connectionStatus = .disconnected
+      logError("Connection failed", error: error)
+    }
+  }
+
+  public func disconnect() async {
+    await bridgeService.disconnect()
+    connectionStatus = .disconnected
+    conversations = []
+    messages = [:]
+    selectedConversationId = nil
+    updateDockBadge()  // Clear badge on disconnect
+    logInfo("Disconnected from server")
+  }
+
+  public func reconnect() async {
+    // Disconnect first
+    await disconnect()
+
+    // Load saved config and reconnect
+    let keychainManager = KeychainManager()
+    guard let config = try? keychainManager.retrieveServerConfig() else {
+      logError("No saved server configuration found")
+      return
     }
 
-    public init(
-        bridgeService: any BridgeServiceProtocol = BridgeConnection(),
-        notificationManager: NotificationManager = NotificationManager()
-    ) {
-        self.bridgeService = bridgeService
-        self.notificationManager = notificationManager
+    await connect(to: config.serverURL, apiKey: config.apiKey, e2eEnabled: config.e2eEnabled)
+  }
 
-        // Observe conversations changes and update dock badge automatically
-        $conversations
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.updateDockBadge()
-            }
-            .store(in: &cancellables)
-    }
-
-    /// Updates the dock badge to show total unread count
-    public func updateDockBadge() {
-        // Guard against nil NSApp in test environments
-        guard let app = NSApp else { return }
-
-        let count = totalUnreadCount
-        if count > 0 {
-            app.dockTile.badgeLabel = "\(count)"
-        } else {
-            app.dockTile.badgeLabel = nil
+  private func startWebSocket() async {
+    do {
+      try await bridgeService.startWebSocket { [weak self] message, sender in
+        Task { @MainActor [weak self] in
+          await self?.handleNewMessage(message, sender: sender)
         }
+      }
+      logInfo("WebSocket connection started")
+    } catch {
+      logError("Failed to start WebSocket", error: error)
+    }
+  }
+
+  private func handleNewMessage(_ message: Message, sender: String) async {
+    // Add message to the conversation
+    let conversationId = message.conversationId
+    logDebug(
+      "handleNewMessage: received message for conversation \(conversationId), text: \(message.text ?? "nil"), isFromMe: \(message.isFromMe)"
+    )
+
+    // Create new array to trigger @Published update (mutating in place doesn't trigger SwiftUI refresh)
+    var updatedMessages = messages[conversationId, default: []]
+
+    // If this is a message from me, check if we have an optimistic version (negative ID) to replace
+    if message.isFromMe {
+      // Look for an optimistic message with matching text (optimistic messages have negative IDs)
+      if let optimisticIndex = updatedMessages.firstIndex(where: {
+        $0.id < 0 && $0.text == message.text
+      }) {
+        // Replace optimistic message with the real one
+        updatedMessages.remove(at: optimisticIndex)
+        updatedMessages.insert(message, at: optimisticIndex)
+        logDebug("handleNewMessage: replaced optimistic message with real message ID \(message.id)")
+      } else {
+        // No optimistic message found - this might be from another device, so add it
+        updatedMessages.insert(message, at: 0)
+        logDebug("handleNewMessage: added message from me (no optimistic version found)")
+      }
+    } else {
+      // Message from someone else - always add it
+      updatedMessages.insert(message, at: 0)
     }
 
-    public func requestNotificationPermission() async {
-        do {
-            _ = try await notificationManager.requestAuthorization()
-        } catch {
-            logWarning("Failed to request notification permission: \(error.localizedDescription)")
-        }
+    messages[conversationId] = updatedMessages
+    logDebug("handleNewMessage: updated messages array, now has \(updatedMessages.count) messages")
+
+    // Update conversation's last message and unread count
+    if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
+      logDebug("handleNewMessage: found conversation at index \(index)")
+      let existingConversation = conversations[index]
+
+      // Increment unread count if message is not from me AND conversation is not currently selected
+      let newUnreadCount: Int
+      if !message.isFromMe && selectedConversationId != conversationId {
+        newUnreadCount = existingConversation.unreadCount + 1
+      } else {
+        newUnreadCount = existingConversation.unreadCount
+      }
+
+      let updatedConversation = Conversation(
+        id: existingConversation.id,
+        guid: existingConversation.guid,
+        displayName: existingConversation.rawDisplayName,
+        participants: existingConversation.participants,
+        lastMessage: message,
+        isGroup: existingConversation.isGroup,
+        groupPhotoBase64: existingConversation.groupPhotoBase64,
+        unreadCount: newUnreadCount
+      )
+      // Force SwiftUI to detect change by creating a new array
+      var newConversations = conversations
+      newConversations[index] = updatedConversation
+      conversations = newConversations
+      logDebug("handleNewMessage: updated conversation lastMessage to: \(message.text ?? "nil")")
+
+      // Update dock badge if unread count changed
+      if newUnreadCount != existingConversation.unreadCount {
+        updateDockBadge()
+      }
+    } else {
+      logWarning("handleNewMessage: conversation not found for id \(conversationId)")
     }
 
-    public func connect(to serverURL: URL, apiKey: String, e2eEnabled: Bool = false) async {
-        connectionStatus = .connecting
-        do {
-            try await bridgeService.connect(to: serverURL, apiKey: apiKey, e2eEnabled: e2eEnabled)
-            connectionStatus = .connected
-            logInfo("Connected to server\(e2eEnabled ? " with E2E encryption" : "")")
-            await loadConversations()
-            await startWebSocket()
-        } catch {
-            connectionStatus = .disconnected
-            logError("Connection failed", error: error)
-        }
+    // Show notification if message is not from me and conversation is not selected
+    if !message.isFromMe && selectedConversationId != conversationId {
+      do {
+        try await notificationManager.showNotification(for: message, senderName: sender)
+      } catch {
+        logWarning("Failed to show notification: \(error.localizedDescription)")
+      }
     }
+  }
 
-    public func disconnect() async {
-        await bridgeService.disconnect()
-        connectionStatus = .disconnected
-        conversations = []
-        messages = [:]
-        selectedConversationId = nil
-        updateDockBadge()  // Clear badge on disconnect
-        logInfo("Disconnected from server")
-    }
+  public func selectConversation(_ conversationId: String?) {
+    logDebug("Selecting conversation: \(conversationId ?? "nil")")
+    selectedConversationId = conversationId
 
-    public func reconnect() async {
-        // Disconnect first
-        await disconnect()
+    // Handle conversation selection
+    if let id = conversationId {
+      // Clear notifications for this conversation
+      Task {
+        await notificationManager.clearNotifications(for: id)
+      }
 
-        // Load saved config and reconnect
-        let keychainManager = KeychainManager()
-        guard let config = try? keychainManager.retrieveServerConfig() else {
-            logError("No saved server configuration found")
-            return
-        }
-
-        await connect(to: config.serverURL, apiKey: config.apiKey, e2eEnabled: config.e2eEnabled)
-    }
-
-    private func startWebSocket() async {
-        do {
-            try await bridgeService.startWebSocket { [weak self] message, sender in
-                Task { @MainActor [weak self] in
-                    await self?.handleNewMessage(message, sender: sender)
-                }
-            }
-            logInfo("WebSocket connection started")
-        } catch {
-            logError("Failed to start WebSocket", error: error)
-        }
-    }
-
-    private func handleNewMessage(_ message: Message, sender: String) async {
-        // Add message to the conversation
-        let conversationId = message.conversationId
-        logDebug("handleNewMessage: received message for conversation \(conversationId), text: \(message.text ?? "nil"), isFromMe: \(message.isFromMe)")
-
-        // Create new array to trigger @Published update (mutating in place doesn't trigger SwiftUI refresh)
-        var updatedMessages = messages[conversationId, default: []]
-
-        // If this is a message from me, check if we have an optimistic version (negative ID) to replace
-        if message.isFromMe {
-            // Look for an optimistic message with matching text (optimistic messages have negative IDs)
-            if let optimisticIndex = updatedMessages.firstIndex(where: { $0.id < 0 && $0.text == message.text }) {
-                // Replace optimistic message with the real one
-                updatedMessages.remove(at: optimisticIndex)
-                updatedMessages.insert(message, at: optimisticIndex)
-                logDebug("handleNewMessage: replaced optimistic message with real message ID \(message.id)")
-            } else {
-                // No optimistic message found - this might be from another device, so add it
-                updatedMessages.insert(message, at: 0)
-                logDebug("handleNewMessage: added message from me (no optimistic version found)")
-            }
-        } else {
-            // Message from someone else - always add it
-            updatedMessages.insert(message, at: 0)
-        }
-
-        messages[conversationId] = updatedMessages
-        logDebug("handleNewMessage: updated messages array, now has \(updatedMessages.count) messages")
-
-        // Update conversation's last message and unread count
-        if let index = conversations.firstIndex(where: { $0.id == conversationId }) {
-            logDebug("handleNewMessage: found conversation at index \(index)")
-            let existingConversation = conversations[index]
-
-            // Increment unread count if message is not from me AND conversation is not currently selected
-            let newUnreadCount: Int
-            if !message.isFromMe && selectedConversationId != conversationId {
-                newUnreadCount = existingConversation.unreadCount + 1
-            } else {
-                newUnreadCount = existingConversation.unreadCount
-            }
-
-            let updatedConversation = Conversation(
-                id: existingConversation.id,
-                guid: existingConversation.guid,
-                displayName: existingConversation.rawDisplayName,
-                participants: existingConversation.participants,
-                lastMessage: message,
-                isGroup: existingConversation.isGroup,
-                groupPhotoBase64: existingConversation.groupPhotoBase64,
-                unreadCount: newUnreadCount
-            )
-            // Force SwiftUI to detect change by creating a new array
-            var newConversations = conversations
-            newConversations[index] = updatedConversation
-            conversations = newConversations
-            logDebug("handleNewMessage: updated conversation lastMessage to: \(message.text ?? "nil")")
-
-            // Update dock badge if unread count changed
-            if newUnreadCount != existingConversation.unreadCount {
-                updateDockBadge()
-            }
-        } else {
-            logWarning("handleNewMessage: conversation not found for id \(conversationId)")
-        }
-
-        // Show notification if message is not from me and conversation is not selected
-        if !message.isFromMe && selectedConversationId != conversationId {
-            do {
-                try await notificationManager.showNotification(for: message, senderName: sender)
-            } catch {
-                logWarning("Failed to show notification: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    public func selectConversation(_ conversationId: String?) {
-        logDebug("Selecting conversation: \(conversationId ?? "nil")")
-        selectedConversationId = conversationId
-
-        // Handle conversation selection
-        if let id = conversationId {
-            // Clear notifications for this conversation
-            Task {
-                await notificationManager.clearNotifications(for: id)
-            }
-
-            // Update local unread count if needed
-            if let index = conversations.firstIndex(where: { $0.id == id }),
-               conversations[index].unreadCount > 0 {
-                // Reset local unread count immediately for responsive UI
-                let existingConversation = conversations[index]
-                let updatedConversation = Conversation(
-                    id: existingConversation.id,
-                    guid: existingConversation.guid,
-                    displayName: existingConversation.rawDisplayName,
-                    participants: existingConversation.participants,
-                    lastMessage: existingConversation.lastMessage,
-                    isGroup: existingConversation.isGroup,
-                    groupPhotoBase64: existingConversation.groupPhotoBase64,
-                    unreadCount: 0
-                )
-                // Force SwiftUI to detect change by creating a new array
-                var newConversations = conversations
-                newConversations[index] = updatedConversation
-                conversations = newConversations
-
-                // Update dock badge after clearing unread count
-                updateDockBadge()
-            }
-
-            // Always call server to mark as read in database (syncs with Messages.app)
-            Task {
-                do {
-                    try await bridgeService.markConversationAsRead(id)
-                    logDebug("Marked conversation \(id) as read on server")
-                } catch {
-                    logWarning("Failed to mark conversation as read: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-
-    public func loadConversations() async {
-        do {
-            conversations = try await bridgeService.fetchConversations(limit: 50, offset: 0)
-            logDebug("Loaded \(conversations.count) conversations")
-            updateDockBadge()
-        } catch {
-            logError("Failed to load conversations", error: error)
-        }
-    }
-
-    public func loadMessages(for conversationId: String) async {
-        logDebug("Loading messages for conversation: \(conversationId)")
-        do {
-            let msgs = try await bridgeService.fetchMessages(conversationId: conversationId, limit: 50, offset: 0)
-            messages[conversationId] = msgs
-            logDebug("Loaded \(msgs.count) messages for conversation \(conversationId)")
-        } catch {
-            logError("Failed to load messages for conversation \(conversationId)", error: error)
-        }
-    }
-
-    public func fetchAttachment(id: Int64) async throws -> Data {
-        return try await bridgeService.fetchAttachment(id: id)
-    }
-
-    public func sendMessage(_ text: String, toConversation conversation: Conversation) async {
-        // Clear any previous error
-        lastError = nil
-
-        // Determine the recipient:
-        // - For 1:1 conversations: use the participant's address
-        // - For group conversations: use the conversation ID (chat_identifier)
-        let recipient: String
-        if conversation.isGroup {
-            // Group chats: send to the chat ID directly
-            recipient = conversation.id
-        } else {
-            // 1:1 chats: send to the participant's address
-            guard let participantAddress = conversation.participants.first?.address else {
-                lastError = BridgeError.sendFailed
-                return
-            }
-            recipient = participantAddress
-        }
-
-        let conversationId = conversation.id
-
-        // Optimistic UI update: show message immediately
-        let optimisticMessage = Message(
-            id: Int64.random(in: Int64.min..<0), // Negative ID to indicate pending
-            guid: UUID().uuidString,
-            text: text,
-            date: Date(),
-            isFromMe: true,
-            handleId: nil,
-            conversationId: conversationId
+      // Update local unread count if needed
+      if let index = conversations.firstIndex(where: { $0.id == id }),
+        conversations[index].unreadCount > 0
+      {
+        // Reset local unread count immediately for responsive UI
+        let existingConversation = conversations[index]
+        let updatedConversation = Conversation(
+          id: existingConversation.id,
+          guid: existingConversation.guid,
+          displayName: existingConversation.rawDisplayName,
+          participants: existingConversation.participants,
+          lastMessage: existingConversation.lastMessage,
+          isGroup: existingConversation.isGroup,
+          groupPhotoBase64: existingConversation.groupPhotoBase64,
+          unreadCount: 0
         )
-        messages[conversationId, default: []].insert(optimisticMessage, at: 0)
+        // Force SwiftUI to detect change by creating a new array
+        var newConversations = conversations
+        newConversations[index] = updatedConversation
+        conversations = newConversations
 
+        // Update dock badge after clearing unread count
+        updateDockBadge()
+      }
+
+      // Always call server to mark as read in database (syncs with Messages.app)
+      Task {
         do {
-            try await bridgeService.sendMessage(text: text, to: recipient)
-            // Send succeeded - keep the optimistic message
-            // The real message will arrive via WebSocket and replace it
-            logDebug("Message sent successfully to \(recipient)")
+          try await bridgeService.markConversationAsRead(id)
+          logDebug("Marked conversation \(id) as read on server")
         } catch {
-            // Remove optimistic message on failure
-            messages[conversationId]?.removeAll { $0.guid == optimisticMessage.guid }
-            lastError = error
-            logError("Failed to send message to \(recipient)", error: error)
+          logWarning("Failed to mark conversation as read: \(error.localizedDescription)")
         }
+      }
     }
+  }
+
+  public func loadConversations() async {
+    do {
+      conversations = try await bridgeService.fetchConversations(limit: 50, offset: 0)
+      logDebug("Loaded \(conversations.count) conversations")
+      updateDockBadge()
+    } catch {
+      logError("Failed to load conversations", error: error)
+    }
+  }
+
+  public func loadMessages(for conversationId: String) async {
+    logDebug("Loading messages for conversation: \(conversationId)")
+    do {
+      let msgs = try await bridgeService.fetchMessages(
+        conversationId: conversationId, limit: 50, offset: 0)
+      messages[conversationId] = msgs
+      logDebug("Loaded \(msgs.count) messages for conversation \(conversationId)")
+    } catch {
+      logError("Failed to load messages for conversation \(conversationId)", error: error)
+    }
+  }
+
+  public func fetchAttachment(id: Int64) async throws -> Data {
+    return try await bridgeService.fetchAttachment(id: id)
+  }
+
+  public func sendMessage(_ text: String, toConversation conversation: Conversation) async {
+    // Clear any previous error
+    lastError = nil
+
+    // Determine the recipient:
+    // - For 1:1 conversations: use the participant's address
+    // - For group conversations: use the conversation ID (chat_identifier)
+    let recipient: String
+    if conversation.isGroup {
+      // Group chats: send to the chat ID directly
+      recipient = conversation.id
+    } else {
+      // 1:1 chats: send to the participant's address
+      guard let participantAddress = conversation.participants.first?.address else {
+        lastError = BridgeError.sendFailed
+        return
+      }
+      recipient = participantAddress
+    }
+
+    let conversationId = conversation.id
+
+    // Optimistic UI update: show message immediately
+    let optimisticMessage = Message(
+      id: Int64.random(in: Int64.min..<0),  // Negative ID to indicate pending
+      guid: UUID().uuidString,
+      text: text,
+      date: Date(),
+      isFromMe: true,
+      handleId: nil,
+      conversationId: conversationId
+    )
+    messages[conversationId, default: []].insert(optimisticMessage, at: 0)
+
+    do {
+      try await bridgeService.sendMessage(text: text, to: recipient)
+      // Send succeeded - keep the optimistic message
+      // The real message will arrive via WebSocket and replace it
+      logDebug("Message sent successfully to \(recipient)")
+    } catch {
+      // Remove optimistic message on failure
+      messages[conversationId]?.removeAll { $0.guid == optimisticMessage.guid }
+      lastError = error
+      logError("Failed to send message to \(recipient)", error: error)
+    }
+  }
 
 }

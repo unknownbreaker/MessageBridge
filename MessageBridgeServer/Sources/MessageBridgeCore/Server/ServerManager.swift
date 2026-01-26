@@ -3,174 +3,174 @@ import Vapor
 
 /// Server status for UI display
 public enum ServerStatus: Sendable, Equatable {
-    case stopped
-    case starting
-    case running(port: Int)
-    case error(String)
+  case stopped
+  case starting
+  case running(port: Int)
+  case error(String)
 
-    public var isRunning: Bool {
-        if case .running = self { return true }
-        return false
-    }
+  public var isRunning: Bool {
+    if case .running = self { return true }
+    return false
+  }
 
-    public var displayText: String {
-        switch self {
-        case .stopped:
-            return "Stopped"
-        case .starting:
-            return "Starting..."
-        case .running(let port):
-            return "Running on port \(port)"
-        case .error(let message):
-            return "Error: \(message)"
-        }
+  public var displayText: String {
+    switch self {
+    case .stopped:
+      return "Stopped"
+    case .starting:
+      return "Starting..."
+    case .running(let port):
+      return "Running on port \(port)"
+    case .error(let message):
+      return "Error: \(message)"
     }
+  }
 }
 
 /// Manages the Vapor server lifecycle
 public actor ServerManager {
-    private var application: Application?
-    private var database: ChatDatabase?
-    private var messageDetector: MessageChangeDetector?
-    private var webSocketManager: WebSocketManager?
+  private var application: Application?
+  private var database: ChatDatabase?
+  private var messageDetector: MessageChangeDetector?
+  private var webSocketManager: WebSocketManager?
 
-    private(set) public var status: ServerStatus = .stopped
-    private(set) public var port: Int = 8080
+  private(set) public var status: ServerStatus = .stopped
+  private(set) public var port: Int = 8080
 
-    public init() {}
+  public init() {}
 
-    /// Start the server with the given configuration
-    public func start(port: Int = 8080, apiKey: String) async throws {
-        guard !status.isRunning else {
-            throw ServerError.alreadyRunning
-        }
+  /// Start the server with the given configuration
+  public func start(port: Int = 8080, apiKey: String) async throws {
+    guard !status.isRunning else {
+      throw ServerError.alreadyRunning
+    }
 
-        self.port = port
-        status = .starting
+    self.port = port
+    status = .starting
 
+    do {
+      // Initialize database
+      let dbPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Messages/chat.db")
+        .path
+
+      guard FileManager.default.fileExists(atPath: dbPath) else {
+        throw ServerError.databaseNotFound
+      }
+
+      let database = try ChatDatabase(path: dbPath)
+      self.database = database
+
+      // Initialize components
+      let messageSender = AppleScriptMessageSender()
+      let webSocketManager = WebSocketManager()
+      self.webSocketManager = webSocketManager
+
+      // Set up file watcher
+      let fileWatcher = FSEventsFileWatcher(path: dbPath)
+      let messageDetector = MessageChangeDetector(database: database, fileWatcher: fileWatcher)
+      self.messageDetector = messageDetector
+
+      // Create and configure Vapor application
+      let app = try await Application.make(.production)
+      app.http.server.configuration.port = port
+      app.http.server.configuration.hostname = "0.0.0.0"
+
+      // Configure routes
+      try configureRoutes(
+        app,
+        database: database,
+        messageSender: messageSender,
+        apiKey: apiKey,
+        webSocketManager: webSocketManager
+      )
+
+      self.application = app
+
+      // Start message detection
+      try await messageDetector.startDetecting { [weak webSocketManager] message, sender in
+        await webSocketManager?.broadcastNewMessage(message, sender: sender)
+      }
+
+      // Start server in background task
+      Task {
         do {
-            // Initialize database
-            let dbPath = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Messages/chat.db")
-                .path
-
-            guard FileManager.default.fileExists(atPath: dbPath) else {
-                throw ServerError.databaseNotFound
-            }
-
-            let database = try ChatDatabase(path: dbPath)
-            self.database = database
-
-            // Initialize components
-            let messageSender = AppleScriptMessageSender()
-            let webSocketManager = WebSocketManager()
-            self.webSocketManager = webSocketManager
-
-            // Set up file watcher
-            let fileWatcher = FSEventsFileWatcher(path: dbPath)
-            let messageDetector = MessageChangeDetector(database: database, fileWatcher: fileWatcher)
-            self.messageDetector = messageDetector
-
-            // Create and configure Vapor application
-            let app = try await Application.make(.production)
-            app.http.server.configuration.port = port
-            app.http.server.configuration.hostname = "0.0.0.0"
-
-            // Configure routes
-            try configureRoutes(
-                app,
-                database: database,
-                messageSender: messageSender,
-                apiKey: apiKey,
-                webSocketManager: webSocketManager
-            )
-
-            self.application = app
-
-            // Start message detection
-            try await messageDetector.startDetecting { [weak webSocketManager] message, sender in
-                await webSocketManager?.broadcastNewMessage(message, sender: sender)
-            }
-
-            // Start server in background task
-            Task {
-                do {
-                    try await app.execute()
-                } catch {
-                    await self.handleServerError(error)
-                }
-            }
-
-            // Give server a moment to start
-            try await Task.sleep(for: .milliseconds(500))
-
-            status = .running(port: port)
-
+          try await app.execute()
         } catch {
-            status = .error(error.localizedDescription)
-            throw error
+          await self.handleServerError(error)
         }
+      }
+
+      // Give server a moment to start
+      try await Task.sleep(for: .milliseconds(500))
+
+      status = .running(port: port)
+
+    } catch {
+      status = .error(error.localizedDescription)
+      throw error
     }
+  }
 
-    /// Stop the server
-    public func stop() async {
-        guard status.isRunning else { return }
+  /// Stop the server
+  public func stop() async {
+    guard status.isRunning else { return }
 
-        status = .stopped
+    status = .stopped
 
-        // Stop message detection
-        await messageDetector?.stopDetecting()
-        messageDetector = nil
+    // Stop message detection
+    await messageDetector?.stopDetecting()
+    messageDetector = nil
 
-        // Shutdown Vapor application
-        if let app = application {
-            try? await app.asyncShutdown()
-        }
-        application = nil
-        database = nil
-        webSocketManager = nil
+    // Shutdown Vapor application
+    if let app = application {
+      try? await app.asyncShutdown()
     }
+    application = nil
+    database = nil
+    webSocketManager = nil
+  }
 
-    /// Restart the server with new configuration
-    public func restart(port: Int? = nil, apiKey: String) async throws {
-        let newPort = port ?? self.port
-        await stop()
-        try await Task.sleep(for: .milliseconds(500))
-        try await start(port: newPort, apiKey: apiKey)
-    }
+  /// Restart the server with new configuration
+  public func restart(port: Int? = nil, apiKey: String) async throws {
+    let newPort = port ?? self.port
+    await stop()
+    try await Task.sleep(for: .milliseconds(500))
+    try await start(port: newPort, apiKey: apiKey)
+  }
 
-    /// Handle server errors
-    private func handleServerError(_ error: Error) {
-        status = .error(error.localizedDescription)
-        application = nil
-    }
+  /// Handle server errors
+  private func handleServerError(_ error: Error) {
+    status = .error(error.localizedDescription)
+    application = nil
+  }
 
-    /// Get database stats
-    public func getDatabaseStats() async throws -> ChatDatabase.Stats {
-        guard let database = database else {
-            throw ServerError.notRunning
-        }
-        return try await database.getStats()
+  /// Get database stats
+  public func getDatabaseStats() async throws -> ChatDatabase.Stats {
+    guard let database = database else {
+      throw ServerError.notRunning
     }
+    return try await database.getStats()
+  }
 }
 
 /// Server-related errors
 public enum ServerError: LocalizedError {
-    case alreadyRunning
-    case notRunning
-    case databaseNotFound
-    case fullDiskAccessRequired
+  case alreadyRunning
+  case notRunning
+  case databaseNotFound
+  case fullDiskAccessRequired
 
-    public var errorDescription: String? {
-        switch self {
-        case .alreadyRunning:
-            return "Server is already running"
-        case .notRunning:
-            return "Server is not running"
-        case .databaseNotFound:
-            return "Messages database not found"
-        case .fullDiskAccessRequired:
-            return "Full Disk Access permission required"
-        }
+  public var errorDescription: String? {
+    switch self {
+    case .alreadyRunning:
+      return "Server is already running"
+    case .notRunning:
+      return "Server is not running"
+    case .databaseNotFound:
+      return "Messages database not found"
+    case .fullDiskAccessRequired:
+      return "Full Disk Access permission required"
     }
+  }
 }

@@ -1,82 +1,82 @@
-import SwiftUI
 import MessageBridgeClientCore
+import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var viewModel: MessagesViewModel
-    @State private var selectedConversationId: String?
-    @State private var searchText = ""
+  @EnvironmentObject var viewModel: MessagesViewModel
+  @State private var selectedConversationId: String?
+  @State private var searchText = ""
 
-    private var selectedConversation: Conversation? {
-        guard let id = selectedConversationId else { return nil }
-        return viewModel.conversations.first { $0.id == id }
-    }
+  private var selectedConversation: Conversation? {
+    guard let id = selectedConversationId else { return nil }
+    return viewModel.conversations.first { $0.id == id }
+  }
 
-    var body: some View {
-        NavigationSplitView {
-            ConversationListView(
-                selection: $selectedConversationId,
-                searchText: $searchText
-            )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 350)
-        } detail: {
-            if let conversation = selectedConversation {
-                MessageThreadView(conversation: conversation)
-            } else {
-                Text("Select a conversation")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle("MessageBridge")
-        .navigationSubtitle(viewModel.connectionStatus.text)
-        .onChange(of: selectedConversationId) { _, newValue in
-            viewModel.selectConversation(newValue)
-        }
-        .task {
-            await viewModel.requestNotificationPermission()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .openConversation)) { notification in
-            if let conversationId = notification.userInfo?["conversationId"] as? String {
-                selectedConversationId = conversationId
-            }
-        }
+  var body: some View {
+    NavigationSplitView {
+      ConversationListView(
+        selection: $selectedConversationId,
+        searchText: $searchText
+      )
+      .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 350)
+    } detail: {
+      if let conversation = selectedConversation {
+        MessageThreadView(conversation: conversation)
+      } else {
+        Text("Select a conversation")
+          .foregroundStyle(.secondary)
+      }
     }
+    .navigationTitle("MessageBridge")
+    .navigationSubtitle(viewModel.connectionStatus.text)
+    .onChange(of: selectedConversationId) { _, newValue in
+      viewModel.selectConversation(newValue)
+    }
+    .task {
+      await viewModel.requestNotificationPermission()
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .openConversation)) { notification in
+      if let conversationId = notification.userInfo?["conversationId"] as? String {
+        selectedConversationId = conversationId
+      }
+    }
+  }
 
 }
 
 struct ConnectionStatusView: View {
-    let status: ConnectionStatus
+  let status: ConnectionStatus
 
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(status.color)
-                .frame(width: 8, height: 8)
-            Text(status.text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+  var body: some View {
+    HStack(spacing: 6) {
+      Circle()
+        .fill(status.color)
+        .frame(width: 8, height: 8)
+      Text(status.text)
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
+  }
 }
 
 extension ConnectionStatus {
-    var color: Color {
-        switch self {
-        case .connected: return .green
-        case .connecting: return .yellow
-        case .disconnected: return .red
-        }
+  var color: Color {
+    switch self {
+    case .connected: return .green
+    case .connecting: return .yellow
+    case .disconnected: return .red
     }
+  }
 
-    var text: String {
-        switch self {
-        case .connected: return "Connected"
-        case .connecting: return "Connecting..."
-        case .disconnected: return "Disconnected"
-        }
+  var text: String {
+    switch self {
+    case .connected: return "Connected"
+    case .connecting: return "Connecting..."
+    case .disconnected: return "Disconnected"
     }
+  }
 }
 
 #Preview {
-    ContentView()
-        .environmentObject(MessagesViewModel())
+  ContentView()
+    .environmentObject(MessagesViewModel())
 }

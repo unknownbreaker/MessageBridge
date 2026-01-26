@@ -1,1170 +1,513 @@
-# iMessage Bridge - Project Specification
+# MessageBridge Specification
 
-## Project Overview
-
-A self-hosted system for accessing iMessages/SMS on a work Mac (without iCloud) by relaying through a home Mac (with iCloud). Native Swift/SwiftUI implementation with no third-party message services.
+This document defines **what** to build. See `CLAUDE.md` for **how** to build it.
 
 ---
 
-## Coding Guidelines
+## Overview
 
-### General Principles
-- **Avoid deeply nested logic** - Extract nested conditions into early returns or separate functions. Prefer guard statements over nested if-else.
-- **No global variables** - Functions should only receive data through arguments passed into them. Use dependency injection.
-- **Immutability** - Avoid mutating variables passed into a function. Return new values instead of modifying inputs.
-- **Modular design** - Features should be self-contained and swappable without causing cascading changes elsewhere. Use protocols to define boundaries.
-- **Thorough testing** - Create tests for each feature covering success cases, edge cases, and error conditions.
+MessageBridge enables access to iMessages/SMS on a work Mac by relaying through a home Mac with iCloud.
 
-### Swift Conventions
-- Use `actor` for thread-safe classes (e.g., `ChatDatabase`, `BridgeConnection`)
-- Use `@MainActor` for ViewModels that update UI state
-- Prefer `async/await` over callbacks
-- Models should be `Codable`, `Identifiable`, and `Sendable` where applicable
+**Components:**
 
-### Testing Workflow (TDD)
-- **Write tests first** - Always write failing tests before implementing features. Tests act as user stories that define expected behavior.
-- **Tests as specifications** - Each test describes a specific behavior (e.g., `testConnect_success_setsStatusToConnected`).
-- **Cover all cases** - Write tests for success cases, edge cases, and error conditions before implementing.
-- **Implement to pass** - Write the minimum code necessary to make all tests pass.
-- Use protocol-based dependency injection for testability
-- Mock external dependencies (network, database) in tests
+- MessageBridgeServer (home Mac) - Reads Messages database, exposes API
+- MessageBridgeClient (work Mac) - SwiftUI app connecting to server
 
 ---
 
-## Milestone 1: Project Setup & Database Reading ✅
+## Milestones
 
-**Goal:** Establish project structure and prove we can read from the Messages database.
+### Status Key
 
-### Deliverables
-- [x] Create `MessageBridgeServer` Swift Package with Vapor
-- [x] Create `MessageBridgeClient` Swift Package with SwiftUI
-- [x] Define shared data models (`Message`, `Conversation`, `Handle`)
-- [x] Implement `ChatDatabase.swift` to query `chat.db`
-- [x] CLI tool that prints recent conversations and messages
-- [x] Add test targets with unit tests (17 server tests, 4 client tests)
+- 🔴 Not Started
+- 🟡 In Progress
+- 🔵 Complete & Verified (tests pass, code reviewed)
+- 🔵 Implemented (code exists, needs audit)
+- ⏸️ Blocked
 
-### Success Criteria
-```bash
-# Running on home Mac:
-swift run MessageBridgeServer --test-db
-# Output: Lists 10 most recent conversations with last message preview
-
-# Run tests:
-cd MessageBridgeServer && swift test  # 17 tests pass
-cd MessageBridgeClient && swift test  # 4 tests pass
-```
-
-### Key Technical Decisions
-- Use Vapor for HTTP/WebSocket server
-- Use GRDB for database access
-- Full Disk Access permission required
-- Separate Core libraries for testability
+> **Refactor Note:** Features marked 🔵 were implemented in the original codebase but need to be:
+>
+> 1. Tested against spec (new tests, not existing ones)
+> 2. Migrated to new architecture (protocols/registries)
+> 3. Verified and marked 🔵
 
 ---
 
-## Milestone 2: REST API ✅
+## Phase 1: Core Messaging 🔵
 
-**Goal:** Expose message data via HTTP endpoints.
+### M1.1: Basic Server 🔵
 
-### Deliverables
-- [x] `GET /health` - Server status check
-- [x] `GET /conversations` - List all conversations (paginated)
-- [x] `GET /conversations/:id/messages` - Messages for a conversation (paginated)
-- [x] `GET /search?q=` - Search messages by content
-- [x] API key authentication middleware
-- [x] Unit tests for all endpoints (12 API tests)
+**User Stories:**
 
-### Success Criteria
-```bash
-curl -H "X-API-Key: $KEY" http://localhost:8080/conversations
-# Returns JSON array of conversations
+- Server reads conversations from Messages database
+- Server exposes REST API for conversations and messages
+- Server authenticates requests with API key
 
-curl -H "X-API-Key: $KEY" http://localhost:8080/conversations/123/messages
-# Returns JSON array of messages
-```
+**Acceptance Criteria:**
 
-### API Response Formats
-```json
-// GET /conversations
-{
-  "conversations": [
-    {
-      "id": "chat123",
-      "participants": ["+15551234567"],
-      "displayName": "John Doe",
-      "lastMessage": "See you tomorrow!",
-      "lastMessageDate": "2026-01-08T10:30:00Z",
-      "unreadCount": 2
-    }
-  ],
-  "nextCursor": "abc123"
-}
-```
+- [ ] Reads from ~/Library/Messages/chat.db (read-only)
+- [ ] GET /conversations returns paginated conversation list
+- [ ] GET /conversations/:id/messages returns messages
+- [ ] All endpoints require X-API-Key header
+- [ ] Invalid API key returns 401
+
+**Extension Point:** `API/Routes/`
 
 ---
 
-## Milestone 3: Message Sending ✅
+### M1.2: Basic Client 🔵
 
-**Goal:** Send messages via AppleScript integration.
+**User Stories:**
 
-### Deliverables
-- [x] `MessageSender.swift` - AppleScript bridge (use protocol for testability)
-- [x] `POST /send` endpoint
-- [x] Handle iMessage vs SMS routing (via `service` parameter)
-- [x] Return delivery status
-- [x] Unit tests with mock AppleScript executor (7 tests)
+- User can view list of conversations
+- User can view messages in a conversation
+- User can configure server connection
 
-### Success Criteria
-```bash
-curl -X POST -H "X-API-Key: $KEY" \
-  -d '{"to": "+15551234567", "text": "Hello from API"}' \
-  http://localhost:8080/send
-# Message appears in Messages.app and is sent to recipient
-```
+**Acceptance Criteria:**
 
-### AppleScript Integration
-```swift
-protocol MessageSending {
-    func sendMessage(to recipient: String, text: String) async throws
-}
+- [ ] Conversation list shows contact name, last message preview, date
+- [ ] Message thread shows bubbles with sent/received styling
+- [ ] Settings screen for server URL and API key
+- [ ] Credentials stored in Keychain
 
-actor AppleScriptMessageSender: MessageSending {
-    func sendMessage(to recipient: String, text: String) async throws {
-        let script = """
-        tell application "Messages"
-            set targetService to 1st account whose service type = iMessage
-            set targetBuddy to participant "\(recipient)" of targetService
-            send "\(text)" to targetBuddy
-        end tell
-        """
-        // Execute via NSAppleScript
-    }
-}
-```
+**Extension Point:** `Views/`, `ViewModels/`
 
 ---
 
-## Milestone 4: Real-Time Updates ✅
+### M1.3: Send Messages 🔵
 
-**Goal:** Push new messages to connected clients via WebSocket.
+**User Stories:**
 
-### Deliverables
-- [x] `FileWatcher.swift` - FSEvents monitor for chat.db changes (use protocol)
-- [x] WebSocket endpoint at `/ws`
-- [x] Push new messages to all connected clients
-- [x] Handle reconnection gracefully
-- [x] Unit tests with mock file watcher (7 tests)
+- User can send text messages from client
+- Server sends messages via Messages.app
 
-### Success Criteria
-1. Client connects to WebSocket
-2. New message arrives on iPhone
-3. Syncs to home Mac Messages
-4. Server detects change in chat.db
-5. Pushes new message to client within 2 seconds
+**Acceptance Criteria:**
 
-### WebSocket Message Format
-```json
-// Server -> Client
-{
-  "type": "new_message",
-  "data": {
-    "id": "msg456",
-    "conversationId": "chat123",
-    "text": "Hey there!",
-    "sender": "+15551234567",
-    "date": "2026-01-08T10:35:00Z",
-    "isFromMe": false
-  }
-}
-```
+- [ ] Composer text field at bottom of message thread
+- [ ] Enter sends message (configurable)
+- [ ] POST /send endpoint accepts message
+- [ ] Server uses AppleScript to send via Messages.app
+- [ ] Sent message appears in thread immediately
+
+**Extension Point:** `Messaging/AppleScriptSender.swift`
 
 ---
 
-## Milestone 5: macOS Client - Core UI
+### M1.4: Real-time Updates 🔵
 
-**Goal:** Build the native SwiftUI client with conversation list and message display.
+**User Stories:**
 
-### Deliverables
-- [x] `ContentView.swift` - NavigationSplitView layout
-- [x] `ConversationListView.swift` - Sidebar with conversations
-- [x] `MessageThreadView.swift` - Message bubbles display
-- [x] `BridgeConnection.swift` - REST + WebSocket client (with protocol)
-- [x] Connection status indicator in toolbar
-- [x] `MessagesViewModel` with dependency injection
-- [x] Unit tests for ViewModel
+- New messages appear without refreshing
+- User sees when messages are received in real-time
 
-### Success Criteria
-- App launches and connects to server
-- Displays conversation list in sidebar
-- Selecting a conversation shows messages
-- Messages styled like native Messages.app (blue/gray bubbles)
+**Acceptance Criteria:**
 
-### UI Components
-```
-┌────────────────────────────────────────────────────────┐
-│ ● ● ●                  Message Bridge                  │
-├──────────────┬─────────────────────────────────────────┤
-│ Search...    │  John Doe                    ● Connected│
-├──────────────┼─────────────────────────────────────────┤
-│              │                                         │
-│ John Doe     │         Hey, how are you?              │
-│ See you tom… │                     ┌─────────────────┐ │
-│              │                     │ I'm good! You?  │ │
-│ Jane Smith   │                     └─────────────────┘ │
-│ Got it, th…  │                                         │
-│              │         See you tomorrow!               │
-│ Work Chat    │                                         │
-│ Meeting at…  │                                         │
-│              ├─────────────────────────────────────────┤
-│              │ ┌─────────────────────────────────┐ ▲  │
-│              │ │ Type a message...               │    │
-│              │ └─────────────────────────────────┘    │
-└──────────────┴─────────────────────────────────────────┘
-```
+- [ ] WebSocket connection at /ws
+- [ ] Server watches chat.db for changes
+- [ ] New messages pushed to connected clients
+- [ ] Client reconnects automatically on disconnect
+
+**Extension Point:** `API/Routes/WebSocketRoutes.swift`, `FileWatcher/`
 
 ---
 
-## Milestone 6: macOS Client - Compose & Send ✅
+## Phase 2: Connectivity 🔵
 
-**Goal:** Add message composition and sending capability.
+### M2.1: Tailscale Support 🔵
 
-### Deliverables
-- [x] `ComposeView.swift` - Message input with send button
-- [x] Send message via REST API
-- [x] Optimistic UI update (show message immediately)
-- [x] Handle send failures gracefully
-- [x] Keyboard shortcut: Enter to send, Option+Enter for newline
+**User Stories:**
 
-### Success Criteria
-- Type message in compose field
-- Press Enter or click Send
-- Message appears in thread immediately (pending state)
-- Message sends successfully
-- Recipient receives the message
+- User can connect via Tailscale VPN
+- Server shows Tailscale IP in UI
 
----
+**Acceptance Criteria:**
 
-## Milestone 7: Notifications & Polish ✅
+- [ ] Settings tab for Tailscale configuration
+- [ ] Auto-detect Tailscale IP address
+- [ ] Can set as default tunnel
+- [ ] Status indicator in menu bar
 
-**Goal:** Native notifications and UX polish.
-
-### Deliverables
-- [x] `NotificationManager.swift` - UserNotifications integration (with protocol)
-- [x] Show notification for new messages (when app not focused)
-- [x] Click notification to open conversation
-- [x] Keyboard shortcuts (Cmd+N new message, Cmd+F search)
-- [x] Dark mode support (inherent in SwiftUI with system colors)
-- [x] App icon (placeholder - requires design assets)
-
-### Success Criteria
-- New message arrives while app in background
-- Native macOS notification appears
-- Clicking notification opens the conversation
-- All keyboard shortcuts functional
+**Extension Point:** `TunnelProvider` protocol, `Tunnels/Tailscale/`
 
 ---
 
-## Milestone 8: Deployment & Security ✅
+### M2.2: Cloudflare Tunnel Support 🔵
 
-**Goal:** Production-ready deployment with proper security.
+**User Stories:**
 
-### Deliverables
-- [x] LaunchAgent plist for server auto-start
-- [x] Keychain storage for API key
-- [x] Tailscale setup documentation
-- [x] Server installer script
-- [x] Client DMG packaging
+- User can connect via Cloudflare Tunnel
+- Works when VPNs are blocked
 
-### Success Criteria
-- Server starts automatically on home Mac login
-- API key securely stored in Keychain
-- Both Macs connected via Tailscale
-- Client connects reliably to server
-- Full end-to-end message flow works
+**Acceptance Criteria:**
 
-### LaunchAgent
-```xml
-<!-- ~/Library/LaunchAgents/com.messagebridge.server.plist -->
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "...">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.messagebridge.server</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/MessageBridgeServer</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>
-```
+- [ ] Settings tab for Cloudflare configuration
+- [ ] Setup wizard for first-time configuration
+- [ ] Manages cloudflared process
+- [ ] Can set as default tunnel
+
+**Extension Point:** `TunnelProvider` protocol, `Tunnels/Cloudflare/`
 
 ---
 
-## Milestone 9: Logging & Debugging ✅
+### M2.3: ngrok Support 🔵
 
-**Goal:** Comprehensive logging system for easier debugging and troubleshooting.
+**User Stories:**
 
-### Deliverables
-- [x] `Logger.swift` - Core logging infrastructure with log levels
-- [x] `LogEntry` struct with source location (file, function, line)
-- [x] `LogManager` actor for persistent log storage
-- [x] `LogViewerView` - UI for viewing and filtering logs
-- [x] Automatic log cleanup (7 day retention)
-- [x] Update all error handling to use logger
-- [x] Unit tests for logging (12 tests)
+- User can connect via ngrok for quick testing
+- Simple setup with just auth token
 
-### Success Criteria
-- All errors logged with source location for easy debugging
-- Logs accessible via `Cmd+Shift+L` or app menu
-- Logs persist across app restarts
-- Old logs automatically cleaned up
+**Acceptance Criteria:**
 
-### Log Levels
-```swift
-logDebug("...")    // Development details
-logInfo("...")     // Notable events
-logWarning("...")  // Non-critical issues
-logError("...", error: error)  // Failures
-```
+- [ ] Settings tab for ngrok configuration
+- [ ] Enter auth token, optional custom domain
+- [ ] Displays generated URL
+- [ ] Can set as default tunnel
 
-### Log Storage
-- Location: `~/Library/Application Support/MessageBridge/Logs/`
-- `messagebridge.log` - Human-readable format
-- `messagebridge-logs.json` - Structured JSON format
+**Extension Point:** `TunnelProvider` protocol, `Tunnels/Ngrok/`
 
 ---
 
-## Milestone 10: Conventional Commits & Versioning ✅
+### M2.4: E2E Encryption 🔵
 
-**Goal:** Establish versioning infrastructure and commit standards.
+**User Stories:**
 
-### Deliverables
-- [x] Define conventional commit standard (feat, fix, chore, docs, refactor)
-- [x] Add `Version.swift` for programmatic version access
-- [x] Create `CHANGELOG.md` with initial release notes
-- [x] Create `CONTRIBUTING.md` with commit conventions
-- [ ] Add commit message validation (optional: commitlint)
+- Messages are encrypted end-to-end
+- Third-party tunnels cannot read message content
 
-### Conventional Commit Format
-```
-<type>(<scope>): <description>
+**Acceptance Criteria:**
 
-[optional body]
+- [ ] AES-256-GCM encryption
+- [ ] Key derived from API key via HKDF
+- [ ] X-E2E-Encryption header enables encryption
+- [ ] Required for Cloudflare/ngrok, optional for Tailscale
 
-[optional footer]
-```
-
-**Types:**
-- `feat:` - New feature (bumps minor version)
-- `fix:` - Bug fix (bumps patch version)
-- `docs:` - Documentation only
-- `chore:` - Maintenance tasks
-- `refactor:` - Code refactoring
-- `test:` - Adding tests
-- `BREAKING CHANGE:` - In footer, bumps major version
-
-### Success Criteria
-- All commits follow conventional format
-- Version can be read programmatically in both apps
-- CHANGELOG documents all releases
+**Extension Point:** `Security/E2EEncryption.swift`
 
 ---
 
-## Milestone 11: Server App Conversion ✅
+## Phase 3: Rich Messages 🟡
 
-**Goal:** Transform server from CLI daemon to macOS menu bar application.
+### M3.1: Attachments - Display 🟡
 
-### Deliverables
-- [x] Create SwiftUI menu bar application structure
-- [x] Server status indicator in menu bar (running/stopped/error)
-- [x] Start/stop server controls
-- [x] API key display with copy button
-- [x] API key regeneration
-- [x] Server log viewer
-- [x] Login Items support (auto-start on login)
-- [x] Package as `.app` bundle for /Applications
-- [ ] Update installer script for app bundle
+**User Stories:**
 
-### UI Design
-```
-┌─────────────────────────────┐
-│ 🟢 MessageBridge Server     │
-├─────────────────────────────┤
-│ Status: Running             │
-│ Port: 8080                  │
-│ Tailscale IP: 100.x.x.x     │
-├─────────────────────────────┤
-│ ○ Start Server              │
-│ ● Stop Server               │
-├─────────────────────────────┤
-│ API Key: ●●●●●●●● [Copy]    │
-│ Regenerate API Key...       │
-├─────────────────────────────┤
-│ View Logs...                │
-│ Tailscale Settings...       │
-├─────────────────────────────┤
-│ Start at Login  ☑           │
-│ Quit                        │
-└─────────────────────────────┘
-```
+- User can view image attachments in messages
+- User can view video attachments
+- User can view file attachments
 
-### Success Criteria
-- Server runs as menu bar app from /Applications
-- Can start/stop server from menu
-- API key easily accessible
-- Auto-starts on login when enabled
+**Acceptance Criteria:**
+
+- [ ] Images show as thumbnails in message bubble
+- [ ] Tap thumbnail to open fullscreen
+- [ ] Videos show thumbnail with play button
+- [ ] Files show icon, name, and size
+- [ ] Attachments download on demand
+
+**Extension Point:** `AttachmentRenderer` protocol, `Renderers/Attachments/`
 
 ---
 
-## Milestone 12: Tailscale Integration ✅
+### M3.2: Image Gallery & Carousel 🔴
 
-**Goal:** Built-in Tailscale management in both apps.
+**User Stories:**
 
-### Deliverables
-- [x] `TailscaleManager.swift` - Interface with `tailscale` CLI
-- [x] Detect if Tailscale is installed
-- [x] Get connection status (connected/disconnected/not installed)
-- [x] Get device's Tailscale IP address
-- [x] Server app: Tailscale status in menu bar dropdown
-- [x] Client app: Tailscale status in connection settings
-- [x] Setup guidance for first-time users
-- [x] Deep link to Tailscale download if not installed
+- Multiple images in one message show as grid
+- User can swipe through images fullscreen
 
-### TailscaleManager Interface
-```swift
-public actor TailscaleManager {
-    /// Check if Tailscale CLI is available
-    func isInstalled() async -> Bool
+**Acceptance Criteria:**
 
-    /// Get current connection status
-    func getStatus() async -> TailscaleStatus
+- [ ] 2-4 images show as 2x2 grid
+- [ ] 5+ images show as stack with count badge
+- [ ] Tap opens carousel view
+- [ ] Swipe left/right navigates images
+- [ ] Pinch to zoom on individual images
+- [ ] Page indicator shows position
 
-    /// Get this device's Tailscale IP
-    func getIPAddress() async -> String?
-
-    /// Get list of devices on tailnet
-    func getDevices() async throws -> [TailscaleDevice]
-}
-
-public enum TailscaleStatus {
-    case notInstalled
-    case stopped
-    case connecting
-    case connected(ip: String)
-    case error(String)
-}
-```
-
-### Success Criteria
-- Both apps show Tailscale connection status
-- Users guided through Tailscale setup
-- Clear indication when Tailscale is not configured
+**Extension Point:** `ImageGalleryRenderer`, `Views/Carousel/`
 
 ---
 
-## Milestone 13: GitHub Actions & Release Automation ✅
+### M3.3: Attachments - Send 🔴
 
-**Goal:** Automated builds, testing, and releases.
+**User Stories:**
 
-### Deliverables
-- [x] `.github/workflows/ci.yml` - Build and test on every PR
-- [x] `.github/workflows/release.yml` - Build and release on version tags
-- [x] Auto-generate changelog from conventional commits
-- [x] Build both apps as `.app` bundles
-- [x] Create DMG installers for both apps
-- [x] Upload DMGs to GitHub Releases
-- [x] Version extraction from git tags
-- [ ] (Optional) Code signing with Developer ID
-- [ ] (Optional) Notarization for Gatekeeper
+- User can attach files to messages
+- User can attach photos from library
+- User can take photo/video to send
 
-### CI Workflow (ci.yml)
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  build-and-test:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Server
-        run: cd MessageBridgeServer && swift build
-      - name: Test Server
-        run: cd MessageBridgeServer && swift test
-      - name: Build Client
-        run: cd MessageBridgeClient && swift build
-      - name: Test Client
-        run: cd MessageBridgeClient && swift test
-```
+**Acceptance Criteria:**
 
-### Release Workflow (release.yml)
-```yaml
-name: Release
-on:
-  push:
-    tags: ['v*']
-jobs:
-  release:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Build Apps
-        run: ./Scripts/build-release.sh
-      - name: Create DMGs
-        run: ./Scripts/create-dmgs.sh
-      - name: Generate Changelog
-        run: ./Scripts/generate-changelog.sh
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            build/*.dmg
-          body_path: RELEASE_NOTES.md
-```
+- [ ] Attachment button in composer toolbar
+- [ ] Photo picker for library access
+- [ ] Camera capture option
+- [ ] Preview attachments before sending
+- [ ] Remove attachment from draft
+- [ ] Compress images before upload (configurable)
 
-### Success Criteria
-- PRs automatically built and tested
-- Pushing `v*` tag creates GitHub Release
-- Release includes both DMGs and changelog
-- Version number embedded in apps matches tag
+**Extension Point:** `ComposerPlugin` protocol, `Composer/AttachmentPickerPlugin.swift`
 
 ---
 
-## Milestone 14: E2E Encryption & Cloudflare Tunnel ✅
+### M3.4: Audio Messages 🔴
 
-**Goal:** Add end-to-end encryption and alternative network connectivity via Cloudflare Tunnel.
+**User Stories:**
 
-### Deliverables
-- [x] `E2EEncryption.swift` - AES-256-GCM encryption with HKDF key derivation
-- [x] `E2EMiddleware.swift` - Vapor middleware for automatic response encryption
-- [x] `EncryptedEnvelope` - JSON wrapper for encrypted payloads
-- [x] Server: Encrypt responses when `X-E2E-Encryption: enabled` header present
-- [x] Server: Decrypt incoming request bodies for `/send` endpoint
-- [x] Server: WebSocket encryption support per connection
-- [x] Client: E2E toggle in Settings UI
-- [x] Client: Encrypt/decrypt all API traffic when enabled
-- [x] Client: Handle encrypted WebSocket messages
-- [x] Cloudflare Tunnel setup guide (`Scripts/setup-cloudflare-tunnel.md`)
-- [x] Unit tests for encryption (11 server tests, 9 client tests)
+- User can record and send voice messages
+- User can play received audio messages
 
-### E2E Encryption Design
-```swift
-public struct E2EEncryption {
-    private let key: SymmetricKey  // Derived from API key via HKDF
+**Acceptance Criteria:**
 
-    public func encrypt(_ data: Data) throws -> String  // Base64 ciphertext
-    public func decrypt(_ base64: String) throws -> Data
-}
+- [ ] Microphone button in composer
+- [ ] Hold to record, release to preview
+- [ ] Waveform visualization during recording
+- [ ] Play button on received audio
+- [ ] Waveform shows playback progress
+- [ ] Scrubber to seek within audio
 
-public struct EncryptedEnvelope: Codable {
-    let version: Int      // Protocol version (currently 1)
-    let payload: String   // Base64-encoded AES-GCM ciphertext
-}
-```
-
-### Key Derivation
-- Input: API key (shared secret)
-- Salt: `"MessageBridge-E2E-Salt-v1"`
-- Info: `"MessageBridge-E2E-Encryption"`
-- Output: 256-bit AES key via HKDF-SHA256
-
-### Success Criteria
-- Messages encrypted before leaving device
-- Relay servers (Cloudflare) cannot read content
-- Same API key decrypts on both ends
-- Works with both Tailscale and Cloudflare Tunnel
+**Extension Point:** `AudioRecorderPlugin`, `AudioRenderer`
 
 ---
 
-## Milestone 15: Cloudflare Tunnel Setup Wizard ✅
+## Phase 4: Reactions & Status 🔴
 
-**Goal:** Simplify Cloudflare Tunnel setup with a guided wizard in the server app, eliminating manual terminal commands.
+### M4.1: Tapbacks (Reactions) 🔴
 
-### Problem Statement
-Current Cloudflare Tunnel setup requires:
-1. Installing `cloudflared` via Homebrew (terminal)
-2. Running `cloudflared tunnel login` (opens browser)
-3. Creating a tunnel via CLI
-4. Creating a config file manually
-5. Setting up a LaunchAgent manually
-6. Running the tunnel
+**User Stories:**
 
-This is too complex for non-technical users and error-prone.
+- User can see tapbacks on messages
+- User can add/remove tapbacks
 
-### Deliverables (Quick Tunnel - Phase 1)
-- [x] Detect if `cloudflared` is installed
-- [x] One-click `cloudflared` installation (download binary directly, no Homebrew required)
-- [x] Start/stop tunnel from server UI
-- [x] Tunnel status indicator in menu bar
-- [x] Quick tunnel mode (temporary URL, no account needed)
-- [x] Cloudflare settings tab in server preferences
-- [x] CloudflaredManager actor with process management
-- [x] Unit tests for CloudflaredManager (18 tests)
+**Acceptance Criteria:**
 
-### Future Enhancements (Named Tunnel - Phase 2)
-- [ ] OAuth flow integration for Cloudflare login
-- [ ] Automatic tunnel creation and configuration
-- [ ] Generate and manage config.yml automatically
-- [ ] LaunchAgent creation for auto-start
-- [ ] Named tunnel mode (permanent URL, requires Cloudflare account)
+- [ ] Tapback pills appear above message bubble
+- [ ] Shows emoji and count for each type
+- [ ] Long-press message to add tapback
+- [ ] Picker shows: ❤️ 👍 👎 😂 ‼️ ❓
+- [ ] Tap existing tapback to remove
+- [ ] Real-time sync via WebSocket
 
-### UI Design
-```
-┌─────────────────────────────────────────┐
-│ Cloudflare Tunnel Setup                 │
-├─────────────────────────────────────────┤
-│                                         │
-│  ○ Quick Tunnel (Temporary URL)         │
-│    No account needed. URL changes on    │
-│    each restart.                        │
-│                                         │
-│  ○ Named Tunnel (Permanent URL)         │
-│    Requires free Cloudflare account.    │
-│    URL stays the same forever.          │
-│                                         │
-├─────────────────────────────────────────┤
-│              [Continue →]               │
-└─────────────────────────────────────────┘
-
-// Quick Tunnel flow:
-┌─────────────────────────────────────────┐
-│ Quick Tunnel Active                     │
-├─────────────────────────────────────────┤
-│                                         │
-│  Your tunnel URL:                       │
-│  ┌─────────────────────────────────┐    │
-│  │ https://abc-xyz.trycloudflare.com │  │
-│  └─────────────────────────────────┘    │
-│                        [Copy URL]       │
-│                                         │
-│  Status: ● Connected                    │
-│                                         │
-│  ⚠️ This URL will change when you       │
-│     restart the tunnel.                 │
-│                                         │
-├─────────────────────────────────────────┤
-│  [Stop Tunnel]    [Switch to Named →]   │
-└─────────────────────────────────────────┘
-
-// Named Tunnel flow:
-┌─────────────────────────────────────────┐
-│ Connect Cloudflare Account              │
-├─────────────────────────────────────────┤
-│                                         │
-│  Click below to authorize MessageBridge │
-│  to create tunnels on your account.     │
-│                                         │
-│         [Connect Cloudflare →]          │
-│                                         │
-│  This will open your browser.           │
-│                                         │
-└─────────────────────────────────────────┘
-
-┌─────────────────────────────────────────┐
-│ Named Tunnel Active                     │
-├─────────────────────────────────────────┤
-│                                         │
-│  Your permanent tunnel URL:             │
-│  ┌─────────────────────────────────┐    │
-│  │ https://messagebridge.domain.com │   │
-│  └─────────────────────────────────┘    │
-│                        [Copy URL]       │
-│                                         │
-│  Status: ● Connected                    │
-│  Tunnel: messagebridge-xxxxx            │
-│                                         │
-│  ☑ Start tunnel automatically           │
-│                                         │
-├─────────────────────────────────────────┤
-│  [Stop Tunnel]         [Disconnect]     │
-└─────────────────────────────────────────┘
-```
-
-### CloudflaredManager Interface
-```swift
-public actor CloudflaredManager {
-    /// Check if cloudflared binary exists
-    func isInstalled() async -> Bool
-
-    /// Download and install cloudflared binary
-    func install() async throws
-
-    /// Start a quick tunnel (temporary URL)
-    func startQuickTunnel(port: Int) async throws -> String  // Returns URL
-
-    /// Stop the running tunnel
-    func stopTunnel() async throws
-
-    /// Get current tunnel status
-    func getStatus() async -> TunnelStatus
-
-    /// Login to Cloudflare (opens browser)
-    func login() async throws
-
-    /// Create a named tunnel
-    func createNamedTunnel(name: String) async throws -> TunnelInfo
-
-    /// Configure DNS for named tunnel
-    func configureDNS(tunnelId: String, hostname: String) async throws
-
-    /// Start named tunnel
-    func startNamedTunnel(name: String, port: Int) async throws
-
-    /// Create LaunchAgent for auto-start
-    func enableAutoStart() async throws
-
-    /// Remove LaunchAgent
-    func disableAutoStart() async throws
-}
-
-public enum TunnelStatus {
-    case notInstalled
-    case stopped
-    case starting
-    case running(url: String, isQuickTunnel: Bool)
-    case error(String)
-}
-```
-
-### Implementation Notes
-1. **Binary Installation**: Download `cloudflared` directly from GitHub releases, no Homebrew dependency
-2. **Quick Tunnel**: Uses `cloudflared tunnel --url` which requires no authentication
-3. **Named Tunnel**: Requires OAuth flow via `cloudflared tunnel login`
-4. **Process Management**: Use `Process` to spawn and manage `cloudflared` subprocess
-5. **URL Detection**: Parse stdout from cloudflared to extract the assigned URL
-6. **Config Storage**: Store tunnel config in `~/Library/Application Support/MessageBridge/`
-
-### Success Criteria
-- User can set up Cloudflare Tunnel without using Terminal
-- Quick tunnel works with single click
-- Named tunnel setup takes < 2 minutes
-- Tunnel auto-starts with server when enabled
-- Clear status indication in menu bar
+**Extension Point:** `BubbleDecorator` protocol, `Decorators/TapbackDecorator.swift`
 
 ---
 
-## Milestone 16: Contact Name Integration ✅
+### M4.2: Read Receipts 🔴
 
-**Goal:** Display contact names from the macOS Contacts app instead of raw phone numbers/emails.
+**User Stories:**
 
-### Problem Statement
-Currently, conversations and messages display raw phone numbers (+15551234567) or email addresses instead of contact names. Users have to mentally map numbers to names, making it difficult to quickly identify conversations.
+- User can see when messages are read
+- User's read status syncs to sender
 
-### Deliverables
-- [x] `ContactManager.swift` - Actor to look up contact names from macOS Contacts framework
-- [x] Handle model updated with `contactName: String?` field
-- [x] Handle model updated with `displayName` computed property (returns contactName ?? address)
-- [x] Conversation `resolvedDisplayName` uses contact names when available
-- [x] ChatDatabase enriches handles with contact names via batch lookup
-- [x] `ContactDetailsView.swift` - Popover showing full contact details
-- [x] Double-click on contact name to show details popover
-- [x] Copy-to-clipboard button for phone numbers/emails
-- [x] Search includes contact names in filters
-- [x] Unit tests for Handle and Conversation with contact names (9 tests)
+**Acceptance Criteria:**
 
-### ContactManager Interface
-```swift
-public actor ContactManager {
-    /// Look up contact name for a phone number or email
-    func lookupContactName(for address: String) async -> String?
+- [ ] "Delivered" / "Read" status under sent messages
+- [ ] Read timestamp on tap
+- [ ] Mark conversation as read when viewed
+- [ ] Sync read status via WebSocket
 
-    /// Batch lookup for efficiency (reduces database reads)
-    func lookupContactNames(for addresses: [String]) async -> [String: String]
-}
-```
-
-### Handle Model Changes
-```swift
-public struct Handle: Content, Identifiable, Sendable {
-    public let id: Int64
-    public let address: String
-    public let service: String
-    public let contactName: String?  // NEW
-
-    public var displayName: String {  // NEW
-        contactName ?? address
-    }
-}
-```
-
-### UI Changes
-- Conversation list shows contact names instead of phone numbers
-- Message thread header shows contact name with double-click hint
-- Contact details popover shows:
-  - Contact name (or "Unknown Contact" if not found)
-  - Phone number or email address
-  - Service type (iMessage, SMS)
-  - Copy button for each address
-
-### Permissions Required
-- **Contacts** permission on server (System Settings > Privacy & Security > Contacts)
-- If permission denied, falls back to displaying addresses
-
-### Success Criteria
-- Conversations display "John Doe" instead of "+15551234567"
-- Double-clicking contact name shows phone number in popover
-- Search works with both contact names and phone numbers
-- 81 tests pass (including 9 new contact name tests)
+**Extension Point:** `BubbleDecorator` protocol, `Decorators/ReadReceiptDecorator.swift`
 
 ---
 
-## Milestone 17: Permissions Check on Startup ✅
+### M4.3: Typing Indicators 🔴
 
-**Goal:** Show a permissions status window on app startup if any required permissions are missing, with direct links to System Settings.
+**User Stories:**
 
-### Problem Statement
-The server app requires several system permissions (Full Disk Access, Contacts, Automation) to function properly. Users may not realize which permissions are missing or how to grant them, leading to confusing errors.
+- User sees when others are typing
+- Typing status sent while composing
 
-### Deliverables
-- [x] `PermissionsManager.swift` - Actor to check all required permissions
-- [x] `PermissionStatus` struct with id, name, description, isGranted, and settingsURL
-- [x] Check Full Disk Access by testing chat.db readability
-- [x] Check Contacts access via CNContactStore.authorizationStatus
-- [x] Check Automation access by running a test AppleScript
-- [x] `PermissionsView.swift` - Window showing all permissions with status
-- [x] "Open Settings" button for each missing permission (opens exact settings pane)
-- [x] Refresh button to re-check permissions after user makes changes
-- [x] Show window on startup only if any permission is missing
-- [x] Unit tests for PermissionsManager (10 tests)
+**Acceptance Criteria:**
 
-### PermissionsManager Interface
-```swift
-public actor PermissionsManager {
-    public static let shared: PermissionsManager
+- [ ] "..." animation when contact is typing
+- [ ] Appears in message thread, bottom
+- [ ] Client sends typing status to server
+- [ ] 5-second timeout without keystroke stops indicator
 
-    /// Check all required permissions and return their status
-    func checkAllPermissions() async -> [PermissionStatus]
-
-    /// Check if all required permissions are granted
-    func allPermissionsGranted() async -> Bool
-
-    /// Open System Settings to the specified URL
-    func openSettings(url: URL?)
-}
-
-public struct PermissionStatus: Identifiable, Sendable {
-    public let id: String
-    public let name: String
-    public let description: String
-    public let isGranted: Bool
-    public let settingsURL: URL?
-}
-```
-
-### Permissions Checked
-| Permission | Purpose | Settings URL |
-|------------|---------|--------------|
-| Full Disk Access | Read Messages database (chat.db) | Privacy_AllFiles |
-| Contacts | Look up contact names | Privacy_Contacts |
-| Automation (Messages.app) | Send messages via AppleScript | Privacy_Automation |
-
-### UI Design
-```
-┌─────────────────────────────────────────────┐
-│           🔒 Permissions Required            │
-├─────────────────────────────────────────────┤
-│ MessageBridge Server needs the following    │
-│ permissions to function properly.           │
-├─────────────────────────────────────────────┤
-│ ✅ Full Disk Access                         │
-│    Required to read the Messages database   │
-├─────────────────────────────────────────────┤
-│ ❌ Contacts               [Open Settings]   │
-│    Required to display contact names        │
-├─────────────────────────────────────────────┤
-│ ✅ Automation (Messages.app)                │
-│    Required to send messages                │
-├─────────────────────────────────────────────┤
-│ [Refresh]                  [Continue Anyway]│
-└─────────────────────────────────────────────┘
-```
-
-### Success Criteria
-- On startup, if all permissions granted → no popup, app starts normally
-- On startup, if any permission missing → popup shows with status of all permissions
-- Clicking "Open Settings" opens the correct System Settings pane
-- After granting permission and clicking "Refresh", status updates correctly
-- 109 tests pass (including 10 new permissions tests)
+**Extension Point:** `PresenceProvider` protocol, `Presence/TypingIndicatorProvider.swift`
 
 ---
 
-## Milestone 18: Attachment Support
+## Phase 5: Quality of Life 🔴
 
-**Goal:** Display and download message attachments (images, videos, files) like Apple Messages.
+### M5.1: 2FA Code Detection 🔴
 
-### Problem Statement
-Currently, messages with attachments only show "(attachment)" placeholder text. Users cannot view or download images, videos, or files that were sent in conversations.
+**User Stories:**
 
-### Deliverables
+- Verification codes are highlighted
+- One-tap copy code to clipboard
 
-#### Server Side
-- [ ] `Attachment.swift` - Model with id, guid, filename, mimeType, size, thumbnailBase64
-- [ ] Update `Message` model with `attachments: [Attachment]` array
-- [ ] Database queries to fetch attachments via `message_attachment_join` table
-- [ ] Thumbnail generation for images (max 300x300, base64 encoded)
-- [ ] `GET /attachments/:id` endpoint to serve full attachment files
-- [ ] Support streaming for large files (videos)
-- [ ] Unit tests for attachment functionality
+**Acceptance Criteria:**
 
-#### Client Side
-- [ ] `Attachment` model mirroring server (with computed properties: isImage, isVideo, formattedSize)
-- [ ] Update `Message` model with `attachments` array
-- [ ] `AttachmentView.swift` - Component that renders different attachment types
-- [ ] `ImageAttachmentView` - Inline thumbnail, tap to view full resolution
-- [ ] `VideoAttachmentView` - Thumbnail with play button, tap to play
-- [ ] `AudioAttachmentView` - Audio player widget
-- [ ] `DocumentAttachmentView` - File icon with name/size, tap to download
-- [ ] `AttachmentService.swift` - Fetch full attachments from server
-- [ ] Integrate attachments into `MessageBubble`
-- [ ] Unit tests for attachment views and service
+- [ ] Detect 4-8 digit codes with context words
+- [ ] Detect formatted codes (G-123456)
+- [ ] Yellow highlight on detected codes
+- [ ] "Copy [code]" button on message
+- [ ] Optional: auto-copy high-confidence codes
+- [ ] Notification when auto-copied
 
-### Database Schema
-```sql
--- attachment table (read-only, part of chat.db)
-CREATE TABLE attachment (
-    ROWID INTEGER PRIMARY KEY,
-    guid TEXT UNIQUE NOT NULL,
-    filename TEXT,              -- Full path with ~ prefix
-    mime_type TEXT,
-    uti TEXT,                   -- Uniform Type Identifier
-    transfer_name TEXT,         -- Original filename
-    total_bytes INTEGER,
-    is_outgoing INTEGER,
-    is_sticker INTEGER
-);
-
--- Links messages to attachments
-CREATE TABLE message_attachment_join (
-    message_id INTEGER,
-    attachment_id INTEGER
-);
-```
-
-### Attachment Types
-| Type | MIME Types | Display |
-|------|------------|---------|
-| Image | image/jpeg, image/png, image/gif, image/heic | Inline thumbnail, tap for full |
-| Video | video/mp4, video/quicktime | Thumbnail with play icon |
-| Audio | audio/mpeg, audio/m4a | Audio player widget |
-| Document | application/pdf, etc. | File icon + name + size |
-| Other | * | Generic file icon |
-
-### API Changes
-```
-GET /attachments/:id
-Headers: X-API-Key (required), X-E2E-Encryption (optional)
-Response: File stream with appropriate Content-Type
-```
-
-### Success Criteria
-- Images display inline in message bubbles
-- Tapping an image opens full-resolution view
-- Videos play in native player
-- Files can be downloaded and opened
-- Attachments work with E2E encryption enabled
+**Extension Point:** `MessageProcessor` protocol, `Processors/CodeDetector.swift`
 
 ---
 
-## Milestone 19: URL Link Previews
+### M5.2: Multi-line Composer 🔴
 
-**Goal:** Display rich link previews for URLs in messages, matching Apple Messages behavior.
+**User Stories:**
 
-### Problem Statement
-When messages contain URLs, they display as plain text. Apple Messages shows rich previews with title, description, and image extracted from the linked page.
+- User can write multi-line messages
+- Composer expands as text grows
 
-### Deliverables
-- [ ] `URLDetector.swift` - Utility to extract URLs from message text using NSDataDetector
-- [ ] `LinkPreviewView.swift` - SwiftUI view using LinkPresentation framework
-- [ ] `LinkPreviewCard.swift` - NSViewRepresentable wrapper for LPLinkView
-- [ ] `LinkPreviewCache.swift` - Actor to cache fetched metadata
-- [ ] Integrate link previews into `MessageBubble` (show first URL only)
-- [ ] Unit tests for URL detection
+**Acceptance Criteria:**
 
-### Implementation Approach
-Use Apple's built-in `LinkPresentation` framework:
+- [ ] Text field grows up to 6 lines (configurable)
+- [ ] Scrolls internally after max lines
+- [ ] Shift+Enter or Option+Enter for newline
+- [ ] Enter behavior configurable (send vs newline)
+- [ ] Cmd+Enter always sends
 
-```swift
-import LinkPresentation
-
-// Fetch metadata
-let provider = LPMetadataProvider()
-let metadata = try await provider.startFetchingMetadata(for: url)
-
-// Display with native view
-LPLinkView(metadata: metadata)
-```
-
-### URLDetector Interface
-```swift
-struct URLDetector {
-    /// Extract all URLs from text using NSDataDetector
-    static func detectURLs(in text: String) -> [URL]
-}
-```
-
-### LinkPreviewCache Interface
-```swift
-actor LinkPreviewCache {
-    static let shared = LinkPreviewCache()
-
-    /// Get cached metadata for URL
-    func metadata(for url: URL) -> LPLinkMetadata?
-
-    /// Store metadata in cache
-    func store(_ metadata: LPLinkMetadata, for url: URL)
-}
-```
-
-### UI Behavior
-- Link previews appear below message text
-- Only first URL in message gets a preview (like Apple Messages)
-- Preview shows: title, description, domain, image (if available)
-- Clicking preview opens URL in default browser
-- Previews are fetched lazily when message becomes visible
-- Cached to avoid refetching on scroll
-
-### Success Criteria
-- URLs in messages show rich previews with title and image
-- Previews match native Apple Messages appearance
-- Clicking preview opens the link
-- Previews are cached for performance
-- Works with E2E encryption (URLs visible in decrypted text)
+**Extension Point:** `Views/Composer/ExpandingTextEditor.swift`
 
 ---
 
-## Future Enhancements (Out of Scope)
+### M5.3: Text Selection 🔴
 
-These are not part of the current implementation:
+**User Stories:**
 
-- [ ] Group chat management
-- [ ] Reactions/tapbacks
-- [ ] Read receipts
-- [ ] Multiple client support
-- [ ] Message encryption at rest
-- [ ] Code signing and notarization (requires Apple Developer account)
+- User can select portions of message text
+- User can copy selected text
 
----
+**Acceptance Criteria:**
 
-## Technical Stack
+- [ ] Click and drag to select text in messages
+- [ ] Right-click selection shows context menu
+- [ ] Copy, Look Up, Share options
+- [ ] Cmd+C copies selection
 
-| Component | Technology |
-|-----------|------------|
-| Server Runtime | Swift 5.9+ |
-| Server Framework | Vapor 4 |
-| Server UI | SwiftUI Menu Bar App |
-| Database Access | GRDB |
-| Client UI | SwiftUI (macOS 13+) |
-| Networking | URLSession + WebSocket |
-| Security | Keychain, AES-256-GCM, HKDF |
-| Network Options | Tailscale VPN, Cloudflare Tunnel |
-| Testing | XCTest, Protocol Mocks |
-| CI/CD | GitHub Actions |
-| Versioning | Semantic Versioning |
-| Commits | Conventional Commits |
+**Extension Point:** `Renderers/Messages/SelectableMessageText.swift`
 
 ---
 
-## File Structure
+### M5.4: Link Previews 🔴
 
-```
-MessageBridge/
-├── CLAUDE.md                    # Claude Code guidance
-├── spec.md                      # This file
-├── CHANGELOG.md                 # Release history
-├── CONTRIBUTING.md              # Contribution guidelines
-├── VERSION                      # Current version (semver)
-│
-├── .github/
-│   └── workflows/
-│       ├── ci.yml               # Build & test on PR
-│       └── release.yml          # Build & release on tag
-│
-├── MessageBridgeServer/
-│   ├── Package.swift
-│   ├── Sources/
-│   │   ├── MessageBridgeCore/   # Testable library
-│   │   │   ├── Models/
-│   │   │   │   ├── Handle.swift
-│   │   │   │   ├── Message.swift
-│   │   │   │   ├── Conversation.swift
-│   │   │   │   └── Attachment.swift      # NEW (Milestone 18)
-│   │   │   ├── Database/
-│   │   │   │   └── ChatDatabase.swift
-│   │   │   ├── Contacts/
-│   │   │   │   └── ContactManager.swift
-│   │   │   ├── API/
-│   │   │   │   ├── Routes.swift
-│   │   │   │   ├── E2EMiddleware.swift
-│   │   │   │   └── WebSocketManager.swift
-│   │   │   ├── Security/
-│   │   │   │   └── E2EEncryption.swift
-│   │   │   ├── Tailscale/
-│   │   │   │   └── TailscaleManager.swift
-│   │   │   └── Version/
-│   │   │       └── Version.swift
-│   │   └── MessageBridgeServer/ # Menu Bar App (SwiftUI)
-│   │       ├── App/
-│   │       │   └── ServerApp.swift
-│   │       └── Views/
-│   │           ├── MenuBarView.swift
-│   │           ├── StatusMenuView.swift
-│   │           ├── TailscaleSettingsView.swift
-│   │           └── LogViewerView.swift
-│   └── Tests/
-│       └── MessageBridgeCoreTests/
-│
-├── MessageBridgeClient/
-│   ├── Package.swift
-│   ├── Sources/
-│   │   ├── MessageBridgeClientCore/  # Testable library
-│   │   │   ├── Models/
-│   │   │   │   └── Models.swift
-│   │   │   ├── Services/
-│   │   │   │   ├── BridgeConnection.swift
-│   │   │   │   ├── TailscaleManager.swift
-│   │   │   │   └── AttachmentService.swift   # NEW (Milestone 18)
-│   │   │   ├── Utilities/
-│   │   │   │   ├── URLDetector.swift         # NEW (Milestone 19)
-│   │   │   │   └── LinkPreviewCache.swift    # NEW (Milestone 19)
-│   │   │   ├── ViewModels/
-│   │   │   │   └── MessagesViewModel.swift
-│   │   │   ├── Security/
-│   │   │   │   ├── KeychainManager.swift
-│   │   │   │   └── E2EEncryption.swift
-│   │   │   ├── Logging/
-│   │   │   │   └── Logger.swift
-│   │   │   └── Version/
-│   │   │       └── Version.swift
-│   │   └── MessageBridgeClient/      # Executable (SwiftUI)
-│   │       ├── App/
-│   │       │   └── MessageBridgeApp.swift
-│   │       └── Views/
-│   │           ├── ContentView.swift
-│   │           ├── ConversationListView.swift
-│   │           ├── MessageThreadView.swift
-│   │           ├── ContactDetailsView.swift
-│   │           ├── LogViewerView.swift
-│   │           ├── TailscaleStatusView.swift
-│   │           ├── AttachmentView.swift          # NEW (Milestone 18)
-│   │           ├── ImageAttachmentView.swift     # NEW (Milestone 18)
-│   │           ├── VideoAttachmentView.swift     # NEW (Milestone 18)
-│   │           ├── DocumentAttachmentView.swift  # NEW (Milestone 18)
-│   │           └── LinkPreviewView.swift         # NEW (Milestone 19)
-│   └── Tests/
-│       └── MessageBridgeClientCoreTests/
-│
-└── Scripts/
-    ├── build-release.sh         # Build both apps for release
-    ├── create-dmgs.sh           # Package apps into DMGs
-    ├── generate-changelog.sh    # Generate changelog from commits
-    ├── install-server.sh        # Server installer (legacy)
-    ├── package-client.sh        # Client packager (legacy)
-    ├── setup-tailscale.md       # Tailscale network setup guide
-    └── setup-cloudflare-tunnel.md  # Cloudflare Tunnel setup guide
-```
+**User Stories:**
+
+- URLs in messages show rich previews
+- Preview shows title, description, image
+
+**Acceptance Criteria:**
+
+- [ ] Detect URLs in message text
+- [ ] Fetch metadata (title, description, image)
+- [ ] Display card below message text
+- [ ] Tap card opens URL in browser
+- [ ] Cache previews to avoid re-fetching
+
+**Extension Point:** `MessageProcessor` for detection, `MessageRenderer` for display
+
+---
+
+### M5.5: Search 🔵
+
+**User Stories:**
+
+- User can search across all messages
+- Search results link to conversation
+
+**Acceptance Criteria:**
+
+- [ ] Search bar in conversation list
+- [ ] GET /search?q= endpoint
+- [ ] Results show message snippet and conversation
+- [ ] Tap result navigates to message in thread
+
+**Extension Point:** `API/Routes/SearchRoutes.swift`
+
+---
+
+## Phase 6: Polish 🔴
+
+### M6.1: Contact Names 🔵
+
+**User Stories:**
+
+- Phone numbers show contact names
+- Contact photos display in conversation list
+
+**Acceptance Criteria:**
+
+- [ ] Resolve phone/email to contact name
+- [ ] Show contact photo as avatar
+- [ ] Fallback to initials if no photo
+- [ ] Cache contact lookups
+
+---
+
+### M6.2: Notifications 🔵
+
+**User Stories:**
+
+- New messages trigger system notification
+- Clicking notification opens conversation
+
+**Acceptance Criteria:**
+
+- [ ] macOS notification for new messages
+- [ ] Shows sender name and message preview
+- [ ] Click opens app to that conversation
+- [ ] No notification if app is active and conversation visible
+
+---
+
+### M6.3: Dark Mode 🔴
+
+**User Stories:**
+
+- App respects system appearance
+- Message bubbles readable in both modes
+
+**Acceptance Criteria:**
+
+- [ ] Follows system light/dark setting
+- [ ] Sent bubbles: blue in both modes
+- [ ] Received bubbles: gray (light) / dark gray (dark)
+- [ ] Text contrast meets accessibility guidelines
+
+---
+
+### M6.4: Keyboard Navigation 🔴
+
+**User Stories:**
+
+- User can navigate entirely by keyboard
+- Shortcuts for common actions
+
+**Acceptance Criteria:**
+
+- [ ] Tab through conversations
+- [ ] Arrow keys in message list
+- [ ] Cmd+F focuses search
+- [ ] Cmd+N new conversation (future)
+- [ ] Escape clears selection / closes modals
+
+---
+
+## Future Considerations
+
+These are not planned but may be added later:
+
+- **Group chat support** - Display and send to group conversations
+- **Message threading** - Reply to specific messages
+- **Stickers and effects** - Display/send iMessage effects
+- **Message editing** - Edit sent messages (iOS 16+)
+- **Undo send** - Unsend recent messages (iOS 16+)
+- **Schedule send** - Send messages at specific time
+- **Quick replies** - Suggested responses based on context
+- **Multiple accounts** - Connect to multiple servers
+
+---
+
+## Changelog
+
+| Date       | Change                                        |
+| ---------- | --------------------------------------------- |
+| 2024-01-15 | Initial spec with Phase 1-2                   |
+| 2024-02-01 | Added Phase 3-6 milestones                    |
+| 2024-03-01 | Added 2FA code detection, multi-line composer |
