@@ -275,6 +275,7 @@ class AppState: ObservableObject {
   @Published var isCheckingForUpdates: Bool = false
 
   let serverManager = ServerManager()
+  let tailscaleManager = TailscaleManager()
   let cloudflaredManager = CloudflaredManager()
   let ngrokManager = NgrokManager()
 
@@ -306,6 +307,7 @@ class AppState: ObservableObject {
 
   init() {
     loadSettings()
+    setupTunnelProviders()
     setupTunnelStatusHandlers()
     setupCoreLogging()
 
@@ -407,6 +409,15 @@ class AppState: ObservableObject {
   }
 
   // MARK: - Tunnel Management
+
+  /// Register all tunnel providers with the central registry.
+  /// This enables UI components and other services to discover and interact with providers
+  /// through the registry rather than direct references.
+  private func setupTunnelProviders() {
+    TunnelRegistry.shared.register(tailscaleManager)
+    TunnelRegistry.shared.register(cloudflaredManager)
+    TunnelRegistry.shared.register(ngrokManager)
+  }
 
   func setupTunnelStatusHandlers() {
     Task {
