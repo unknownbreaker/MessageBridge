@@ -1,3 +1,4 @@
+import AppKit
 import XCTVapor
 import XCTest
 
@@ -532,7 +533,212 @@ final class APITests: XCTestCase {
     }
   }
 
+  // MARK: - Thumbnail Endpoint Tests
+
+  func testThumbnail_withValidImageAttachment_returnsJPEG() throws {
+    let mockDb = MockChatDatabase()
+
+    // Create test image file
+    let testImagePath = FileManager.default.temporaryDirectory
+      .appendingPathComponent("thumb-test-\(UUID().uuidString).png").path
+    createTestImage(at: testImagePath, width: 800, height: 600)
+    defer { try? FileManager.default.removeItem(atPath: testImagePath) }
+
+    // Setup mock database to return attachment with the test path
+    let attachment = Attachment(
+      id: 999,
+      guid: "test-guid",
+      filename: "test.png",
+      mimeType: "image/png",
+      uti: "public.png",
+      size: 1000,
+      isOutgoing: false,
+      isSticker: false
+    )
+    mockDb.attachmentToReturn = (attachment, testImagePath)
+
+    // Register image handler
+    AttachmentRegistry.shared.reset()
+    AttachmentRegistry.shared.register(ImageHandler())
+
+    let app = try createTestApp(database: mockDb)
+    defer { app.shutdown() }
+
+    try app.test(.GET, "attachments/999/thumbnail", headers: ["X-API-Key": "test-api-key"]) { res in
+      XCTAssertEqual(res.status, .ok)
+      XCTAssertEqual(res.headers.contentType, .jpeg)
+      // Check for JPEG magic bytes
+      XCTAssertTrue(res.body.readableBytes > 0)
+      let bytes = res.body.getBytes(at: 0, length: 2)
+      XCTAssertEqual(bytes, [0xFF, 0xD8])
+    }
+  }
+
+  func testThumbnail_withCustomSize_respectsDimensions() throws {
+    let mockDb = MockChatDatabase()
+
+    let testImagePath = FileManager.default.temporaryDirectory
+      .appendingPathComponent("thumb-size-\(UUID().uuidString).png").path
+    createTestImage(at: testImagePath, width: 1600, height: 1200)
+    defer { try? FileManager.default.removeItem(atPath: testImagePath) }
+
+    let attachment = Attachment(
+      id: 998,
+      guid: "test-guid-2",
+      filename: "large.png",
+      mimeType: "image/png",
+      uti: "public.png",
+      size: 5000,
+      isOutgoing: false,
+      isSticker: false
+    )
+    mockDb.attachmentToReturn = (attachment, testImagePath)
+
+    AttachmentRegistry.shared.reset()
+    AttachmentRegistry.shared.register(ImageHandler())
+
+    let app = try createTestApp(database: mockDb)
+    defer { app.shutdown() }
+
+    try app.test(
+      .GET, "attachments/998/thumbnail?width=100&height=100", headers: ["X-API-Key": "test-api-key"]
+    ) { res in
+      XCTAssertEqual(res.status, .ok)
+      XCTAssertEqual(res.headers.contentType, .jpeg)
+    }
+  }
+
+  func testThumbnail_withInvalidId_returnsBadRequest() throws {
+    let app = try createTestApp()
+    defer { app.shutdown() }
+
+    try app.test(.GET, "attachments/invalid/thumbnail", headers: ["X-API-Key": "test-api-key"]) {
+      res in
+      XCTAssertEqual(res.status, .badRequest)
+    }
+  }
+
+  func testThumbnail_withNotFoundAttachment_returnsNotFound() throws {
+    let mockDb = MockChatDatabase()
+    mockDb.attachmentToReturn = nil
+
+    let app = try createTestApp(database: mockDb)
+    defer { app.shutdown() }
+
+    try app.test(.GET, "attachments/12345/thumbnail", headers: ["X-API-Key": "test-api-key"]) {
+      res in
+      XCTAssertEqual(res.status, .notFound)
+    }
+  }
+
+  func testThumbnail_withMissingFile_returnsNotFound() throws {
+    let mockDb = MockChatDatabase()
+
+    let attachment = Attachment(
+      id: 997,
+      guid: "missing-file-guid",
+      filename: "missing.png",
+      mimeType: "image/png",
+      uti: "public.png",
+      size: 1000,
+      isOutgoing: false,
+      isSticker: false
+    )
+    mockDb.attachmentToReturn = (attachment, "/nonexistent/path.png")
+
+    let app = try createTestApp(database: mockDb)
+    defer { app.shutdown() }
+
+    try app.test(.GET, "attachments/997/thumbnail", headers: ["X-API-Key": "test-api-key"]) { res in
+      XCTAssertEqual(res.status, .notFound)
+    }
+  }
+
+  func testThumbnail_withUnsupportedMimeType_returnsUnsupportedMedia() throws {
+    let mockDb = MockChatDatabase()
+
+    let testPath = FileManager.default.temporaryDirectory
+      .appendingPathComponent("test-\(UUID().uuidString).xyz").path
+    try "test".write(toFile: testPath, atomically: true, encoding: .utf8)
+    defer { try? FileManager.default.removeItem(atPath: testPath) }
+
+    let attachment = Attachment(
+      id: 996,
+      guid: "unsupported-guid",
+      filename: "test.xyz",
+      mimeType: "application/x-unknown",
+      uti: "public.data",
+      size: 4,
+      isOutgoing: false,
+      isSticker: false
+    )
+    mockDb.attachmentToReturn = (attachment, testPath)
+
+    AttachmentRegistry.shared.reset()
+    // Don't register any handlers
+
+    let app = try createTestApp(database: mockDb)
+    defer { app.shutdown() }
+
+    try app.test(.GET, "attachments/996/thumbnail", headers: ["X-API-Key": "test-api-key"]) { res in
+      XCTAssertEqual(res.status, .unsupportedMediaType)
+    }
+  }
+
+  func testThumbnail_hasCacheHeaders() throws {
+    let mockDb = MockChatDatabase()
+
+    let testImagePath = FileManager.default.temporaryDirectory
+      .appendingPathComponent("cache-test-\(UUID().uuidString).png").path
+    createTestImage(at: testImagePath, width: 100, height: 100)
+    defer { try? FileManager.default.removeItem(atPath: testImagePath) }
+
+    let attachment = Attachment(
+      id: 995,
+      guid: "cache-guid",
+      filename: "cached.png",
+      mimeType: "image/png",
+      uti: "public.png",
+      size: 500,
+      isOutgoing: false,
+      isSticker: false
+    )
+    mockDb.attachmentToReturn = (attachment, testImagePath)
+
+    AttachmentRegistry.shared.reset()
+    AttachmentRegistry.shared.register(ImageHandler())
+
+    let app = try createTestApp(database: mockDb)
+    defer { app.shutdown() }
+
+    try app.test(.GET, "attachments/995/thumbnail", headers: ["X-API-Key": "test-api-key"]) { res in
+      XCTAssertEqual(res.status, .ok)
+      // Check for cache headers
+      XCTAssertNotNil(res.headers.cacheControl)
+      XCTAssertTrue(res.headers.cacheControl?.isPublic ?? false)
+    }
+  }
+
   // MARK: - Helper Methods
+
+  /// Helper to create test images
+  private func createTestImage(at path: String, width: Int, height: Int) {
+    let size = NSSize(width: width, height: height)
+    let image = NSImage(size: size)
+    image.lockFocus()
+    NSColor.blue.setFill()
+    NSRect(origin: .zero, size: size).fill()
+    image.unlockFocus()
+
+    guard let tiffData = image.tiffRepresentation,
+      let bitmap = NSBitmapImageRep(data: tiffData),
+      let pngData = bitmap.representation(using: .png, properties: [:])
+    else {
+      return
+    }
+
+    try? pngData.write(to: URL(fileURLWithPath: path))
+  }
 
   private func createTestApp(
     database: ChatDatabaseProtocol? = nil, messageSender: MessageSenderProtocol? = nil

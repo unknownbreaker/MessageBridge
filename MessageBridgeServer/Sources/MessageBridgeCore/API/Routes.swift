@@ -124,6 +124,53 @@ public func configureRoutes(
     }
   }
 
+  // GET /attachments/:id/thumbnail - Serve attachment thumbnail
+  protected.get("attachments", ":id", "thumbnail") { req async throws -> Response in
+    guard let idString = req.parameters.get("id"),
+      let attachmentId = Int64(idString)
+    else {
+      throw Abort(.badRequest, reason: "Invalid attachment ID")
+    }
+
+    // Size parameters (optional, defaults to 300x300)
+    let maxWidth = req.query[Int.self, at: "width"] ?? 300
+    let maxHeight = req.query[Int.self, at: "height"] ?? 300
+    let maxSize = CGSize(width: maxWidth, height: maxHeight)
+
+    guard let result = try await database.fetchAttachment(id: attachmentId) else {
+      throw Abort(.notFound, reason: "Attachment not found")
+    }
+
+    let (attachment, filePath) = result
+
+    guard FileManager.default.fileExists(atPath: filePath) else {
+      throw Abort(.notFound, reason: "Attachment file not found")
+    }
+
+    // Find appropriate handler
+    guard let mimeType = attachment.mimeType,
+      let handler = AttachmentRegistry.shared.handler(for: mimeType)
+    else {
+      throw Abort(.unsupportedMediaType, reason: "No handler for this attachment type")
+    }
+
+    // Generate thumbnail
+    guard
+      let thumbnailData = try await handler.generateThumbnail(
+        filePath: filePath,
+        maxSize: maxSize
+      )
+    else {
+      throw Abort(.notFound, reason: "Could not generate thumbnail")
+    }
+
+    // Return as JPEG with cache headers
+    let response = Response(status: .ok, body: .init(data: thumbnailData))
+    response.headers.contentType = .jpeg
+    response.headers.cacheControl = .init(isPublic: true, maxAge: 86400)  // Cache 24h
+    return response
+  }
+
   // POST /send - Send a message
   protected.post("send") { req async throws -> SendResponse in
     let sendRequest: SendMessageRequest
