@@ -138,7 +138,7 @@ cd MessageBridgeServer && swift build && cd ../MessageBridgeClient && swift buil
 
 | Subsystem               | Current State                                 | Target State                                  | Status             |
 | ----------------------- | --------------------------------------------- | --------------------------------------------- | ------------------ |
-| **Server Tunnels**      | Separate manager classes, no common interface | `TunnelProvider` protocol + `TunnelRegistry`  | 🔴 Not migrated    |
+| **Server Tunnels**      | Separate manager classes, no common interface | `TunnelProvider` protocol + `TunnelRegistry`  | ✅ Migrated        |
 | **Server API Routes**   | Standard Vapor routes                         | Same (no change needed)                       | ✅ Already matches |
 | **Server Middleware**   | Basic auth middleware                         | Same (no change needed)                       | ✅ Already matches |
 | **Message Processing**  | Inline in routes                              | `MessageProcessor` chain                      | 🔴 Not migrated    |
