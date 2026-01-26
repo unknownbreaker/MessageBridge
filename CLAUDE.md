@@ -10,17 +10,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Update this section at the start and end of each session**
 
-**Active Work:** [Describe current task or "None - ready for new work"]
+**Active Work:** None - ready for new work
 
-**Last Session:** [Brief summary of what was accomplished]
+**Last Session:** Implemented MessageProcessor chain architecture migration
+- Created ProcessedMessage wrapper type and supporting models (DetectedCode, TextHighlight, Mention)
+- Created MessageProcessor protocol and ProcessorChain singleton
+- Implemented 4 processors: CodeDetector, PhoneNumberDetector, MentionExtractor, EmojiEnlarger
+- Integrated ProcessorChain into Routes.swift and WebSocketManager
+- Registered processors at server startup
+- Updated API response types to use ProcessedMessage
 
-**Known Blockers:** [Any issues preventing progress]
+**Known Blockers:** None
 
 **Next Steps:**
 
-1. [First priority]
-2. [Second priority]
-3. [Third priority]
+1. Implement client-side rendering of ProcessedMessage enrichments
+2. Add M5.1 2FA Code Detection milestone tests (verify against spec.md)
+3. Continue architecture migration (Attachment Handling next)
 
 ---
 
@@ -141,7 +147,7 @@ cd MessageBridgeServer && swift build && cd ../MessageBridgeClient && swift buil
 | **Server Tunnels**      | Separate manager classes, no common interface | `TunnelProvider` protocol + `TunnelRegistry`  | ✅ Migrated        |
 | **Server API Routes**   | Standard Vapor routes                         | Same (no change needed)                       | ✅ Already matches |
 | **Server Middleware**   | Basic auth middleware                         | Same (no change needed)                       | ✅ Already matches |
-| **Message Processing**  | Inline in routes                              | `MessageProcessor` chain                      | 🔴 Not migrated    |
+| **Message Processing**  | `ProcessorChain` with 4 processors            | `MessageProcessor` chain                      | ✅ Migrated        |
 | **Attachment Handling** | Basic serving                                 | `AttachmentHandler` protocol + thumbnails     | 🔴 Not migrated    |
 | **Client Renderers**    | Hardcoded in views                            | `MessageRenderer` protocol + registry         | 🔴 Not migrated    |
 | **Client Attachments**  | Basic/none                                    | `AttachmentRenderer` protocol + carousel      | 🔴 Not migrated    |
