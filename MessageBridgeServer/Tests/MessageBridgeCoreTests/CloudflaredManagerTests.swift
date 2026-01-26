@@ -61,43 +61,6 @@ final class CloudflaredManagerTests: XCTestCase {
     XCTAssertNotEqual(running1, running3)
   }
 
-  // MARK: - CloudflaredError Tests
-
-  func testCloudflaredError_notInstalled_description() {
-    let error = CloudflaredError.notInstalled
-    XCTAssertEqual(error.errorDescription, "cloudflared is not installed")
-  }
-
-  func testCloudflaredError_invalidDownloadURL_description() {
-    let error = CloudflaredError.invalidDownloadURL
-    XCTAssertEqual(error.errorDescription, "Invalid download URL")
-  }
-
-  func testCloudflaredError_downloadFailed_description() {
-    let error = CloudflaredError.downloadFailed
-    XCTAssertEqual(error.errorDescription, "Failed to download cloudflared")
-  }
-
-  func testCloudflaredError_extractionFailed_description() {
-    let error = CloudflaredError.extractionFailed
-    XCTAssertEqual(error.errorDescription, "Failed to extract cloudflared archive")
-  }
-
-  func testCloudflaredError_failedToStart_description() {
-    let error = CloudflaredError.failedToStart("Process crashed")
-    XCTAssertEqual(error.errorDescription, "Failed to start tunnel: Process crashed")
-  }
-
-  func testCloudflaredError_tunnelFailed_description() {
-    let error = CloudflaredError.tunnelFailed("Connection reset")
-    XCTAssertEqual(error.errorDescription, "Tunnel failed: Connection reset")
-  }
-
-  func testCloudflaredError_timeout_description() {
-    let error = CloudflaredError.timeout
-    XCTAssertEqual(error.errorDescription, "Timed out waiting for tunnel URL")
-  }
-
   // MARK: - CloudflaredInfo Tests
 
   func testCloudflaredInfo_init() {

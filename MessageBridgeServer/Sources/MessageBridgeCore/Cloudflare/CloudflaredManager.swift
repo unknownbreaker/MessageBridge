@@ -9,7 +9,17 @@ public struct CloudflaredInfo: Sendable {
 }
 
 /// Manages the cloudflared binary and tunnel process
-public actor CloudflaredManager {
+public actor CloudflaredManager: TunnelProvider {
+  // MARK: - TunnelProvider Conformance
+
+  public nonisolated let id = "cloudflare"
+  public nonisolated let displayName = "Cloudflare Tunnel"
+  public nonisolated let description =
+    "Free, no account required. May be blocked by some corporate firewalls."
+  public nonisolated let iconName = "cloud"
+
+  // MARK: - Private Properties
+
   /// Possible locations for cloudflared binary
   private let searchPaths = [
     "/opt/homebrew/bin/cloudflared",
@@ -45,12 +55,29 @@ public actor CloudflaredManager {
 
   public init() {}
 
-  // MARK: - Public API
+  // MARK: - TunnelProvider Methods
 
   /// Get current tunnel status
   public var status: TunnelStatus {
     _status
   }
+
+  /// Check if cloudflared is installed (nonisolated for TunnelProvider)
+  public nonisolated func isInstalled() -> Bool {
+    findBinaryNonisolated() != nil
+  }
+
+  /// Connect the tunnel (TunnelProvider conformance)
+  public func connect(port: Int) async throws -> String {
+    try await startQuickTunnel(port: port)
+  }
+
+  /// Disconnect the tunnel (TunnelProvider conformance)
+  public func disconnect() async {
+    await stopTunnel()
+  }
+
+  // MARK: - Public API
 
   /// Check if a cloudflared process is already running externally (not managed by this instance)
   /// and update status accordingly. Returns true if a process is detected.
@@ -90,11 +117,6 @@ public actor CloudflaredManager {
   /// Set a handler to be called when status changes
   public func onStatusChange(_ handler: @escaping (TunnelStatus) -> Void) {
     statusChangeHandler = handler
-  }
-
-  /// Check if cloudflared is installed
-  public func isInstalled() -> Bool {
-    findBinary() != nil
   }
 
   /// Get information about installed cloudflared
@@ -156,7 +178,7 @@ public actor CloudflaredManager {
   /// Start a quick tunnel (temporary URL, no account needed)
   public func startQuickTunnel(port: Int = 8080) async throws -> String {
     guard let binaryPath = findBinary() else {
-      throw CloudflaredError.notInstalled
+      throw TunnelError.notInstalled(provider: id)
     }
 
     // Stop any existing tunnel
@@ -213,7 +235,7 @@ public actor CloudflaredManager {
       outputPipe.fileHandleForReading.readabilityHandler = nil
       errorPipe.fileHandleForReading.readabilityHandler = nil
       updateStatus(.error("Failed to start: \(error.localizedDescription)"))
-      throw CloudflaredError.failedToStart(error.localizedDescription)
+      throw TunnelError.connectionFailed("Failed to start: \(error.localizedDescription)")
     }
 
     // Wait for URL to appear (with timeout)
@@ -258,6 +280,34 @@ public actor CloudflaredManager {
   }
 
   // MARK: - Private Methods
+
+  /// Find cloudflared binary in known locations (nonisolated for TunnelProvider.isInstalled)
+  private nonisolated func findBinaryNonisolated() -> String? {
+    // App-specific install location
+    let appSupport = FileManager.default.urls(
+      for: .applicationSupportDirectory, in: .userDomainMask
+    ).first!
+    let appBinary = appSupport.appendingPathComponent("MessageBridge/bin/cloudflared").path
+
+    // Check app-specific location first
+    if FileManager.default.isExecutableFile(atPath: appBinary) {
+      return appBinary
+    }
+
+    // Check system paths (duplicated from searchPaths since we can't access actor state)
+    let systemPaths = [
+      "/opt/homebrew/bin/cloudflared",
+      "/usr/local/bin/cloudflared",
+      "/usr/bin/cloudflared",
+    ]
+    for path in systemPaths {
+      if FileManager.default.isExecutableFile(atPath: path) {
+        return path
+      }
+    }
+
+    return nil
+  }
 
   /// Find cloudflared binary in known locations
   private func findBinary() -> String? {
@@ -314,7 +364,7 @@ public actor CloudflaredManager {
     let urlString =
       "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-\(arch).tgz"
     guard let url = URL(string: urlString) else {
-      throw CloudflaredError.invalidDownloadURL
+      throw TunnelError.installationFailed(reason: "Invalid download URL")
     }
     return url
   }
@@ -331,7 +381,7 @@ public actor CloudflaredManager {
     process.waitUntilExit()
 
     if process.terminationStatus != 0 {
-      throw CloudflaredError.extractionFailed
+      throw TunnelError.installationFailed(reason: "Failed to extract cloudflared archive")
     }
   }
 
@@ -358,27 +408,27 @@ public actor CloudflaredManager {
       }
 
       if case .error(let message) = _status {
-        throw CloudflaredError.tunnelFailed(message)
+        throw TunnelError.connectionFailed(message)
       }
 
       // Check if process died or stopped
       if case .stopped = _status {
-        throw CloudflaredError.tunnelFailed("Tunnel stopped unexpectedly")
+        throw TunnelError.connectionFailed("Tunnel stopped unexpectedly")
       }
 
       if let process = tunnelProcess, !process.isRunning {
-        throw CloudflaredError.tunnelFailed("Process terminated unexpectedly")
+        throw TunnelError.connectionFailed("Process terminated unexpectedly")
       }
 
       // Also check if tunnelProcess became nil (process terminated and was cleaned up)
       if tunnelProcess == nil {
-        throw CloudflaredError.tunnelFailed("Tunnel process terminated")
+        throw TunnelError.connectionFailed("Tunnel process terminated")
       }
 
       try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
     }
 
-    throw CloudflaredError.timeout
+    throw TunnelError.timeout
   }
 
   /// Handle tunnel process termination
@@ -400,36 +450,5 @@ public actor CloudflaredManager {
   private func updateStatus(_ newStatus: TunnelStatus) {
     _status = newStatus
     statusChangeHandler?(newStatus)
-  }
-}
-
-// MARK: - Errors
-
-public enum CloudflaredError: LocalizedError {
-  case notInstalled
-  case invalidDownloadURL
-  case downloadFailed
-  case extractionFailed
-  case failedToStart(String)
-  case tunnelFailed(String)
-  case timeout
-
-  public var errorDescription: String? {
-    switch self {
-    case .notInstalled:
-      return "cloudflared is not installed"
-    case .invalidDownloadURL:
-      return "Invalid download URL"
-    case .downloadFailed:
-      return "Failed to download cloudflared"
-    case .extractionFailed:
-      return "Failed to extract cloudflared archive"
-    case .failedToStart(let reason):
-      return "Failed to start tunnel: \(reason)"
-    case .tunnelFailed(let reason):
-      return "Tunnel failed: \(reason)"
-    case .timeout:
-      return "Timed out waiting for tunnel URL"
-    }
   }
 }

@@ -473,7 +473,7 @@ class AppState: ObservableObject {
 
   func startCloudfareTunnel() async throws {
     guard serverStatus.isRunning else {
-      throw CloudflaredError.failedToStart("Server must be running first")
+      throw TunnelError.connectionFailed("Server must be running first")
     }
     addLog(level: .info, message: "Starting Cloudflare Tunnel...")
     let url = try await cloudflaredManager.startQuickTunnel(port: port)
