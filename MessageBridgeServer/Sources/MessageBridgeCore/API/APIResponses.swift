@@ -24,10 +24,10 @@ public struct ConversationsResponse: Content {
 
 /// Response for GET /conversations/:id/messages
 public struct MessagesResponse: Content {
-  public let messages: [Message]
+  public let messages: [ProcessedMessage]
   public let nextCursor: String?
 
-  public init(messages: [Message], nextCursor: String? = nil) {
+  public init(messages: [ProcessedMessage], nextCursor: String? = nil) {
     self.messages = messages
     self.nextCursor = nextCursor
   }
@@ -35,10 +35,10 @@ public struct MessagesResponse: Content {
 
 /// Response for GET /search
 public struct SearchResponse: Content {
-  public let messages: [Message]
+  public let messages: [ProcessedMessage]
   public let query: String
 
-  public init(messages: [Message], query: String) {
+  public init(messages: [ProcessedMessage], query: String) {
     self.messages = messages
     self.query = query
   }

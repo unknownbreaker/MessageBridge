@@ -40,8 +40,9 @@ public func configureRoutes(
     do {
       let messages = try await database.fetchMessages(
         conversationId: conversationId, limit: limit, offset: offset)
+      let processedMessages = messages.map { ProcessorChain.shared.process($0) }
       let nextCursor = messages.count == limit ? String(offset + limit) : nil
-      return MessagesResponse(messages: messages, nextCursor: nextCursor)
+      return MessagesResponse(messages: processedMessages, nextCursor: nextCursor)
     } catch {
       throw Abort(.internalServerError, reason: "Failed to fetch messages")
     }
@@ -71,7 +72,8 @@ public func configureRoutes(
 
     do {
       let messages = try await database.searchMessages(query: query, limit: limit)
-      return SearchResponse(messages: messages, query: query)
+      let processedMessages = messages.map { ProcessorChain.shared.process($0) }
+      return SearchResponse(messages: processedMessages, query: query)
     } catch {
       throw Abort(.internalServerError, reason: "Failed to search messages")
     }

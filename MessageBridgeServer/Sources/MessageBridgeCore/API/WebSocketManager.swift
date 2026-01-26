@@ -51,7 +51,8 @@ public actor WebSocketManager {
     os_log(
       "Broadcasting message ID %lld to %d client(s)", log: logger, type: .info, message.id,
       connections.count)
-    let data = NewMessageData(from: message, sender: sender)
+    let processedMessage = ProcessorChain.shared.process(message)
+    let data = NewMessageData(from: processedMessage)
     let wsMessage = WebSocketMessage(type: .newMessage, data: data)
 
     await broadcast(wsMessage)

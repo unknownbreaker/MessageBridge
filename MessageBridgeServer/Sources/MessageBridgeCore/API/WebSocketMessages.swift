@@ -20,31 +20,14 @@ public struct WebSocketMessage<T: Codable & Sendable>: Codable, Sendable {
 
 /// Data payload for new message notifications
 public struct NewMessageData: Codable, Sendable {
-  public let id: Int64
-  public let conversationId: String
-  public let text: String?
-  public let sender: String?
-  public let date: Date
-  public let isFromMe: Bool
+  public let message: ProcessedMessage
 
-  public init(
-    id: Int64, conversationId: String, text: String?, sender: String?, date: Date, isFromMe: Bool
-  ) {
-    self.id = id
-    self.conversationId = conversationId
-    self.text = text
-    self.sender = sender
-    self.date = date
-    self.isFromMe = isFromMe
+  public init(message: ProcessedMessage) {
+    self.message = message
   }
 
-  public init(from message: Message, sender: String?) {
-    self.id = message.id
-    self.conversationId = message.conversationId
-    self.text = message.text
-    self.sender = sender
-    self.date = message.date
-    self.isFromMe = message.isFromMe
+  public init(from message: ProcessedMessage) {
+    self.message = message
   }
 }
 
