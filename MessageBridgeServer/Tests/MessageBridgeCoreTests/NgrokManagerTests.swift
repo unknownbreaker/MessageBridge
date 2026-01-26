@@ -4,47 +4,33 @@ import XCTest
 
 final class NgrokManagerTests: XCTestCase {
 
-  // MARK: - NgrokError Tests
+  // MARK: - TunnelProvider Conformance Tests
 
-  func testNgrokError_notInstalled_description() {
-    let error = NgrokError.notInstalled
-    XCTAssertEqual(error.errorDescription, "ngrok is not installed")
+  func testNgrokManager_id_isNgrok() {
+    let manager = NgrokManager()
+    XCTAssertEqual(manager.id, "ngrok")
   }
 
-  func testNgrokError_invalidDownloadURL_description() {
-    let error = NgrokError.invalidDownloadURL
-    XCTAssertEqual(error.errorDescription, "Invalid download URL")
+  func testNgrokManager_displayName_isNgrok() {
+    let manager = NgrokManager()
+    XCTAssertEqual(manager.displayName, "ngrok")
   }
 
-  func testNgrokError_downloadFailed_description() {
-    let error = NgrokError.downloadFailed
-    XCTAssertEqual(error.errorDescription, "Failed to download ngrok")
+  func testNgrokManager_description_isNotEmpty() {
+    let manager = NgrokManager()
+    XCTAssertFalse(manager.description.isEmpty)
+    XCTAssertTrue(manager.description.contains("corporate"))
   }
 
-  func testNgrokError_extractionFailed_description() {
-    let error = NgrokError.extractionFailed
-    XCTAssertEqual(error.errorDescription, "Failed to extract ngrok archive")
+  func testNgrokManager_iconName_isNetwork() {
+    let manager = NgrokManager()
+    XCTAssertEqual(manager.iconName, "network")
   }
 
-  func testNgrokError_failedToStart_description() {
-    let error = NgrokError.failedToStart("Process crashed")
-    XCTAssertEqual(error.errorDescription, "Failed to start tunnel: Process crashed")
-  }
-
-  func testNgrokError_tunnelFailed_description() {
-    let error = NgrokError.tunnelFailed("Connection reset")
-    XCTAssertEqual(error.errorDescription, "Tunnel failed: Connection reset")
-  }
-
-  func testNgrokError_timeout_description() {
-    let error = NgrokError.timeout
-    XCTAssertEqual(error.errorDescription, "Timed out waiting for tunnel URL")
-  }
-
-  func testNgrokError_authTokenRequired_description() {
-    let error = NgrokError.authTokenRequired
-    XCTAssertEqual(
-      error.errorDescription, "ngrok auth token required (run: ngrok config add-authtoken <token>)")
+  func testNgrokManager_isInstalled_returnsBoolean() {
+    let manager = NgrokManager()
+    // Just verify it returns without crashing - actual result depends on system
+    _ = manager.isInstalled()
   }
 
   // MARK: - NgrokInfo Tests
@@ -73,6 +59,16 @@ final class NgrokManagerTests: XCTestCase {
     let manager = NgrokManager()
     let isRunning = await manager.isRunning()
     XCTAssertFalse(isRunning)
+  }
+
+  // MARK: - Connect/Disconnect Tests
+
+  func testNgrokManager_disconnect_whenNotRunning_succeeds() async {
+    let manager = NgrokManager()
+    // Should complete without error even when not running
+    await manager.disconnect()
+    let status = await manager.status
+    XCTAssertEqual(status, .stopped)
   }
 
   // MARK: - Detect Existing Tunnel Tests

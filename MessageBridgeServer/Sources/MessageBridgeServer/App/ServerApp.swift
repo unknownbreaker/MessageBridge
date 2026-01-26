@@ -507,7 +507,7 @@ class AppState: ObservableObject {
 
   func startNgrokTunnel() async throws {
     guard serverStatus.isRunning else {
-      throw NgrokError.failedToStart("Server must be running first")
+      throw TunnelError.connectionFailed("Server must be running first")
     }
     addLog(level: .info, message: "Starting ngrok tunnel...")
     let url = try await ngrokManager.startTunnel(port: port)

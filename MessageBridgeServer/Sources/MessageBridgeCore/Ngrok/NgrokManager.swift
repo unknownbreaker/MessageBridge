@@ -1,7 +1,17 @@
 import Foundation
 
 /// Manages the ngrok binary and tunnel process
-public actor NgrokManager {
+public actor NgrokManager: TunnelProvider {
+  // MARK: - TunnelProvider Conformance
+
+  public nonisolated let id = "ngrok"
+  public nonisolated let displayName = "ngrok"
+  public nonisolated let description =
+    "Widely used, often whitelisted by corporate networks. Free tier available."
+  public nonisolated let iconName = "network"
+
+  // MARK: - Private Properties
+
   /// Possible locations for ngrok binary
   private let searchPaths = [
     "/opt/homebrew/bin/ngrok",
@@ -37,12 +47,29 @@ public actor NgrokManager {
 
   public init() {}
 
-  // MARK: - Public API
+  // MARK: - TunnelProvider Methods
 
   /// Get current tunnel status
   public var status: TunnelStatus {
     _status
   }
+
+  /// Check if ngrok is installed (nonisolated for TunnelProvider)
+  public nonisolated func isInstalled() -> Bool {
+    findBinaryNonisolated() != nil
+  }
+
+  /// Connect the tunnel (TunnelProvider conformance)
+  public func connect(port: Int) async throws -> String {
+    try await startTunnel(port: port)
+  }
+
+  /// Disconnect the tunnel (TunnelProvider conformance)
+  public func disconnect() async {
+    await stopTunnel()
+  }
+
+  // MARK: - Public API
 
   /// Check if an ngrok process is already running externally (not managed by this instance)
   /// and update status accordingly. Returns the tunnel URL if found.
@@ -127,11 +154,6 @@ public actor NgrokManager {
     statusChangeHandler = handler
   }
 
-  /// Check if ngrok is installed
-  public func isInstalled() -> Bool {
-    findBinary() != nil
-  }
-
   /// Get information about installed ngrok
   public func getInfo() async -> NgrokInfo? {
     guard let path = findBinary() else { return nil }
@@ -171,7 +193,7 @@ public actor NgrokManager {
   /// Start a tunnel (requires ngrok account for persistent URLs, free tier available)
   public func startTunnel(port: Int = 8080) async throws -> String {
     guard let binaryPath = findBinary() else {
-      throw NgrokError.notInstalled
+      throw TunnelError.notInstalled(provider: id)
     }
 
     // Stop any existing tunnel
@@ -228,7 +250,7 @@ public actor NgrokManager {
       outputPipe.fileHandleForReading.readabilityHandler = nil
       errorPipe.fileHandleForReading.readabilityHandler = nil
       updateStatus(.error("Failed to start: \(error.localizedDescription)"))
-      throw NgrokError.failedToStart(error.localizedDescription)
+      throw TunnelError.connectionFailed("Failed to start: \(error.localizedDescription)")
     }
 
     // Wait for URL to appear (with timeout)
@@ -273,6 +295,34 @@ public actor NgrokManager {
   }
 
   // MARK: - Private Methods
+
+  /// Find ngrok binary in known locations (nonisolated for TunnelProvider.isInstalled)
+  private nonisolated func findBinaryNonisolated() -> String? {
+    // App-specific install location
+    let appSupport = FileManager.default.urls(
+      for: .applicationSupportDirectory, in: .userDomainMask
+    ).first!
+    let appBinary = appSupport.appendingPathComponent("MessageBridge/bin/ngrok").path
+
+    // Check app-specific location first
+    if FileManager.default.isExecutableFile(atPath: appBinary) {
+      return appBinary
+    }
+
+    // Check system paths (duplicated from searchPaths since we can't access actor state)
+    let systemPaths = [
+      "/opt/homebrew/bin/ngrok",
+      "/usr/local/bin/ngrok",
+      "/usr/bin/ngrok",
+    ]
+    for path in systemPaths {
+      if FileManager.default.isExecutableFile(atPath: path) {
+        return path
+      }
+    }
+
+    return nil
+  }
 
   /// Find ngrok binary in known locations
   private func findBinary() -> String? {
@@ -329,7 +379,7 @@ public actor NgrokManager {
     // ngrok downloads are zip files from their CDN
     let urlString = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-\(arch).zip"
     guard let url = URL(string: urlString) else {
-      throw NgrokError.invalidDownloadURL
+      throw TunnelError.installationFailed(reason: "Invalid download URL")
     }
     return url
   }
@@ -346,7 +396,7 @@ public actor NgrokManager {
     process.waitUntilExit()
 
     if process.terminationStatus != 0 {
-      throw NgrokError.extractionFailed
+      throw TunnelError.installationFailed(reason: "Failed to extract ngrok archive")
     }
   }
 
@@ -425,27 +475,27 @@ public actor NgrokManager {
       }
 
       if case .error(let message) = _status {
-        throw NgrokError.tunnelFailed(message)
+        throw TunnelError.connectionFailed(message)
       }
 
       // Check if process died or stopped
       if case .stopped = _status {
-        throw NgrokError.tunnelFailed("Tunnel stopped unexpectedly")
+        throw TunnelError.connectionFailed("Tunnel stopped unexpectedly")
       }
 
       if let process = tunnelProcess, !process.isRunning {
-        throw NgrokError.tunnelFailed("Process terminated unexpectedly")
+        throw TunnelError.connectionFailed("Process terminated unexpectedly")
       }
 
       // Also check if tunnelProcess became nil (process terminated and was cleaned up)
       if tunnelProcess == nil {
-        throw NgrokError.tunnelFailed("Tunnel process terminated")
+        throw TunnelError.connectionFailed("Tunnel process terminated")
       }
 
       try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
     }
 
-    throw NgrokError.timeout
+    throw TunnelError.timeout
   }
 
   /// Handle tunnel process termination
@@ -476,38 +526,4 @@ public actor NgrokManager {
 public struct NgrokInfo: Sendable {
   public let path: String
   public let version: String?
-}
-
-// MARK: - Errors
-
-public enum NgrokError: LocalizedError {
-  case notInstalled
-  case invalidDownloadURL
-  case downloadFailed
-  case extractionFailed
-  case failedToStart(String)
-  case tunnelFailed(String)
-  case timeout
-  case authTokenRequired
-
-  public var errorDescription: String? {
-    switch self {
-    case .notInstalled:
-      return "ngrok is not installed"
-    case .invalidDownloadURL:
-      return "Invalid download URL"
-    case .downloadFailed:
-      return "Failed to download ngrok"
-    case .extractionFailed:
-      return "Failed to extract ngrok archive"
-    case .failedToStart(let reason):
-      return "Failed to start tunnel: \(reason)"
-    case .tunnelFailed(let reason):
-      return "Tunnel failed: \(reason)"
-    case .timeout:
-      return "Timed out waiting for tunnel URL"
-    case .authTokenRequired:
-      return "ngrok auth token required (run: ngrok config add-authtoken <token>)"
-    }
-  }
 }
