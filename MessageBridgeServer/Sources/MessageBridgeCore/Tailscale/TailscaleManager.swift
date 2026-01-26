@@ -72,7 +72,14 @@ public struct TailscaleDevice: Sendable, Identifiable, Codable {
 }
 
 /// Manages interaction with the Tailscale CLI
-public actor TailscaleManager {
+public actor TailscaleManager: TunnelProvider {
+  // MARK: - TunnelProvider Conformance
+
+  public nonisolated let id = "tailscale"
+  public nonisolated let displayName = "Tailscale"
+  public nonisolated let description =
+    "VPN mesh network. Requires Tailscale app installed separately."
+  public nonisolated let iconName = "point.3.connected.trianglepath.dotted"
   /// Known locations for the Tailscale CLI
   private let cliPaths = [
     "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
@@ -83,14 +90,60 @@ public actor TailscaleManager {
   private var cachedStatus: TailscaleStatus = .notInstalled
   private var lastStatusCheck: Date = .distantPast
   private let statusCacheDuration: TimeInterval = 5  // seconds
+  private var statusChangeHandler: ((TunnelStatus) -> Void)?
 
   public init() {}
 
+  // MARK: - TunnelProvider Status
+
+  /// Current status of the tunnel (TunnelProvider conformance)
+  public var status: TunnelStatus {
+    get async {
+      let tsStatus = await getStatus()
+      return tsStatus.toTunnelStatus()
+    }
+  }
+
+  /// Connect or activate the tunnel.
+  /// For Tailscale, this verifies connection status and may prompt the user to connect.
+  /// - Parameter port: The local port (unused for Tailscale, but required by protocol)
+  /// - Returns: The Tailscale IP address
+  /// - Throws: `TunnelError` if not connected or not installed
+  public func connect(port: Int) async throws -> String {
+    let tsStatus = await getStatus(forceRefresh: true)
+
+    switch tsStatus {
+    case .connected(let ip, _):
+      return ip
+    case .notInstalled:
+      throw TunnelError.notInstalled(provider: id)
+    case .stopped:
+      openTailscaleApp()
+      throw TunnelError.userActionRequired("Please connect in the Tailscale app")
+    case .connecting:
+      throw TunnelError.userActionRequired(
+        "Tailscale is connecting. Please wait or check the Tailscale app.")
+    case .error(let message):
+      throw TunnelError.connectionFailed(message)
+    }
+  }
+
+  /// Disconnect the tunnel.
+  /// For Tailscale, this is a no-op since the external app manages the connection.
+  public func disconnect() async {
+    // No-op: Tailscale is managed by the external app
+  }
+
+  /// Register a callback to be notified of status changes.
+  public func onStatusChange(_ handler: @escaping (TunnelStatus) -> Void) {
+    statusChangeHandler = handler
+  }
+
   // MARK: - Public API
 
-  /// Check if Tailscale is installed
-  public func isInstalled() -> Bool {
-    findCLIPath() != nil
+  /// Check if Tailscale is installed (TunnelProvider conformance)
+  public nonisolated func isInstalled() -> Bool {
+    findCLIPathNonisolated() != nil
   }
 
   /// Get current Tailscale connection status
@@ -148,8 +201,24 @@ public actor TailscaleManager {
 
   // MARK: - Private Helpers
 
+  /// Known locations for the Tailscale CLI (nonisolated for use in isInstalled)
+  private static let staticCLIPaths = [
+    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+    "/usr/local/bin/tailscale",
+    "/opt/homebrew/bin/tailscale",
+  ]
+
   private func findCLIPath() -> String? {
     for path in cliPaths {
+      if FileManager.default.isExecutableFile(atPath: path) {
+        return path
+      }
+    }
+    return nil
+  }
+
+  private nonisolated func findCLIPathNonisolated() -> String? {
+    for path in Self.staticCLIPaths {
       if FileManager.default.isExecutableFile(atPath: path) {
         return path
       }
@@ -296,6 +365,26 @@ public enum TailscaleError: LocalizedError {
       return "Invalid output from Tailscale CLI"
     case .commandFailed(let message):
       return "Tailscale command failed: \(message)"
+    }
+  }
+}
+
+// MARK: - Status Conversion
+
+extension TailscaleStatus {
+  /// Convert TailscaleStatus to the unified TunnelStatus type
+  func toTunnelStatus() -> TunnelStatus {
+    switch self {
+    case .notInstalled:
+      return .notInstalled
+    case .stopped:
+      return .stopped
+    case .connecting:
+      return .starting
+    case .connected(let ip, _):
+      return .running(url: ip, isQuickTunnel: false)
+    case .error(let message):
+      return .error(message)
     }
   }
 }
