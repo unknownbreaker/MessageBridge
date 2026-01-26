@@ -308,6 +308,7 @@ class AppState: ObservableObject {
   init() {
     loadSettings()
     setupMessageProcessors()
+    setupAttachmentHandlers()
     setupTunnelProviders()
     setupTunnelStatusHandlers()
     setupCoreLogging()
@@ -418,6 +419,13 @@ class AppState: ObservableObject {
     ProcessorChain.shared.register(PhoneNumberDetector())
     ProcessorChain.shared.register(MentionExtractor())
     ProcessorChain.shared.register(EmojiEnlarger())
+  }
+
+  /// Register all attachment handlers with the AttachmentRegistry.
+  /// Handlers process attachments to generate thumbnails and extract metadata.
+  private func setupAttachmentHandlers() {
+    AttachmentRegistry.shared.register(ImageHandler())
+    AttachmentRegistry.shared.register(VideoHandler())
   }
 
   /// Register all tunnel providers with the central registry.
