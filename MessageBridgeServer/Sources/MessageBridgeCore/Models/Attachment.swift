@@ -11,7 +11,20 @@ public struct Attachment: Content, Identifiable, Sendable {
   public let size: Int64  // File size in bytes
   public let isOutgoing: Bool  // Whether we sent this attachment
   public let isSticker: Bool  // Whether this is a sticker
-  public let thumbnailBase64: String?  // Thumbnail image as base64 (for images/videos)
+  public let thumbnailBase64: String?  // Thumbnail image as base64 (deprecated, use thumbnailURL)
+
+  /// Metadata extracted by AttachmentHandler (dimensions, duration)
+  public let metadata: AttachmentMetadata?
+
+  /// Computed thumbnail URL for clients to fetch thumbnails.
+  /// Returns a path for images and videos, nil for other types.
+  public var thumbnailURL: String? {
+    guard let mimeType = mimeType else { return nil }
+    if mimeType.hasPrefix("image/") || mimeType.hasPrefix("video/") {
+      return "/attachments/\(id)/thumbnail"
+    }
+    return nil
+  }
 
   public init(
     id: Int64,
@@ -22,7 +35,8 @@ public struct Attachment: Content, Identifiable, Sendable {
     size: Int64,
     isOutgoing: Bool,
     isSticker: Bool,
-    thumbnailBase64: String? = nil
+    thumbnailBase64: String? = nil,
+    metadata: AttachmentMetadata? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -33,6 +47,7 @@ public struct Attachment: Content, Identifiable, Sendable {
     self.isOutgoing = isOutgoing
     self.isSticker = isSticker
     self.thumbnailBase64 = thumbnailBase64
+    self.metadata = metadata
   }
 
   // MARK: - Attachment Type Detection

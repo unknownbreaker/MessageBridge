@@ -482,4 +482,116 @@ final class AttachmentTests: XCTestCase {
     XCTAssertNil(attachment.uti)
     XCTAssertNil(attachment.thumbnailBase64)
   }
+
+  // MARK: - Metadata Tests
+
+  func testMetadata_defaultsToNil() {
+    let attachment = Attachment(
+      id: 1,
+      guid: "test",
+      filename: "test.jpg",
+      mimeType: "image/jpeg",
+      uti: nil,
+      size: 1000,
+      isOutgoing: false,
+      isSticker: false
+    )
+
+    XCTAssertNil(attachment.metadata)
+  }
+
+  func testMetadata_canBeSet() {
+    let metadata = AttachmentMetadata(width: 1920, height: 1080)
+    let attachment = Attachment(
+      id: 1,
+      guid: "test",
+      filename: "test.jpg",
+      mimeType: "image/jpeg",
+      uti: nil,
+      size: 1000,
+      isOutgoing: false,
+      isSticker: false,
+      metadata: metadata
+    )
+
+    XCTAssertEqual(attachment.metadata?.width, 1920)
+    XCTAssertEqual(attachment.metadata?.height, 1080)
+  }
+
+  // MARK: - ThumbnailURL Tests
+
+  func testThumbnailURL_forImage_returnsPath() {
+    let attachment = Attachment(
+      id: 123,
+      guid: "test",
+      filename: "photo.jpg",
+      mimeType: "image/jpeg",
+      uti: nil,
+      size: 1000,
+      isOutgoing: false,
+      isSticker: false
+    )
+
+    XCTAssertEqual(attachment.thumbnailURL, "/attachments/123/thumbnail")
+  }
+
+  func testThumbnailURL_forVideo_returnsPath() {
+    let attachment = Attachment(
+      id: 456,
+      guid: "test",
+      filename: "video.mp4",
+      mimeType: "video/mp4",
+      uti: nil,
+      size: 5000,
+      isOutgoing: false,
+      isSticker: false
+    )
+
+    XCTAssertEqual(attachment.thumbnailURL, "/attachments/456/thumbnail")
+  }
+
+  func testThumbnailURL_forAudio_returnsNil() {
+    let attachment = Attachment(
+      id: 789,
+      guid: "test",
+      filename: "audio.mp3",
+      mimeType: "audio/mpeg",
+      uti: nil,
+      size: 2000,
+      isOutgoing: false,
+      isSticker: false
+    )
+
+    XCTAssertNil(attachment.thumbnailURL)
+  }
+
+  func testThumbnailURL_forDocument_returnsNil() {
+    let attachment = Attachment(
+      id: 101,
+      guid: "test",
+      filename: "doc.pdf",
+      mimeType: "application/pdf",
+      uti: nil,
+      size: 3000,
+      isOutgoing: false,
+      isSticker: false
+    )
+
+    XCTAssertNil(attachment.thumbnailURL)
+  }
+
+  func testThumbnailURL_withNoMimeType_returnsNil() {
+    let attachment = Attachment(
+      id: 102,
+      guid: "test",
+      filename: "unknown",
+      mimeType: nil,
+      uti: nil,
+      size: 100,
+      isOutgoing: false,
+      isSticker: false
+    )
+
+    XCTAssertNil(attachment.thumbnailURL)
+  }
 }
