@@ -73,6 +73,18 @@ public actor MockTunnelProvider: TunnelProvider {
     updateStatus(status)
   }
 
+  public func setShouldFailConnect(_ error: TunnelError?) {
+    shouldFailConnect = error
+  }
+
+  public func setMockURL(_ url: String) {
+    mockURL = url
+  }
+
+  public func setConnectDelay(_ delay: Duration) {
+    connectDelay = delay
+  }
+
   private func updateStatus(_ newStatus: TunnelStatus) {
     _status = newStatus
     statusHandler?(newStatus)
