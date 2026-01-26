@@ -307,6 +307,7 @@ class AppState: ObservableObject {
 
   init() {
     loadSettings()
+    setupMessageProcessors()
     setupTunnelProviders()
     setupTunnelStatusHandlers()
     setupCoreLogging()
@@ -409,6 +410,15 @@ class AppState: ObservableObject {
   }
 
   // MARK: - Tunnel Management
+
+  /// Register all message processors with the ProcessorChain.
+  /// Processors enrich messages with detected codes, mentions, and other metadata.
+  private func setupMessageProcessors() {
+    ProcessorChain.shared.register(CodeDetector())
+    ProcessorChain.shared.register(PhoneNumberDetector())
+    ProcessorChain.shared.register(MentionExtractor())
+    ProcessorChain.shared.register(EmojiEnlarger())
+  }
 
   /// Register all tunnel providers with the central registry.
   /// This enables UI components and other services to discover and interact with providers
