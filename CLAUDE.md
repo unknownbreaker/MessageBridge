@@ -209,7 +209,7 @@ Follow this order to minimize breakage:
 | M1.1 Basic Server          | ✅                 | ✅         | ✅       | ⬜       |
 | M1.2 Basic Client          | ✅                 | ✅         | ✅       | ⬜       |
 | M1.3 Send Messages         | ✅                 | ✅         | ✅       | ⬜       |
-| M1.4 Real-time Updates     | ✅                 | 🟡         | ✅       | ⬜       |
+| M1.4 Real-time Updates     | ✅                 | ✅         | ✅       | ⬜       |
 | **Phase 2: Connectivity**  |
 | M2.1 Tailscale             | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M2.2 Cloudflare            | ⬜                 | ⬜         | ⬜       | ⬜       |

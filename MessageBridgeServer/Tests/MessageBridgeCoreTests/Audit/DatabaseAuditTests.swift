@@ -31,10 +31,9 @@ final class DatabaseAuditTests: XCTestCase {
   // MARK: - M1.4: Real-time Infrastructure
 
   /// Spec: "Server watches chat.db for changes"
-  /// FINDING: ChatDatabaseWatcher type does not exist in module.
-  /// The file watcher may use a different name or not be exposed as a public type.
-  func testChatDatabaseWatcher_typeExists() {
-    // ChatDatabaseWatcher not found in scope — see audit findings below
+  /// FINDING: Spec says ChatDatabaseWatcher, implementation uses FileWatcherProtocol.
+  func testFileWatcher_typeExists() {
+    let _: (any FileWatcherProtocol).Type = (any FileWatcherProtocol).self
   }
 
   /// Spec: "WebSocket connection at /ws"
@@ -49,10 +48,8 @@ final class DatabaseAuditTests: XCTestCase {
 }
 
 // MARK: - Audit Findings
-// Compiled: YES (after removing ChatDatabaseWatcher reference)
+// Compiled: YES
 // Tests passed: 5/5
-// Failures: none
-// Compilation errors (fixed):
-//   1. ChatDatabaseWatcher type not found in scope — no public type for DB file watching
-//      (test body commented out; type may exist under different name or be internal)
+// Findings:
+//   1. Spec says "ChatDatabaseWatcher" but implementation uses "FileWatcherProtocol" (naming divergence)
 //   2. Application(.testing) deprecated — migrated to Application.make(.testing)
