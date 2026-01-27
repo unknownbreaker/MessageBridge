@@ -208,7 +208,6 @@ struct AvatarView: View {
   }
 }
 
-
 #Preview {
   MessageThreadView(
     conversation: Conversation(
