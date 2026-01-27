@@ -15,6 +15,7 @@ struct MessageBridgeApp: App {
     setupAttachmentRenderers()
     setupDecorators()
     setupActions()
+    setupComposer()
   }
 
   var body: some Scene {
@@ -90,6 +91,11 @@ struct MessageBridgeApp: App {
     registry.register(TranslateAction())
     registry.register(DeleteAction())
     registry.register(UnsendAction())
+  }
+
+  private func setupComposer() {
+    // No plugins registered yet — infrastructure ready for future plugins
+    _ = ComposerRegistry.shared
   }
 
   private func setupRenderers() {

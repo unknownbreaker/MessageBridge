@@ -153,7 +153,7 @@ cd MessageBridgeServer && swift build && cd ../MessageBridgeClient && swift buil
 | **Client Attachments**  | Basic/none                                    | `AttachmentRenderer` protocol + carousel      | ✅ Migrated         |
 | **Client Decorators**   | Inline in bubble view                         | `BubbleDecorator` protocol                    | ✅ Migrated         |
 | **Client Actions**      | Context menu via ActionRegistry               | `MessageAction` protocol + registry           | ✅ Migrated         |
-| **Client Composer**     | Basic text field                              | `ComposerPlugin` protocol + expandable editor | 🔴 Not migrated    |
+| **Client Composer**     | ComposerPlugin + ExpandingTextEditor          | `ComposerPlugin` protocol + expandable editor | ✅ Migrated         |
 
 ### Migration Order
 
