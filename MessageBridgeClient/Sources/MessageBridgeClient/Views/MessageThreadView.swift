@@ -54,7 +54,7 @@ struct MessageThreadView: View {
       Divider()
 
       // Compose
-      ComposeView(text: $messageText) {
+      ComposerView(text: $messageText) {
         sendMessage()
       }
     }
@@ -208,38 +208,6 @@ struct AvatarView: View {
   }
 }
 
-struct ComposeView: View {
-  @Binding var text: String
-  let onSend: () -> Void
-  @FocusState private var isFocused: Bool
-
-  var body: some View {
-    HStack(spacing: 12) {
-      TextField("Message", text: $text, axis: .vertical)
-        .textFieldStyle(.plain)
-        .lineLimit(1...5)
-        .focused($isFocused)
-        .onSubmit {
-          // Enter sends message (Option+Enter inserts newline by default)
-          if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            onSend()
-          }
-        }
-
-      Button(action: onSend) {
-        Image(systemName: "arrow.up.circle.fill")
-          .font(.title2)
-      }
-      .buttonStyle(.plain)
-      .foregroundColor(text.isEmpty ? .secondary : .blue)
-      .disabled(text.isEmpty)
-    }
-    .padding()
-    .onAppear {
-      isFocused = true
-    }
-  }
-}
 
 #Preview {
   MessageThreadView(
