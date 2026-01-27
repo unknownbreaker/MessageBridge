@@ -150,7 +150,7 @@ cd MessageBridgeServer && swift build && cd ../MessageBridgeClient && swift buil
 | **Message Processing**  | `ProcessorChain` with 4 processors            | `MessageProcessor` chain                      | ✅ Migrated        |
 | **Attachment Handling** | Basic serving                                 | `AttachmentHandler` protocol + thumbnails     | ✅ Migrated        |
 | **Client Renderers**    | Hardcoded in views                            | `MessageRenderer` protocol + registry         | ✅ Migrated         |
-| **Client Attachments**  | Basic/none                                    | `AttachmentRenderer` protocol + carousel      | 🔴 Not migrated    |
+| **Client Attachments**  | Basic/none                                    | `AttachmentRenderer` protocol + carousel      | ✅ Migrated         |
 | **Client Decorators**   | Inline in bubble view                         | `BubbleDecorator` protocol                    | 🔴 Not migrated    |
 | **Client Actions**      | Hardcoded context menu                        | `MessageAction` protocol + registry           | 🔴 Not migrated    |
 | **Client Composer**     | Basic text field                              | `ComposerPlugin` protocol + expandable editor | 🔴 Not migrated    |
