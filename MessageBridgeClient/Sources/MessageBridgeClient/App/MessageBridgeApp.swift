@@ -12,6 +12,7 @@ struct MessageBridgeApp: App {
 
   init() {
     setupRenderers()
+    setupAttachmentRenderers()
   }
 
   var body: some Scene {
@@ -62,6 +63,14 @@ struct MessageBridgeApp: App {
       SettingsView()
         .environmentObject(viewModel)
     }
+  }
+
+  private func setupAttachmentRenderers() {
+    AttachmentRendererRegistry.shared.register(DocumentRenderer())
+    AttachmentRendererRegistry.shared.register(SingleImageRenderer())
+    AttachmentRendererRegistry.shared.register(VideoRenderer())
+    AttachmentRendererRegistry.shared.register(AudioRenderer())
+    AttachmentRendererRegistry.shared.register(ImageGalleryRenderer())
   }
 
   private func setupRenderers() {

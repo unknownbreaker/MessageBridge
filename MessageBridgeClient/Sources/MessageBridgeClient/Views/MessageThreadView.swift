@@ -123,9 +123,8 @@ struct MessageBubble: View {
 
         // Display attachments first (like Apple Messages)
         if message.hasAttachments {
-          ForEach(message.attachments) { attachment in
-            AttachmentView(attachment: attachment)
-          }
+          AttachmentRendererRegistry.shared.renderer(for: message.attachments)
+            .render(message.attachments)
         }
 
         // Display text if present - delegated to RendererRegistry
