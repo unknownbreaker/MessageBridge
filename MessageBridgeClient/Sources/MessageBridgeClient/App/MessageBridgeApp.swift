@@ -13,6 +13,7 @@ struct MessageBridgeApp: App {
   init() {
     setupRenderers()
     setupAttachmentRenderers()
+    setupDecorators()
   }
 
   var body: some Scene {
@@ -71,6 +72,10 @@ struct MessageBridgeApp: App {
     AttachmentRendererRegistry.shared.register(VideoRenderer())
     AttachmentRendererRegistry.shared.register(AudioRenderer())
     AttachmentRendererRegistry.shared.register(ImageGalleryRenderer())
+  }
+
+  private func setupDecorators() {
+    DecoratorRegistry.shared.register(TimestampDecorator())
   }
 
   private func setupRenderers() {

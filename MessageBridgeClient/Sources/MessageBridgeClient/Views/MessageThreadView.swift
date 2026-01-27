@@ -138,9 +138,11 @@ struct MessageBubble: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
 
-        Text(message.date, style: .time)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
+        // Below decorators (timestamp, etc.)
+        ForEach(DecoratorRegistry.shared.decorators(for: message, at: .below), id: \.id) {
+          decorator in
+          decorator.decorate(message)
+        }
       }
 
       if !message.isFromMe {
