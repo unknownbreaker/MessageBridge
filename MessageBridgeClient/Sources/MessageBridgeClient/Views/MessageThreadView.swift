@@ -144,6 +144,15 @@ struct MessageBubble: View {
           decorator.decorate(message)
         }
       }
+      .contextMenu {
+        ForEach(ActionRegistry.shared.availableActions(for: message), id: \.id) { action in
+          Button(role: action.destructive ? .destructive : nil) {
+            Task { await action.perform(on: message) }
+          } label: {
+            Label(action.title, systemImage: action.icon)
+          }
+        }
+      }
 
       if !message.isFromMe {
         Spacer(minLength: 60)

@@ -14,6 +14,7 @@ struct MessageBridgeApp: App {
     setupRenderers()
     setupAttachmentRenderers()
     setupDecorators()
+    setupActions()
   }
 
   var body: some Scene {
@@ -76,6 +77,19 @@ struct MessageBridgeApp: App {
 
   private func setupDecorators() {
     DecoratorRegistry.shared.register(TimestampDecorator())
+  }
+
+  private func setupActions() {
+    let registry = ActionRegistry.shared
+    registry.register(CopyTextAction())
+    registry.register(CopyCodeAction())
+    registry.register(ReplyAction())
+    registry.register(TapbackAction())
+    registry.register(ForwardAction())
+    registry.register(ShareAction())
+    registry.register(TranslateAction())
+    registry.register(DeleteAction())
+    registry.register(UnsendAction())
   }
 
   private func setupRenderers() {
