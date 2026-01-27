@@ -138,10 +138,19 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
   public let handleId: Int64?
   public let conversationId: String
   public let attachments: [Attachment]
+  public let detectedCodes: [DetectedCode]?
+  public let highlights: [TextHighlight]?
+
+  enum CodingKeys: String, CodingKey {
+    case id, guid, text, date, isFromMe, handleId, conversationId, attachments
+    case detectedCodes, highlights
+  }
 
   public init(
     id: Int64, guid: String, text: String?, date: Date, isFromMe: Bool, handleId: Int64?,
-    conversationId: String, attachments: [Attachment] = []
+    conversationId: String, attachments: [Attachment] = [],
+    detectedCodes: [DetectedCode]? = nil,
+    highlights: [TextHighlight]? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -151,6 +160,22 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     self.handleId = handleId
     self.conversationId = conversationId
     self.attachments = attachments
+    self.detectedCodes = detectedCodes
+    self.highlights = highlights
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(Int64.self, forKey: .id)
+    guid = try container.decode(String.self, forKey: .guid)
+    text = try container.decodeIfPresent(String.self, forKey: .text)
+    date = try container.decode(Date.self, forKey: .date)
+    isFromMe = try container.decode(Bool.self, forKey: .isFromMe)
+    handleId = try container.decodeIfPresent(Int64.self, forKey: .handleId)
+    conversationId = try container.decode(String.self, forKey: .conversationId)
+    attachments = try container.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
+    detectedCodes = try container.decodeIfPresent([DetectedCode].self, forKey: .detectedCodes)
+    highlights = try container.decodeIfPresent([TextHighlight].self, forKey: .highlights)
   }
 
   public var hasText: Bool {

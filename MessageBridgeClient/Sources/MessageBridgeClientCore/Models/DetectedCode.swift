@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Populated by the server's CodeDetector processor when it identifies
 /// patterns like 2FA codes, OTPs, or verification numbers.
-public struct DetectedCode: Codable, Sendable, Equatable {
+public struct DetectedCode: Codable, Sendable, Equatable, Hashable {
   /// The code value (e.g., "847293", "G-582941")
   public let value: String
 

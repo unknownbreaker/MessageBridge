@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Used by renderers to apply visual styling to detected content
 /// such as verification codes, URLs, phone numbers, and emails.
-public struct TextHighlight: Codable, Sendable, Equatable {
+public struct TextHighlight: Codable, Sendable, Equatable, Hashable {
   /// The text content to highlight
   public let text: String
 
