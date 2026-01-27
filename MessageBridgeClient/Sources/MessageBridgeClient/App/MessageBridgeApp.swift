@@ -10,6 +10,10 @@ struct MessageBridgeApp: App {
 
   private let keychainManager = KeychainManager()
 
+  init() {
+    setupRenderers()
+  }
+
   var body: some Scene {
     WindowGroup {
       ContentView()
@@ -58,6 +62,13 @@ struct MessageBridgeApp: App {
       SettingsView()
         .environmentObject(viewModel)
     }
+  }
+
+  private func setupRenderers() {
+    RendererRegistry.shared.register(PlainTextRenderer())
+    RendererRegistry.shared.register(LargeEmojiRenderer())
+    RendererRegistry.shared.register(LinkPreviewRenderer())
+    RendererRegistry.shared.register(CodeHighlightRenderer())
   }
 
   private func autoConnect() async {
