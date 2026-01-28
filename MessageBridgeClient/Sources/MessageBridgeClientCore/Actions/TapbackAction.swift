@@ -1,6 +1,7 @@
 import AppKit
 
-/// Shows the tapback picker for a message. Currently shows a stub alert.
+/// Shows the tapback picker for a message.
+/// Posts .showTapbackPicker notification with the message in userInfo.
 public struct TapbackAction: MessageAction {
   public let id = "tapback"
   public let title = "Tapback"
@@ -14,6 +15,10 @@ public struct TapbackAction: MessageAction {
 
   @MainActor
   public func perform(on message: Message) async {
-    showStubAlert(title: title)
+    NotificationCenter.default.post(
+      name: .showTapbackPicker,
+      object: nil,
+      userInfo: ["message": message]
+    )
   }
 }
