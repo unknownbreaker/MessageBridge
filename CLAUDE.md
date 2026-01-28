@@ -12,21 +12,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Implemented MessageProcessor chain architecture migration
-- Created ProcessedMessage wrapper type and supporting models (DetectedCode, TextHighlight, Mention)
-- Created MessageProcessor protocol and ProcessorChain singleton
-- Implemented 4 processors: CodeDetector, PhoneNumberDetector, MentionExtractor, EmojiEnlarger
-- Integrated ProcessorChain into Routes.swift and WebSocketManager
-- Registered processors at server startup
-- Updated API response types to use ProcessedMessage
+**Last Session:** Unified highlight rendering — client-side ProcessedMessage enrichments
+- Added Mention model and `.mention` highlight type to client
+- Created ProcessedMessageDTO to decode server's nested ProcessedMessage JSON (fixes both REST and WebSocket)
+- Created HighlightedTextRenderer (priority 90) for all highlight types: codes, phone numbers, mentions, links, emails
+- Retired CodeHighlightRenderer, replaced with unified renderer
+- All 297 client tests + all server tests pass
 
 **Known Blockers:** None
 
 **Next Steps:**
 
-1. Implement client-side rendering of ProcessedMessage enrichments
-2. Add M5.1 2FA Code Detection milestone tests (verify against spec.md)
-3. Continue architecture migration (Attachment Handling next)
+1. Add M5.1 2FA Code Detection milestone tests (verify against spec.md)
+2. Start new phase milestones (M3.2 Image Gallery, M4.1 Tapbacks, M5.2 Multi-line Composer, etc.)
+3. Consider adding startIndex/endIndex character offsets to client TextHighlight for precise highlighting
 
 ---
 
