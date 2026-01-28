@@ -208,6 +208,9 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         // Fetch attachments for this message
         let attachments = try self.fetchAttachmentsForMessage(db: db, messageId: messageId)
 
+        let dateDeliveredRaw: Int64? = row["date_delivered"]
+        let dateReadRaw: Int64? = row["date_read"]
+
         return Message(
           id: messageId,
           guid: row["guid"],
@@ -271,6 +274,9 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         } else {
           messageText = nil
         }
+
+        let dateDeliveredRaw: Int64? = row["date_delivered"]
+        let dateReadRaw: Int64? = row["date_read"]
 
         let message = Message(
           id: messageId,

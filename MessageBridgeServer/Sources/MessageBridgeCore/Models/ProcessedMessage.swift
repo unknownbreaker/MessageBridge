@@ -63,4 +63,10 @@ public struct ProcessedMessage: Codable, Sendable {
 
   /// Attachments (forwards to underlying message)
   public var attachments: [Attachment] { message.attachments }
+
+  /// Date message was delivered (forwards to underlying message)
+  public var dateDelivered: Date? { message.dateDelivered }
+
+  /// Date message was read (forwards to underlying message)
+  public var dateRead: Date? { message.dateRead }
 }
