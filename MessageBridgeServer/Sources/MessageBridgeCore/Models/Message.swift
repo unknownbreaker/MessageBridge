@@ -11,10 +11,11 @@ public struct Message: Content, Identifiable, Sendable {
   public let handleId: Int64?
   public let conversationId: String
   public let attachments: [Attachment]
+  public var tapbacks: [Tapback]
 
   public init(
     id: Int64, guid: String, text: String?, date: Date, isFromMe: Bool, handleId: Int64?,
-    conversationId: String, attachments: [Attachment] = []
+    conversationId: String, attachments: [Attachment] = [], tapbacks: [Tapback] = []
   ) {
     self.id = id
     self.guid = guid
@@ -24,6 +25,7 @@ public struct Message: Content, Identifiable, Sendable {
     self.handleId = handleId
     self.conversationId = conversationId
     self.attachments = attachments
+    self.tapbacks = tapbacks
   }
 
   /// Whether this message has text content (vs attachment-only or reaction)

@@ -20,6 +20,9 @@ public struct ProcessedMessage: Codable, Sendable {
   /// Whether this is an emoji-only message (for enlarged display)
   public var isEmojiOnly: Bool
 
+  /// Tapbacks on this message (copied from underlying message for convenience)
+  public var tapbacks: [Tapback]
+
   /// Creates a new ProcessedMessage wrapping the given message with empty enrichments.
   ///
   /// - Parameter message: The original message to wrap
@@ -29,6 +32,7 @@ public struct ProcessedMessage: Codable, Sendable {
     self.highlights = []
     self.mentions = []
     self.isEmojiOnly = false
+    self.tapbacks = message.tapbacks
   }
 
   // MARK: - Convenience Accessors
