@@ -78,6 +78,7 @@ struct MessageBridgeApp: App {
 
   private func setupDecorators() {
     DecoratorRegistry.shared.register(TimestampDecorator())
+    DecoratorRegistry.shared.register(TapbackDecorator())
   }
 
   private func setupActions() {
