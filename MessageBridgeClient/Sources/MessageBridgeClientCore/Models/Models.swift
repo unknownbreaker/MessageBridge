@@ -170,6 +170,16 @@ public enum AttachmentType: String, Codable, Sendable {
   case document
 }
 
+// MARK: - DeliveryStatus
+
+/// Delivery status of a sent message
+public enum DeliveryStatus: String, Codable, Sendable {
+  case none       // Received messages (no status shown)
+  case sent       // Sent, no delivery confirmation yet
+  case delivered  // Delivered to recipient's device
+  case read       // Recipient opened conversation
+}
+
 // MARK: - Message
 
 public struct Message: Codable, Identifiable, Hashable, Sendable {
@@ -185,10 +195,13 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
   public let highlights: [TextHighlight]?
   public let mentions: [Mention]?
   public var tapbacks: [Tapback]?
+  public let dateDelivered: Date?
+  public let dateRead: Date?
 
   enum CodingKeys: String, CodingKey {
     case id, guid, text, date, isFromMe, handleId, conversationId, attachments
     case detectedCodes, highlights, mentions, tapbacks
+    case dateDelivered, dateRead
   }
 
   public init(
@@ -197,7 +210,9 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     detectedCodes: [DetectedCode]? = nil,
     highlights: [TextHighlight]? = nil,
     mentions: [Mention]? = nil,
-    tapbacks: [Tapback]? = nil
+    tapbacks: [Tapback]? = nil,
+    dateDelivered: Date? = nil,
+    dateRead: Date? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -211,6 +226,8 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     self.highlights = highlights
     self.mentions = mentions
     self.tapbacks = tapbacks
+    self.dateDelivered = dateDelivered
+    self.dateRead = dateRead
   }
 
   public init(from decoder: Decoder) throws {
@@ -227,6 +244,8 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     highlights = try container.decodeIfPresent([TextHighlight].self, forKey: .highlights)
     mentions = try container.decodeIfPresent([Mention].self, forKey: .mentions)
     tapbacks = try container.decodeIfPresent([Tapback].self, forKey: .tapbacks)
+    dateDelivered = try container.decodeIfPresent(Date.self, forKey: .dateDelivered)
+    dateRead = try container.decodeIfPresent(Date.self, forKey: .dateRead)
   }
 
   public var hasText: Bool {
@@ -237,6 +256,13 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
   /// Whether this message has any attachments
   public var hasAttachments: Bool {
     !attachments.isEmpty
+  }
+
+  public var deliveryStatus: DeliveryStatus {
+    if dateRead != nil { return .read }
+    if dateDelivered != nil { return .delivered }
+    if isFromMe { return .sent }
+    return .none
   }
 }
 
