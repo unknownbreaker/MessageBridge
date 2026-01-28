@@ -89,3 +89,27 @@ public struct SendResponse: Content {
     self.timestamp = result.timestamp
   }
 }
+
+/// Request body for POST /messages/:id/tapback
+public struct TapbackRequest: Content {
+  /// The tapback type: love, like, dislike, laugh, emphasis, question
+  public let type: String
+  /// The action: "add" or "remove"
+  public let action: String
+
+  public init(type: String, action: String) {
+    self.type = type
+    self.action = action
+  }
+}
+
+/// Response for POST /messages/:id/tapback
+public struct TapbackResponse: Content {
+  public let success: Bool
+  public let error: String?
+
+  public init(success: Bool, error: String? = nil) {
+    self.success = success
+    self.error = error
+  }
+}

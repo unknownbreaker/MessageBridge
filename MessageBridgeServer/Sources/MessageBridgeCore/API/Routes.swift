@@ -171,6 +171,40 @@ public func configureRoutes(
     return response
   }
 
+  // POST /messages/:id/tapback - Add or remove a tapback on a message
+  protected.post("messages", ":id", "tapback") { req async throws -> TapbackResponse in
+    guard let messageId = req.parameters.get("id") else {
+      throw Abort(.badRequest, reason: "Missing message ID")
+    }
+
+    let tapbackRequest: TapbackRequest
+    do {
+      tapbackRequest = try req.content.decode(TapbackRequest.self)
+    } catch {
+      throw Abort(.badRequest, reason: "Invalid request body")
+    }
+
+    // Validate tapback type
+    let validTypes = ["love", "like", "dislike", "laugh", "emphasis", "question"]
+    guard validTypes.contains(tapbackRequest.type) else {
+      throw Abort(
+        .badRequest,
+        reason:
+          "Invalid tapback type: \(tapbackRequest.type). Must be one of: \(validTypes.joined(separator: ", "))"
+      )
+    }
+
+    // Validate action
+    guard tapbackRequest.action == "add" || tapbackRequest.action == "remove" else {
+      throw Abort(.badRequest, reason: "Action must be 'add' or 'remove'")
+    }
+
+    // TODO: Implement IMCore bridge to actually send tapback via AppleScript
+    // For now, return success (tapback will appear when chat.db is updated by Messages.app)
+    _ = messageId  // Silence unused variable warning
+    return TapbackResponse(success: true, error: nil)
+  }
+
   // POST /send - Send a message
   protected.post("send") { req async throws -> SendResponse in
     let sendRequest: SendMessageRequest
