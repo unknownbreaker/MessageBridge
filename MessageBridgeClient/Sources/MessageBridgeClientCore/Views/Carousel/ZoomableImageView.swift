@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ZoomableImageView: View {
+public struct ZoomableImageView: View {
   let imageData: Data?
 
   @State private var scale: CGFloat = 1.0
@@ -11,7 +11,11 @@ struct ZoomableImageView: View {
   private let minScale: CGFloat = 1.0
   private let maxScale: CGFloat = 5.0
 
-  var body: some View {
+  public init(imageData: Data?) {
+    self.imageData = imageData
+  }
+
+  public var body: some View {
     Group {
       if let data = imageData, let nsImage = NSImage(data: data) {
         Image(nsImage: nsImage)
@@ -75,11 +79,13 @@ struct ZoomableImageView: View {
 
   // MARK: - Testable helpers
 
-  static func clampedScale(_ value: CGFloat, min minVal: CGFloat, max maxVal: CGFloat) -> CGFloat {
+  public static func clampedScale(_ value: CGFloat, min minVal: CGFloat, max maxVal: CGFloat)
+    -> CGFloat
+  {
     Swift.min(Swift.max(value, minVal), maxVal)
   }
 
-  static func clampAndReset() -> (CGFloat, CGSize) {
+  public static func clampAndReset() -> (CGFloat, CGSize) {
     (1.0, .zero)
   }
 }

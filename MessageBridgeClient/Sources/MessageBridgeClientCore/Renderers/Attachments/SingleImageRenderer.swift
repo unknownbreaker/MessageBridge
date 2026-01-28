@@ -23,9 +23,7 @@ public struct SingleImageRenderer: AttachmentRenderer {
 
 struct SingleImageView: View {
   let attachment: Attachment
-  @State private var isShowingFullImage = false
-  @State private var fullImageData: Data?
-  @State private var isLoading = false
+  @State private var isShowingCarousel = false
 
   var body: some View {
     Group {
@@ -37,7 +35,7 @@ struct SingleImageView: View {
           .aspectRatio(contentMode: .fit)
           .frame(maxWidth: 250, maxHeight: 250)
           .clipShape(RoundedRectangle(cornerRadius: 12))
-          .onTapGesture { isShowingFullImage = true }
+          .onTapGesture { isShowingCarousel = true }
       } else {
         HStack(spacing: 8) {
           Image(systemName: "photo")
@@ -51,21 +49,8 @@ struct SingleImageView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
       }
     }
-    .sheet(isPresented: $isShowingFullImage) {
-      if let data = fullImageData, let nsImage = NSImage(data: data) {
-        VStack {
-          Image(nsImage: nsImage)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .padding()
-          Button("Close") { isShowingFullImage = false }
-            .padding()
-        }
-        .frame(minWidth: 400, minHeight: 300)
-      } else if isLoading {
-        ProgressView("Loading...")
-          .frame(width: 200, height: 200)
-      }
+    .sheet(isPresented: $isShowingCarousel) {
+      CarouselView(attachments: [attachment], startIndex: 0)
     }
   }
 }

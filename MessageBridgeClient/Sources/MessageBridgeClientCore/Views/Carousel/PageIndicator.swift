@@ -1,10 +1,15 @@
 import SwiftUI
 
-struct PageIndicator: View {
+public struct PageIndicator: View {
   let currentIndex: Int
   let total: Int
 
-  var body: some View {
+  public init(currentIndex: Int, total: Int) {
+    self.currentIndex = currentIndex
+    self.total = total
+  }
+
+  public var body: some View {
     if total > 1 {
       HStack(spacing: 6) {
         ForEach(0..<total, id: \.self) { index in

@@ -1,18 +1,17 @@
-import MessageBridgeClientCore
 import SwiftUI
 
-struct CarouselView: View {
+public struct CarouselView: View {
   let attachments: [Attachment]
   @State var currentIndex: Int
   @Environment(\.dismiss) private var dismiss
 
-  init(attachments: [Attachment], startIndex: Int = 0) {
+  public init(attachments: [Attachment], startIndex: Int = 0) {
     self.attachments = attachments
     self._currentIndex = State(
       initialValue: Self.clampedIndex(startIndex, count: attachments.count))
   }
 
-  var body: some View {
+  public var body: some View {
     ZStack {
       Color.black.ignoresSafeArea()
 
@@ -65,7 +64,7 @@ struct CarouselView: View {
 
   // MARK: - Testable helpers
 
-  static func clampedIndex(_ index: Int, count: Int) -> Int {
+  public static func clampedIndex(_ index: Int, count: Int) -> Int {
     guard count > 0 else { return 0 }
     return max(0, min(index, count - 1))
   }
