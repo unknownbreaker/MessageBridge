@@ -87,6 +87,16 @@ public actor ServerManager {
 
       self.application = app
 
+      // Configure tapback callbacks
+      await messageDetector.setTapbackCallbacks(
+        onAdded: { [weak webSocketManager] tapback, conversationId in
+          await webSocketManager?.broadcastTapbackAdded(tapback, conversationId: conversationId)
+        },
+        onRemoved: { [weak webSocketManager] tapback, conversationId in
+          await webSocketManager?.broadcastTapbackRemoved(tapback, conversationId: conversationId)
+        }
+      )
+
       // Start message detection
       try await messageDetector.startDetecting { [weak webSocketManager] message, sender in
         await webSocketManager?.broadcastNewMessage(message, sender: sender)

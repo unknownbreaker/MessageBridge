@@ -23,6 +23,18 @@ public actor MessageChangeDetector {
     self.fileWatcher = fileWatcher
   }
 
+  /// Set the tapback callback handlers
+  /// - Parameters:
+  ///   - onAdded: Called when a tapback is added (tapback, conversationId)
+  ///   - onRemoved: Called when a tapback is removed (tapback, conversationId)
+  public func setTapbackCallbacks(
+    onAdded: @escaping (Tapback, String) async -> Void,
+    onRemoved: @escaping (Tapback, String) async -> Void
+  ) {
+    self.onTapbackAdded = onAdded
+    self.onTapbackRemoved = onRemoved
+  }
+
   /// Start detecting new messages
   /// - Parameter handler: Called when a new message is detected, with the message and sender address
   public func startDetecting(handler: @escaping (Message, String?) async -> Void) async throws {

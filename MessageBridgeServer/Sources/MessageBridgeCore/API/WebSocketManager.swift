@@ -58,6 +58,42 @@ public actor WebSocketManager {
     await broadcast(wsMessage)
   }
 
+  /// Broadcast a tapback added event to all connected clients
+  public func broadcastTapbackAdded(_ tapback: Tapback, conversationId: String) async {
+    os_log(
+      "Broadcasting tapback added (%{public}@) to %d client(s)", log: logger, type: .info,
+      tapback.type.emoji, connections.count)
+
+    let event = TapbackEvent(
+      messageGUID: tapback.messageGUID,
+      tapbackType: tapback.type,
+      sender: tapback.sender,
+      isFromMe: tapback.isFromMe,
+      conversationId: conversationId
+    )
+    let wsMessage = WebSocketMessage(type: .tapbackAdded, data: event)
+
+    await broadcast(wsMessage)
+  }
+
+  /// Broadcast a tapback removed event to all connected clients
+  public func broadcastTapbackRemoved(_ tapback: Tapback, conversationId: String) async {
+    os_log(
+      "Broadcasting tapback removed (%{public}@) to %d client(s)", log: logger, type: .info,
+      tapback.type.emoji, connections.count)
+
+    let event = TapbackEvent(
+      messageGUID: tapback.messageGUID,
+      tapbackType: tapback.type,
+      sender: tapback.sender,
+      isFromMe: tapback.isFromMe,
+      conversationId: conversationId
+    )
+    let wsMessage = WebSocketMessage(type: .tapbackRemoved, data: event)
+
+    await broadcast(wsMessage)
+  }
+
   /// Send a connected confirmation to a specific client
   public func sendConnected(to id: UUID) async {
     guard let connInfo = connections[id] else { return }
