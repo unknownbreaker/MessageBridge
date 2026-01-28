@@ -211,10 +211,10 @@ Follow this order to minimize breakage:
 | M1.3 Send Messages         | ✅                 | ✅         | ✅       | ⬜       |
 | M1.4 Real-time Updates     | ✅                 | ✅         | ✅       | ⬜       |
 | **Phase 2: Connectivity**  |
-| M2.1 Tailscale             | ⬜                 | ⬜         | ⬜       | ⬜       |
-| M2.2 Cloudflare            | ⬜                 | ⬜         | ⬜       | ⬜       |
+| M2.1 Tailscale             | ✅                 | ✅         | ✅       | ⬜       |
+| M2.2 Cloudflare            | ✅                 | ✅         | ✅       | ⬜       |
 | M2.3 ngrok                 | ⬜                 | ⬜         | ⬜       | ⬜       |
-| M2.4 E2E Encryption        | ⬜                 | ⬜         | ⬜       | ⬜       |
+| M2.4 E2E Encryption        | ✅                 | ✅         | ✅       | ⬜       |
 | **Phase 3: Rich Messages** |
 | M3.1 Attachments Display   | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M3.2 Image Gallery         | ⬜                 | ⬜         | ⬜       | ⬜       |
