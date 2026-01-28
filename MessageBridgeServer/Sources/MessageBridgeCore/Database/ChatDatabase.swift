@@ -288,6 +288,67 @@ public actor ChatDatabase: ChatDatabaseProtocol {
     }
   }
 
+  // MARK: - Tapback Detection (Fast Path)
+
+  /// Fetch tapback rows newer than a given ROWID - optimized for real-time detection
+  /// This queries for messages with associated_message_type between 2000-3005 (tapbacks)
+  public nonisolated func fetchTapbacksNewerThan(id: Int64, limit: Int = 20) throws -> [(
+    rowId: Int64, tapback: Tapback, conversationId: String, isRemoval: Bool
+  )] {
+    try dbPool.read { db in
+      // Query for tapback messages (associated_message_type 2000-3005)
+      // Join to get the target message's conversation
+      let sql = """
+        SELECT
+            m.ROWID as id,
+            m.guid,
+            m.associated_message_guid,
+            m.associated_message_type,
+            m.is_from_me,
+            m.date,
+            COALESCE(h.id, '') as sender,
+            c.chat_identifier as conversation_id
+        FROM message m
+        LEFT JOIN handle h ON m.handle_id = h.ROWID
+        JOIN message target_msg ON target_msg.guid = m.associated_message_guid
+        JOIN chat_message_join cmj ON target_msg.ROWID = cmj.message_id
+        JOIN chat c ON cmj.chat_id = c.ROWID
+        WHERE m.ROWID > ?
+          AND m.associated_message_type BETWEEN 2000 AND 3005
+        ORDER BY m.ROWID ASC
+        LIMIT ?
+        """
+
+      let rows = try Row.fetchAll(db, sql: sql, arguments: [id, limit])
+
+      return rows.compactMap { row -> (Int64, Tapback, String, Bool)? in
+        guard
+          let rowId: Int64 = row["id"],
+          let associatedGUID: String = row["associated_message_guid"],
+          let associatedType: Int = row["associated_message_type"],
+          let conversationId: String = row["conversation_id"],
+          let parsed = TapbackType.from(associatedType: associatedType)
+        else {
+          return nil
+        }
+
+        let isFromMe: Int = row["is_from_me"] ?? 0
+        let sender: String = row["sender"] ?? ""
+        let dateValue: Int64 = row["date"] ?? 0
+
+        let tapback = Tapback(
+          type: parsed.type,
+          sender: sender,
+          isFromMe: isFromMe == 1,
+          date: Message.dateFromAppleTimestamp(dateValue),
+          messageGUID: associatedGUID
+        )
+
+        return (rowId, tapback, conversationId, parsed.isRemoval)
+      }
+    }
+  }
+
   // MARK: - Search
 
   public func searchMessages(query: String, limit: Int = 50) async throws -> [Message] {

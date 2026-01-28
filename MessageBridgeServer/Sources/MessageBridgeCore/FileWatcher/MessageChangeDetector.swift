@@ -5,9 +5,18 @@ public actor MessageChangeDetector {
   private let database: ChatDatabaseProtocol
   private let fileWatcher: FileWatcherProtocol
   private var lastMessageId: Int64 = 0
+  private var lastTapbackId: Int64 = 0
   private var onNewMessage: ((Message, String?) async -> Void)?
   private var pollTimer: Task<Void, Never>?
   private let pollInterval: TimeInterval = 0.5  // Poll every 500ms as backup
+
+  /// Called when a tapback is added to a message.
+  /// Parameters: (tapback, conversationId)
+  public var onTapbackAdded: ((Tapback, String) async -> Void)?
+
+  /// Called when a tapback is removed from a message.
+  /// Parameters: (tapback, conversationId)
+  public var onTapbackRemoved: ((Tapback, String) async -> Void)?
 
   public init(database: ChatDatabaseProtocol, fileWatcher: FileWatcherProtocol) {
     self.database = database
@@ -23,6 +32,7 @@ public actor MessageChangeDetector {
     let recentMessages = try await database.fetchRecentConversations(limit: 1, offset: 0)
     if let lastMessage = recentMessages.first?.lastMessage {
       lastMessageId = lastMessage.id
+      lastTapbackId = lastMessage.id  // Tapbacks are also in message table, use same baseline
       serverLog("Starting with baseline message ID \(lastMessageId)")
     } else {
       serverLog("Starting with no existing messages")
@@ -32,12 +42,15 @@ public actor MessageChangeDetector {
     try await fileWatcher.startWatching { [weak self] in
       Task {
         await self?.checkForNewMessages()
+        await self?.checkForNewTapbacks()
       }
     }
 
     // Start backup polling timer (FSEvents can be slow/unreliable)
     startPolling()
-    serverLog("Now watching for new messages (with \(Int(pollInterval * 1000))ms backup polling)")
+    serverLog(
+      "Now watching for new messages and tapbacks (with \(Int(pollInterval * 1000))ms backup polling)"
+    )
   }
 
   private func startPolling() {
@@ -45,6 +58,7 @@ public actor MessageChangeDetector {
       while !Task.isCancelled {
         try? await Task.sleep(nanoseconds: UInt64(500_000_000))  // 500ms
         await self?.checkForNewMessages()
+        await self?.checkForNewTapbacks()
       }
     }
   }
@@ -55,6 +69,8 @@ public actor MessageChangeDetector {
     pollTimer = nil
     await fileWatcher.stopWatching()
     onNewMessage = nil
+    onTapbackAdded = nil
+    onTapbackRemoved = nil
   }
 
   // MARK: - Private Methods
@@ -87,6 +103,46 @@ public actor MessageChangeDetector {
       }
     } catch {
       serverLogError("Error checking for new messages: \(error)")
+    }
+  }
+
+  private func checkForNewTapbacks() async {
+    // Skip if no callbacks are registered
+    guard onTapbackAdded != nil || onTapbackRemoved != nil else {
+      return
+    }
+
+    let startTime = Date()
+    do {
+      let newTapbacks = try database.fetchTapbacksNewerThan(id: lastTapbackId, limit: 20)
+
+      // Only log when there are new tapbacks (avoid log spam from polling)
+      if !newTapbacks.isEmpty {
+        let queryTime = Date().timeIntervalSince(startTime) * 1000
+        serverLog(
+          "Found \(newTapbacks.count) new tapback(s) in \(String(format: "%.1f", queryTime))ms")
+
+        for (rowId, tapback, conversationId, isRemoval) in newTapbacks {
+          let tapbackAge = Date().timeIntervalSince(tapback.date) * 1000
+          let action = isRemoval ? "removed" : "added"
+          serverLog(
+            "Broadcasting tapback \(action): \(tapback.type.emoji) on message \(tapback.messageGUID), age: \(Int(tapbackAge))ms"
+          )
+
+          if isRemoval {
+            await onTapbackRemoved?(tapback, conversationId)
+          } else {
+            await onTapbackAdded?(tapback, conversationId)
+          }
+
+          // Update lastTapbackId to track which tapbacks we've processed
+          if rowId > lastTapbackId {
+            lastTapbackId = rowId
+          }
+        }
+      }
+    } catch {
+      serverLogError("Error checking for new tapbacks: \(error)")
     }
   }
 }

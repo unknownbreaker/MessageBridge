@@ -10,4 +10,10 @@ public protocol ChatDatabaseProtocol: Sendable {
   func searchMessages(query: String, limit: Int) async throws -> [Message]
   func fetchAttachment(id: Int64) async throws -> (attachment: Attachment, filePath: String)?
   func markConversationAsRead(conversationId: String) async throws
+
+  /// Fetch tapback rows (associated_message_type 2000-3005) newer than a given ROWID.
+  /// Returns parsed tapbacks with their ROWID, target message's conversation ID, and whether it's a removal.
+  func fetchTapbacksNewerThan(id: Int64, limit: Int) throws -> [(
+    rowId: Int64, tapback: Tapback, conversationId: String, isRemoval: Bool
+  )]
 }

@@ -84,6 +84,18 @@ final class MockChatDatabase: ChatDatabaseProtocol, @unchecked Sendable {
     }
     return newMessagesToReturn
   }
+
+  var newTapbacksToReturn:
+    [(rowId: Int64, tapback: Tapback, conversationId: String, isRemoval: Bool)] = []
+
+  func fetchTapbacksNewerThan(id: Int64, limit: Int) throws -> [(
+    rowId: Int64, tapback: Tapback, conversationId: String, isRemoval: Bool
+  )] {
+    if shouldThrowError {
+      throw DatabaseError.queryFailed
+    }
+    return newTapbacksToReturn
+  }
 }
 
 enum DatabaseError: Error {
