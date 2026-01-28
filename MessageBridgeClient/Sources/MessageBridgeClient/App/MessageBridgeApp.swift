@@ -102,7 +102,7 @@ struct MessageBridgeApp: App {
     RendererRegistry.shared.register(PlainTextRenderer())
     RendererRegistry.shared.register(LargeEmojiRenderer())
     RendererRegistry.shared.register(LinkPreviewRenderer())
-    RendererRegistry.shared.register(CodeHighlightRenderer())
+    RendererRegistry.shared.register(HighlightedTextRenderer())
   }
 
   private func autoConnect() async {

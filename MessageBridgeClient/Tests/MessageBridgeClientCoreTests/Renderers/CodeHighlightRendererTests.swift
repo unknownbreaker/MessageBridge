@@ -2,38 +2,39 @@ import XCTest
 
 @testable import MessageBridgeClientCore
 
+/// Tests that HighlightedTextRenderer handles code-highlight scenarios
+/// previously covered by CodeHighlightRenderer.
 final class CodeHighlightRendererTests: XCTestCase {
-  let renderer = CodeHighlightRenderer()
+  let renderer = HighlightedTextRenderer()
 
-  func testId_isCodeHighlight() {
-    XCTAssertEqual(renderer.id, "code-highlight")
+  func testId_isHighlightedText() {
+    XCTAssertEqual(renderer.id, "highlighted-text")
   }
 
-  func testPriority_is100() {
-    XCTAssertEqual(renderer.priority, 100)
+  func testPriority_is90() {
+    XCTAssertEqual(renderer.priority, 90)
   }
 
-  func testCanRender_withDetectedCodes_returnsTrue() {
+  func testCanRender_withCodeHighlights_returnsTrue() {
     let message = Message(
       id: 1, guid: "g1", text: "Your code is 847293", date: Date(),
       isFromMe: false, handleId: 1, conversationId: "c1",
-      attachments: [],
-      detectedCodes: [DetectedCode(value: "847293")]
+      detectedCodes: [DetectedCode(value: "847293")],
+      highlights: [TextHighlight(text: "847293", type: .code)]
     )
     XCTAssertTrue(renderer.canRender(message))
   }
 
-  func testCanRender_withEmptyCodes_returnsFalse() {
+  func testCanRender_withEmptyHighlights_returnsFalse() {
     let message = Message(
       id: 1, guid: "g1", text: "No codes", date: Date(),
       isFromMe: false, handleId: 1, conversationId: "c1",
-      attachments: [],
-      detectedCodes: []
+      highlights: []
     )
     XCTAssertFalse(renderer.canRender(message))
   }
 
-  func testCanRender_withNilCodes_returnsFalse() {
+  func testCanRender_withNilHighlights_returnsFalse() {
     let message = Message(
       id: 1, guid: "g1", text: "No codes", date: Date(),
       isFromMe: false, handleId: 1, conversationId: "c1"
@@ -41,12 +42,15 @@ final class CodeHighlightRendererTests: XCTestCase {
     XCTAssertFalse(renderer.canRender(message))
   }
 
-  func testCanRender_withMultipleCodes_returnsTrue() {
+  func testCanRender_withMultipleCodeHighlights_returnsTrue() {
     let message = Message(
       id: 1, guid: "g1", text: "Codes: 1234 and 5678", date: Date(),
       isFromMe: false, handleId: 1, conversationId: "c1",
-      attachments: [],
-      detectedCodes: [DetectedCode(value: "1234"), DetectedCode(value: "5678")]
+      detectedCodes: [DetectedCode(value: "1234"), DetectedCode(value: "5678")],
+      highlights: [
+        TextHighlight(text: "1234", type: .code),
+        TextHighlight(text: "5678", type: .code),
+      ]
     )
     XCTAssertTrue(renderer.canRender(message))
   }
