@@ -29,3 +29,6 @@ DerivedData/
 # Build artifacts
 build/
 .env
+
+# Worktrees
+.worktrees/
