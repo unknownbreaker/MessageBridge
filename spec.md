@@ -268,9 +268,9 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 ---
 
-## Phase 4: Reactions & Status 🔴
+## Phase 4: Reactions & Status 🟡
 
-### M4.1: Tapbacks (Reactions) 🔴
+### M4.1: Tapbacks (Reactions) 🔵
 
 **User Stories:**
 
@@ -290,7 +290,7 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 ---
 
-### M4.2: Read Receipts 🔴
+### M4.2: Read Receipts 🔵
 
 **User Stories:**
 
