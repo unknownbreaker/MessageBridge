@@ -12,20 +12,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Unified highlight rendering — client-side ProcessedMessage enrichments
-- Added Mention model and `.mention` highlight type to client
-- Created ProcessedMessageDTO to decode server's nested ProcessedMessage JSON (fixes both REST and WebSocket)
-- Created HighlightedTextRenderer (priority 90) for all highlight types: codes, phone numbers, mentions, links, emails
-- Retired CodeHighlightRenderer, replaced with unified renderer
-- All 297 client tests + all server tests pass
+**Last Session:** M3.2 Image Gallery Carousel
+- Added CarouselView, ZoomableImageView, PageIndicator in MessageBridgeClientCore/Views/Carousel/
+- Integrated carousel into ImageGalleryRenderer (tap grid image → sheet)
+- Integrated carousel into SingleImageRenderer (replaces old basic sheet)
+- Moved carousel views from app target to Core for cross-module access
+- All 307 client tests + all server tests pass
 
 **Known Blockers:** None
 
 **Next Steps:**
 
-1. Add M5.1 2FA Code Detection milestone tests (verify against spec.md)
-2. Start new phase milestones (M3.2 Image Gallery, M4.1 Tapbacks, M5.2 Multi-line Composer, etc.)
-3. Consider adding startIndex/endIndex character offsets to client TextHighlight for precise highlighting
+1. Start new phase milestones (M3.2 Image Gallery, M4.1 Tapbacks, M5.2 Multi-line Composer, etc.)
+2. Consider adding startIndex/endIndex character offsets to client TextHighlight for precise highlighting
 
 ---
 
@@ -216,7 +215,7 @@ Follow this order to minimize breakage:
 | M2.4 E2E Encryption        | ✅                 | ✅         | ✅       | ⬜       |
 | **Phase 3: Rich Messages** |
 | M3.1 Attachments Display   | ✅                 | ✅         | ✅       | ⬜       |
-| M3.2 Image Gallery         | ⬜                 | ⬜         | ⬜       | ⬜       |
+| M3.2 Image Gallery         | ✅                 | ✅         | ✅       | ✅       |
 | M3.3 Attachments Send      | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M3.4 Audio Messages        | ⬜                 | ⬜         | ⬜       | ⬜       |
 | **Phase 4: Reactions**     |
@@ -224,7 +223,7 @@ Follow this order to minimize breakage:
 | M4.2 Read Receipts         | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M4.3 Typing Indicators     | ⬜                 | ⬜         | ⬜       | ⬜       |
 | **Phase 5: QoL**           |
-| M5.1 2FA Code Detection    | ✅                 | ✅          | ⬜       | ⬜       |
+| M5.1 2FA Code Detection    | ✅                 | ✅          | ✅       | ✅       |
 | M5.2 Multi-line Composer   | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M5.3 Text Selection        | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M5.4 Link Previews         | ⬜                 | ⬜         | ⬜       | ⬜       |

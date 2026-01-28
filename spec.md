@@ -207,7 +207,7 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 ---
 
-### M3.2: Image Gallery & Carousel 🔴
+### M3.2: Image Gallery & Carousel 🔵
 
 **User Stories:**
 
@@ -328,7 +328,7 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 ## Phase 5: Quality of Life 🔴
 
-### M5.1: 2FA Code Detection 🔴
+### M5.1: 2FA Code Detection 🔵
 
 **User Stories:**
 
