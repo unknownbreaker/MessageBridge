@@ -5,6 +5,8 @@ public enum WebSocketMessageType: String, Codable, Sendable {
   case newMessage = "new_message"
   case connected = "connected"
   case error = "error"
+  case tapbackAdded = "tapback_added"
+  case tapbackRemoved = "tapback_removed"
 }
 
 /// Base WebSocket message envelope
@@ -46,5 +48,52 @@ public struct ErrorData: Codable, Sendable {
 
   public init(message: String) {
     self.message = message
+  }
+}
+
+/// Data payload for tapback events (added or removed)
+public struct TapbackEvent: Codable, Sendable {
+  /// The GUID of the message this tapback is attached to.
+  public let messageGUID: String
+
+  /// The tapback type as a string (e.g., "love", "like", "dislike", "laugh", "emphasis", "question").
+  public let tapbackType: String
+
+  /// The handle ID of the sender (e.g., "+15551234567" or "email@example.com").
+  public let sender: String
+
+  /// Whether this tapback was sent by the current user.
+  public let isFromMe: Bool
+
+  /// The conversation ID for the client to find the message.
+  public let conversationId: String
+
+  public init(
+    messageGUID: String,
+    tapbackType: TapbackType,
+    sender: String,
+    isFromMe: Bool,
+    conversationId: String
+  ) {
+    self.messageGUID = messageGUID
+    self.tapbackType = String(describing: tapbackType)
+    self.sender = sender
+    self.isFromMe = isFromMe
+    self.conversationId = conversationId
+  }
+
+  /// Alternative initializer accepting tapbackType as a raw string.
+  public init(
+    messageGUID: String,
+    tapbackType: String,
+    sender: String,
+    isFromMe: Bool,
+    conversationId: String
+  ) {
+    self.messageGUID = messageGUID
+    self.tapbackType = tapbackType
+    self.sender = sender
+    self.isFromMe = isFromMe
+    self.conversationId = conversationId
   }
 }
