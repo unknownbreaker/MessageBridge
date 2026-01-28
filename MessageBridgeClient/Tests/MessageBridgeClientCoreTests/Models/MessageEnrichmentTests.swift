@@ -10,6 +10,7 @@ final class MessageEnrichmentTests: XCTestCase {
     )
     XCTAssertNil(message.detectedCodes)
     XCTAssertNil(message.highlights)
+    XCTAssertNil(message.mentions)
   }
 
   func testMessage_withDetectedCodes_storesValues() {
@@ -34,6 +35,18 @@ final class MessageEnrichmentTests: XCTestCase {
       highlights: highlights
     )
     XCTAssertEqual(message.highlights?.count, 1)
+  }
+
+  func testMessage_withMentions_storesValues() {
+    let mentions = [Mention(text: "@john", handle: "+15551234567")]
+    let message = Message(
+      id: 1, guid: "g1", text: "Hey @john", date: Date(),
+      isFromMe: false, handleId: 1, conversationId: "c1",
+      mentions: mentions
+    )
+    XCTAssertEqual(message.mentions?.count, 1)
+    XCTAssertEqual(message.mentions?.first?.text, "@john")
+    XCTAssertEqual(message.mentions?.first?.handle, "+15551234567")
   }
 
   func testMessage_codable_roundTripsWithEnrichments() throws {
@@ -70,5 +83,27 @@ final class MessageEnrichmentTests: XCTestCase {
     let message = try decoder.decode(Message.self, from: json)
     XCTAssertNil(message.detectedCodes)
     XCTAssertNil(message.highlights)
+    XCTAssertNil(message.mentions)
+  }
+
+  func testMessage_codable_decodesWithMentions() throws {
+    let json = """
+      {
+          "id": 1,
+          "guid": "g1",
+          "text": "Hey @john",
+          "date": 0,
+          "isFromMe": false,
+          "handleId": 1,
+          "conversationId": "c1",
+          "attachments": [],
+          "mentions": [{"text": "@john", "handle": "+15551234567"}]
+      }
+      """.data(using: .utf8)!
+
+    let decoder = JSONDecoder()
+    let message = try decoder.decode(Message.self, from: json)
+    XCTAssertEqual(message.mentions?.count, 1)
+    XCTAssertEqual(message.mentions?.first?.text, "@john")
   }
 }

@@ -16,6 +16,7 @@ public struct TextHighlight: Codable, Sendable, Equatable, Hashable {
     case link
     case phoneNumber
     case email
+    case mention
   }
 
   public init(text: String, type: HighlightType) {
