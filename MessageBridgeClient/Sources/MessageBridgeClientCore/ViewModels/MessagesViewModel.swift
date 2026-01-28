@@ -103,11 +103,18 @@ public class MessagesViewModel: ObservableObject {
 
   private func startWebSocket() async {
     do {
-      try await bridgeService.startWebSocket { [weak self] message, sender in
-        Task { @MainActor [weak self] in
-          await self?.handleNewMessage(message, sender: sender)
+      try await bridgeService.startWebSocket(
+        onNewMessage: { [weak self] message, sender in
+          Task { @MainActor [weak self] in
+            await self?.handleNewMessage(message, sender: sender)
+          }
+        },
+        onTapbackEvent: { [weak self] event in
+          Task { @MainActor [weak self] in
+            self?.handleTapbackEvent(event)
+          }
         }
-      }
+      )
       logInfo("WebSocket connection started")
     } catch {
       logError("Failed to start WebSocket", error: error)
@@ -192,6 +199,75 @@ public class MessagesViewModel: ObservableObject {
         logWarning("Failed to show notification: \(error.localizedDescription)")
       }
     }
+  }
+
+  /// Handle a tapback event from WebSocket (tapback added or removed)
+  private func handleTapbackEvent(_ event: TapbackEvent) {
+    let conversationId = event.conversationId
+    logDebug(
+      "handleTapbackEvent: \(event.isRemoval ? "removed" : "added") \(event.tapbackType.emoji) on message \(event.messageGUID)"
+    )
+
+    // Find the message in our local cache
+    guard var conversationMessages = messages[conversationId] else {
+      logDebug("handleTapbackEvent: conversation \(conversationId) not loaded, ignoring")
+      return
+    }
+
+    guard
+      let messageIndex = conversationMessages.firstIndex(where: { $0.guid == event.messageGUID })
+    else {
+      logDebug("handleTapbackEvent: message \(event.messageGUID) not found in conversation")
+      return
+    }
+
+    let message = conversationMessages[messageIndex]
+    var tapbacks = message.tapbacks ?? []
+
+    if event.isRemoval {
+      // Remove the tapback from this sender with matching type
+      tapbacks.removeAll { tapback in
+        tapback.sender == event.sender && tapback.type == event.tapbackType
+      }
+      logDebug(
+        "handleTapbackEvent: removed tapback, now has \(tapbacks.count) tapbacks")
+    } else {
+      // Add the new tapback
+      let newTapback = Tapback(
+        type: event.tapbackType,
+        sender: event.sender,
+        isFromMe: event.isFromMe,
+        date: Date(),
+        messageGUID: event.messageGUID
+      )
+
+      // Remove any existing tapback from this sender (user can only have one tapback per message)
+      tapbacks.removeAll { $0.sender == event.sender }
+      tapbacks.append(newTapback)
+      logDebug(
+        "handleTapbackEvent: added tapback, now has \(tapbacks.count) tapbacks")
+    }
+
+    // Create updated message with new tapbacks
+    let updatedMessage = Message(
+      id: message.id,
+      guid: message.guid,
+      text: message.text,
+      date: message.date,
+      isFromMe: message.isFromMe,
+      handleId: message.handleId,
+      conversationId: message.conversationId,
+      attachments: message.attachments,
+      detectedCodes: message.detectedCodes,
+      highlights: message.highlights,
+      mentions: message.mentions,
+      tapbacks: tapbacks.isEmpty ? nil : tapbacks
+    )
+
+    // Update the messages array to trigger UI refresh
+    conversationMessages[messageIndex] = updatedMessage
+    messages[conversationId] = conversationMessages
+    logDebug("handleTapbackEvent: updated message in cache")
   }
 
   public func selectConversation(_ conversationId: String?) {

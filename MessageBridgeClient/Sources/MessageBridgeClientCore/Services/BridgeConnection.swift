@@ -3,10 +3,39 @@ import Foundation
 /// Callback for receiving new messages via WebSocket
 public typealias NewMessageHandler = @Sendable (Message, String) -> Void
 
+/// Callback for receiving tapback events via WebSocket
+public typealias TapbackEventHandler = @Sendable (TapbackEvent) -> Void
+
 /// Action type for tapback operations
 public enum TapbackActionType: String, Sendable {
   case add
   case remove
+}
+
+/// WebSocket event for tapback added/removed
+public struct TapbackEvent: Codable, Sendable {
+  public let messageGUID: String
+  public let tapbackType: TapbackType
+  public let sender: String
+  public let isFromMe: Bool
+  public let conversationId: String
+  public let isRemoval: Bool
+
+  public init(
+    messageGUID: String,
+    tapbackType: TapbackType,
+    sender: String,
+    isFromMe: Bool,
+    conversationId: String,
+    isRemoval: Bool
+  ) {
+    self.messageGUID = messageGUID
+    self.tapbackType = tapbackType
+    self.sender = sender
+    self.isFromMe = isFromMe
+    self.conversationId = conversationId
+    self.isRemoval = isRemoval
+  }
 }
 
 /// Protocol defining the bridge service interface for testability
@@ -16,7 +45,10 @@ public protocol BridgeServiceProtocol: Sendable {
   func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation]
   func fetchMessages(conversationId: String, limit: Int, offset: Int) async throws -> [Message]
   func sendMessage(text: String, to recipient: String) async throws
-  func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws
+  func startWebSocket(
+    onNewMessage: @escaping NewMessageHandler,
+    onTapbackEvent: @escaping TapbackEventHandler
+  ) async throws
   func stopWebSocket() async
   func fetchAttachment(id: Int64) async throws -> Data
   func markConversationAsRead(_ conversationId: String) async throws
@@ -97,6 +129,21 @@ struct NewMessagePayload: Codable {
   let message: ProcessedMessageDTO
 }
 
+/// WebSocket message for tapback events
+struct TapbackWebSocketMessage: Codable {
+  let type: String
+  let data: TapbackEventPayload
+}
+
+/// Data payload for tapback_added/tapback_removed WebSocket events
+struct TapbackEventPayload: Codable {
+  let messageGUID: String
+  let tapbackType: Int
+  let sender: String
+  let isFromMe: Bool
+  let conversationId: String
+}
+
 /// Handles communication with the MessageBridge server
 public actor BridgeConnection: BridgeServiceProtocol {
   private var serverURL: URL?
@@ -104,6 +151,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
   private var urlSession: URLSession
   private var webSocketTask: URLSessionWebSocketTask?
   private var newMessageHandler: NewMessageHandler?
+  private var tapbackEventHandler: TapbackEventHandler?
   private var e2eEnabled: Bool = false
   private var encryption: E2EEncryption?
 
@@ -370,12 +418,16 @@ public actor BridgeConnection: BridgeServiceProtocol {
     }
   }
 
-  public func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws {
+  public func startWebSocket(
+    onNewMessage: @escaping NewMessageHandler,
+    onTapbackEvent: @escaping TapbackEventHandler
+  ) async throws {
     guard let serverURL, let apiKey else {
       throw BridgeError.notConnected
     }
 
     self.newMessageHandler = onNewMessage
+    self.tapbackEventHandler = onTapbackEvent
 
     // Convert HTTP URL to WebSocket URL
     var wsComponents = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)!
@@ -403,6 +455,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
     webSocketTask?.cancel(with: .goingAway, reason: nil)
     webSocketTask = nil
     newMessageHandler = nil
+    tapbackEventHandler = nil
   }
 
   private func receiveWebSocketMessage() {
@@ -459,8 +512,8 @@ public actor BridgeConnection: BridgeServiceProtocol {
       // First decode just the type to determine message format
       let envelope = try decoder.decode(WebSocketEnvelope.self, from: messageData)
 
-      // Only process new_message type - ignore connected, error, etc.
-      if envelope.type == "new_message" {
+      switch envelope.type {
+      case "new_message":
         let wsMessage = try decoder.decode(NewMessageWebSocketMessage.self, from: messageData)
         let processed = wsMessage.data.message
         let message = processed.toMessage()
@@ -471,7 +524,33 @@ public actor BridgeConnection: BridgeServiceProtocol {
         logInfo("WebSocket: new_message received, age: \(Int(messageAge))ms, id: \(message.id)")
 
         newMessageHandler?(message, sender)
-      } else {
+
+      case "tapback_added", "tapback_removed":
+        let wsMessage = try decoder.decode(TapbackWebSocketMessage.self, from: messageData)
+        let payload = wsMessage.data
+
+        // Convert the raw tapbackType Int to TapbackType enum
+        guard let tapbackType = TapbackType(rawValue: payload.tapbackType) else {
+          logWarning("WebSocket: Unknown tapback type \(payload.tapbackType)")
+          return
+        }
+
+        let event = TapbackEvent(
+          messageGUID: payload.messageGUID,
+          tapbackType: tapbackType,
+          sender: payload.sender,
+          isFromMe: payload.isFromMe,
+          conversationId: payload.conversationId,
+          isRemoval: envelope.type == "tapback_removed"
+        )
+
+        logInfo(
+          "WebSocket: \(envelope.type) received for message \(payload.messageGUID), type: \(tapbackType.emoji)"
+        )
+
+        tapbackEventHandler?(event)
+
+      default:
         logDebug("WebSocket received \(envelope.type) message")
       }
     } catch {

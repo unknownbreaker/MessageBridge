@@ -18,6 +18,7 @@ actor MockBridgeService: BridgeServiceProtocol {
   var lastRecipient: String?
   var lastMessageText: String?
   var newMessageHandler: NewMessageHandler?
+  var tapbackEventHandler: TapbackEventHandler?
 
   func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws {
     connectCalled = true
@@ -55,14 +56,19 @@ actor MockBridgeService: BridgeServiceProtocol {
     }
   }
 
-  func startWebSocket(onNewMessage: @escaping NewMessageHandler) async throws {
+  func startWebSocket(
+    onNewMessage: @escaping NewMessageHandler,
+    onTapbackEvent: @escaping TapbackEventHandler
+  ) async throws {
     startWebSocketCalled = true
     newMessageHandler = onNewMessage
+    tapbackEventHandler = onTapbackEvent
   }
 
   func stopWebSocket() async {
     stopWebSocketCalled = true
     newMessageHandler = nil
+    tapbackEventHandler = nil
   }
 
   var attachmentDataToReturn: Data = Data()
@@ -107,6 +113,11 @@ actor MockBridgeService: BridgeServiceProtocol {
   // Helper to simulate receiving a new message
   func simulateNewMessage(_ message: Message, sender: String) {
     newMessageHandler?(message, sender)
+  }
+
+  // Helper to simulate receiving a tapback event
+  func simulateTapbackEvent(_ event: TapbackEvent) {
+    tapbackEventHandler?(event)
   }
 }
 
