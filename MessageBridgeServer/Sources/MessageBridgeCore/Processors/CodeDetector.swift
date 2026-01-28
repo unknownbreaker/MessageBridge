@@ -32,6 +32,11 @@ public struct CodeDetector: MessageProcessor {
   /// Processing priority (200 = critical detection, runs early)
   public let priority = 200
 
+  /// Pre-compiled regex for formatted codes like G-123456 (letter-dash-digits)
+  // swiftlint:disable:next force_try
+  private static let formattedCodeRegex = try! NSRegularExpression(
+    pattern: #"\b([A-Z]-?\d{5,8})\b"#)
+
   /// Pre-compiled regex for 4-8 digit codes (compiled once, reused)
   // swiftlint:disable:next force_try
   private static let codeRegex = try! NSRegularExpression(pattern: #"\b(\d{4,8})\b"#)
@@ -60,27 +65,40 @@ public struct CodeDetector: MessageProcessor {
     guard hasContext else { return message }
 
     var result = message
-    let range = NSRange(text.startIndex..., in: text)
-    let matches = Self.codeRegex.matches(in: text, range: range)
+    let nsRange = NSRange(text.startIndex..., in: text)
 
-    for match in matches {
+    // Track matched ranges so numeric regex doesn't re-match digits inside formatted codes
+    var matchedRanges: [Range<String.Index>] = []
+
+    // 1. Formatted codes first (e.g., G-582941, A-12345)
+    let formattedMatches = Self.formattedCodeRegex.matches(in: text, range: nsRange)
+    for match in formattedMatches {
       guard let swiftRange = Range(match.range(at: 1), in: text) else { continue }
+      matchedRanges.append(swiftRange)
+      appendCode(String(text[swiftRange]), range: swiftRange, in: text, to: &result)
+    }
 
-      let code = String(text[swiftRange])
-      result.detectedCodes.append(DetectedCode(value: code, confidence: .high))
-
-      let startIndex = text.distance(from: text.startIndex, to: swiftRange.lowerBound)
-      let endIndex = text.distance(from: text.startIndex, to: swiftRange.upperBound)
-
-      result.highlights.append(
-        TextHighlight(
-          text: code,
-          startIndex: startIndex,
-          endIndex: endIndex,
-          type: .code
-        ))
+    // 2. Plain numeric codes (4-8 digits)
+    let numericMatches = Self.codeRegex.matches(in: text, range: nsRange)
+    for match in numericMatches {
+      guard let swiftRange = Range(match.range(at: 1), in: text) else { continue }
+      // Skip if this range overlaps with an already-matched formatted code
+      let overlaps = matchedRanges.contains { $0.overlaps(swiftRange) }
+      guard !overlaps else { continue }
+      appendCode(String(text[swiftRange]), range: swiftRange, in: text, to: &result)
     }
 
     return result
+  }
+
+  private func appendCode(
+    _ code: String, range: Range<String.Index>, in text: String,
+    to result: inout ProcessedMessage
+  ) {
+    result.detectedCodes.append(DetectedCode(value: code, confidence: .high))
+    let startIndex = text.distance(from: text.startIndex, to: range.lowerBound)
+    let endIndex = text.distance(from: text.startIndex, to: range.upperBound)
+    result.highlights.append(
+      TextHighlight(text: code, startIndex: startIndex, endIndex: endIndex, type: .code))
   }
 }

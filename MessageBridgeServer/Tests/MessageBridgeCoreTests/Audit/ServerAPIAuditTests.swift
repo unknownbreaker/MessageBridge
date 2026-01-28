@@ -19,7 +19,8 @@ final class ServerAPIAuditTests: XCTestCase {
         id: "c1", guid: "g1", displayName: "Alice",
         participants: [], lastMessage: nil, isGroup: false)
     ]
-    try configureRoutes(app, database: mockDb, messageSender: MockMessageSender(), apiKey: "test-key")
+    try configureRoutes(
+      app, database: mockDb, messageSender: MockMessageSender(), apiKey: "test-key")
 
     try app.test(.GET, "conversations", headers: ["X-API-Key": "test-key"]) { res in
       XCTAssertEqual(res.status, .ok)
@@ -31,9 +32,11 @@ final class ServerAPIAuditTests: XCTestCase {
     defer { app.shutdown() }
 
     let mockDb = MockChatDatabase()
-    try configureRoutes(app, database: mockDb, messageSender: MockMessageSender(), apiKey: "test-key")
+    try configureRoutes(
+      app, database: mockDb, messageSender: MockMessageSender(), apiKey: "test-key")
 
-    try app.test(.GET, "conversations?limit=10&offset=5", headers: ["X-API-Key": "test-key"]) { res in
+    try app.test(.GET, "conversations?limit=10&offset=5", headers: ["X-API-Key": "test-key"]) {
+      res in
       XCTAssertEqual(res.status, .ok)
     }
 
@@ -49,10 +52,12 @@ final class ServerAPIAuditTests: XCTestCase {
 
     let mockDb = MockChatDatabase()
     mockDb.messagesToReturn = [
-      Message(id: 1, guid: "m1", text: "Hello", date: Date(),
-              isFromMe: false, handleId: nil, conversationId: "c1")
+      Message(
+        id: 1, guid: "m1", text: "Hello", date: Date(),
+        isFromMe: false, handleId: nil, conversationId: "c1")
     ]
-    try configureRoutes(app, database: mockDb, messageSender: MockMessageSender(), apiKey: "test-key")
+    try configureRoutes(
+      app, database: mockDb, messageSender: MockMessageSender(), apiKey: "test-key")
 
     try app.test(.GET, "conversations/c1/messages", headers: ["X-API-Key": "test-key"]) { res in
       XCTAssertEqual(res.status, .ok)
@@ -65,7 +70,8 @@ final class ServerAPIAuditTests: XCTestCase {
     let app = Application(.testing)
     defer { app.shutdown() }
 
-    try configureRoutes(app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
+    try configureRoutes(
+      app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
 
     try app.test(.GET, "conversations") { res in
       XCTAssertEqual(res.status, .unauthorized)
@@ -76,7 +82,8 @@ final class ServerAPIAuditTests: XCTestCase {
     let app = Application(.testing)
     defer { app.shutdown() }
 
-    try configureRoutes(app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
+    try configureRoutes(
+      app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
 
     try app.test(.GET, "conversations", headers: ["X-API-Key": "wrong-key"]) { res in
       XCTAssertEqual(res.status, .unauthorized)
@@ -87,7 +94,8 @@ final class ServerAPIAuditTests: XCTestCase {
     let app = Application(.testing)
     defer { app.shutdown() }
 
-    try configureRoutes(app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
+    try configureRoutes(
+      app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
 
     try app.test(.GET, "conversations/c1/messages") { res in
       XCTAssertEqual(res.status, .unauthorized)
@@ -101,11 +109,15 @@ final class ServerAPIAuditTests: XCTestCase {
     defer { app.shutdown() }
 
     let mockSender = MockMessageSender()
-    try configureRoutes(app, database: MockChatDatabase(), messageSender: mockSender, apiKey: "test-key")
+    try configureRoutes(
+      app, database: MockChatDatabase(), messageSender: mockSender, apiKey: "test-key")
 
-    try app.test(.POST, "send", headers: ["X-API-Key": "test-key"], beforeRequest: { req in
-      try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello"))
-    }) { res in
+    try app.test(
+      .POST, "send", headers: ["X-API-Key": "test-key"],
+      beforeRequest: { req in
+        try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello"))
+      }
+    ) { res in
       XCTAssertEqual(res.status, .ok)
     }
 
@@ -116,11 +128,15 @@ final class ServerAPIAuditTests: XCTestCase {
     let app = Application(.testing)
     defer { app.shutdown() }
 
-    try configureRoutes(app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
+    try configureRoutes(
+      app, database: MockChatDatabase(), messageSender: MockMessageSender(), apiKey: "test-key")
 
-    try app.test(.POST, "send", beforeRequest: { req in
-      try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello"))
-    }) { res in
+    try app.test(
+      .POST, "send",
+      beforeRequest: { req in
+        try req.content.encode(SendMessageRequest(to: "+15551234567", text: "Hello"))
+      }
+    ) { res in
       XCTAssertEqual(res.status, .unauthorized)
     }
   }
