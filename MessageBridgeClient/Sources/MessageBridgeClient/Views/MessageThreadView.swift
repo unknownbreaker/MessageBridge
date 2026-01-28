@@ -6,6 +6,8 @@ struct MessageThreadView: View {
   @EnvironmentObject var viewModel: MessagesViewModel
   @State private var messageText = ""
   @State private var showContactDetails = false
+  @State private var showingTapbackPicker = false
+  @State private var tapbackTargetMessage: Message?
 
   var messages: [Message] {
     viewModel.messages[conversation.id] ?? []
@@ -61,6 +63,25 @@ struct MessageThreadView: View {
     .task(id: conversation.id) {
       // Re-run when conversation changes
       await viewModel.loadMessages(for: conversation.id)
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .showTapbackPicker)) { notification in
+      if let message = notification.userInfo?["message"] as? Message {
+        tapbackTargetMessage = message
+        showingTapbackPicker = true
+      }
+    }
+    .popover(isPresented: $showingTapbackPicker) {
+      if let message = tapbackTargetMessage {
+        TapbackPicker(message: message) { type, isRemoval in
+          Task {
+            await viewModel.sendTapback(
+              type: type,
+              messageGUID: message.guid,
+              action: isRemoval ? .remove : .add
+            )
+          }
+        }
+      }
     }
   }
 
