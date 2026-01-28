@@ -1,6 +1,5 @@
 import XCTest
 
-@testable import MessageBridgeClient
 @testable import MessageBridgeClientCore
 
 final class CarouselViewTests: XCTestCase {

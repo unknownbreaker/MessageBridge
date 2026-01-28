@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import MessageBridgeClient
+@testable import MessageBridgeClientCore
 
 final class ZoomableImageViewTests: XCTestCase {
   func testClampedScale_belowMinimum_returnsMinimum() {

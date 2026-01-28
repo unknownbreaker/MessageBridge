@@ -41,6 +41,9 @@ struct ImageGridView: View {
   let attachments: [Attachment]
   private let maxDisplay = 4
 
+  @State private var isShowingCarousel = false
+  @State private var carouselStartIndex = 0
+
   var body: some View {
     let displayAttachments = Array(attachments.prefix(maxDisplay))
     let overflow = attachments.count - maxDisplay
@@ -59,10 +62,17 @@ struct ImageGridView: View {
               .foregroundStyle(.white)
           }
         }
+        .onTapGesture {
+          carouselStartIndex = index
+          isShowingCarousel = true
+        }
       }
     }
     .frame(maxWidth: 280)
     .clipShape(RoundedRectangle(cornerRadius: 8))
+    .sheet(isPresented: $isShowingCarousel) {
+      CarouselView(attachments: attachments, startIndex: carouselStartIndex)
+    }
   }
 
   private var columns: [GridItem] {
