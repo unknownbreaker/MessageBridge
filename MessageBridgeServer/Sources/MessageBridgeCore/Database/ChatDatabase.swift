@@ -144,7 +144,30 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
   // MARK: - Messages
 
-  public func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) throws
+  public func fetchMessages(conversationId: String, limit: Int = 50, offset: Int = 0) async throws
+    -> [Message]
+  {
+    // First fetch messages from the database (synchronously)
+    let messages = try fetchMessagesFromDB(
+      conversationId: conversationId, limit: limit, offset: offset)
+
+    // Then fetch tapbacks for all messages (asynchronously)
+    let messageGUIDs = messages.map { $0.guid }
+    let tapbackQueries = TapbackQueries(database: dbPool)
+    let tapbacksByGUID = try await tapbackQueries.tapbacks(forMessageGUIDs: messageGUIDs)
+
+    // Attach tapbacks to messages
+    let messagesWithTapbacks = messages.map { message in
+      var updated = message
+      updated.tapbacks = tapbacksByGUID[message.guid] ?? []
+      return updated
+    }
+
+    return messagesWithTapbacks
+  }
+
+  private nonisolated func fetchMessagesFromDB(conversationId: String, limit: Int, offset: Int)
+    throws
     -> [Message]
   {
     return try dbPool.read { db in
@@ -267,7 +290,26 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
   // MARK: - Search
 
-  public func searchMessages(query: String, limit: Int = 50) throws -> [Message] {
+  public func searchMessages(query: String, limit: Int = 50) async throws -> [Message] {
+    // First fetch messages from the database (synchronously)
+    let messages = try searchMessagesFromDB(query: query, limit: limit)
+
+    // Then fetch tapbacks for all messages (asynchronously)
+    let messageGUIDs = messages.map { $0.guid }
+    let tapbackQueries = TapbackQueries(database: dbPool)
+    let tapbacksByGUID = try await tapbackQueries.tapbacks(forMessageGUIDs: messageGUIDs)
+
+    // Attach tapbacks to messages
+    let messagesWithTapbacks = messages.map { message in
+      var updated = message
+      updated.tapbacks = tapbacksByGUID[message.guid] ?? []
+      return updated
+    }
+
+    return messagesWithTapbacks
+  }
+
+  private nonisolated func searchMessagesFromDB(query: String, limit: Int) throws -> [Message] {
     try dbPool.read { db in
       let sql = """
         SELECT
@@ -505,7 +547,14 @@ public actor ChatDatabase: ChatDatabaseProtocol {
   }
 
   /// Fetch a single attachment by ID (for serving files)
-  public func fetchAttachment(id: Int64) throws -> (attachment: Attachment, filePath: String)? {
+  public func fetchAttachment(id: Int64) async throws -> (attachment: Attachment, filePath: String)?
+  {
+    try fetchAttachmentFromDB(id: id)
+  }
+
+  private nonisolated func fetchAttachmentFromDB(id: Int64) throws -> (
+    attachment: Attachment, filePath: String
+  )? {
     try dbPool.read { db in
       let sql = """
         SELECT
