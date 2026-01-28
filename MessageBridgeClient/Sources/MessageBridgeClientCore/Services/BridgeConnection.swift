@@ -22,9 +22,47 @@ struct ConversationsResponse: Codable {
   let nextCursor: String?
 }
 
+/// Server's ProcessedMessage DTO — matches the nested JSON structure.
+/// Converts to client `Message` with enrichment fields populated.
+struct ProcessedMessageDTO: Codable {
+  let message: RawMessageDTO
+  let detectedCodes: [DetectedCode]?
+  let highlights: [TextHighlight]?
+  let mentions: [Mention]?
+  let isEmojiOnly: Bool?
+
+  /// Flattened raw message fields from the server's Message type
+  struct RawMessageDTO: Codable {
+    let id: Int64
+    let guid: String
+    let text: String?
+    let date: Date
+    let isFromMe: Bool
+    let handleId: Int64?
+    let conversationId: String
+    let attachments: [Attachment]?
+  }
+
+  func toMessage() -> Message {
+    Message(
+      id: message.id,
+      guid: message.guid,
+      text: message.text,
+      date: message.date,
+      isFromMe: message.isFromMe,
+      handleId: message.handleId,
+      conversationId: message.conversationId,
+      attachments: message.attachments ?? [],
+      detectedCodes: detectedCodes,
+      highlights: highlights,
+      mentions: mentions
+    )
+  }
+}
+
 /// Response wrapper for messages endpoint
 struct MessagesResponse: Codable {
-  let messages: [Message]
+  let messages: [ProcessedMessageDTO]
   let nextCursor: String?
 }
 
@@ -44,17 +82,12 @@ struct WebSocketEnvelope: Codable {
 /// Full new_message WebSocket message
 struct NewMessageWebSocketMessage: Codable {
   let type: String
-  let data: NewMessageData
+  let data: NewMessagePayload
 }
 
-/// Data payload for new_message type
-struct NewMessageData: Codable {
-  let id: Int64
-  let conversationId: String
-  let text: String?
-  let sender: String?
-  let date: Date
-  let isFromMe: Bool
+/// Data payload for new_message type — wraps a ProcessedMessage
+struct NewMessagePayload: Codable {
+  let message: ProcessedMessageDTO
 }
 
 /// Handles communication with the MessageBridge server
@@ -200,7 +233,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
     }
 
     let messagesResponse = try decryptResponse(data, as: MessagesResponse.self)
-    return messagesResponse.messages
+    return messagesResponse.messages.map { $0.toMessage() }
   }
 
   public func sendMessage(text: String, to recipient: String) async throws {
@@ -386,21 +419,13 @@ public actor BridgeConnection: BridgeServiceProtocol {
       // Only process new_message type - ignore connected, error, etc.
       if envelope.type == "new_message" {
         let wsMessage = try decoder.decode(NewMessageWebSocketMessage.self, from: messageData)
-        let msgData = wsMessage.data
-        let message = Message(
-          id: msgData.id,
-          guid: "ws-\(msgData.id)",
-          text: msgData.text,
-          date: msgData.date,
-          isFromMe: msgData.isFromMe,
-          handleId: nil,
-          conversationId: msgData.conversationId
-        )
-        let sender = msgData.sender ?? "Unknown"
+        let processed = wsMessage.data.message
+        let message = processed.toMessage()
+        let sender = "Unknown"  // Server doesn't include sender name in ProcessedMessage
 
         // Log message age (time since message was created)
-        let messageAge = Date().timeIntervalSince(msgData.date) * 1000
-        logInfo("WebSocket: new_message received, age: \(Int(messageAge))ms, id: \(msgData.id)")
+        let messageAge = Date().timeIntervalSince(message.date) * 1000
+        logInfo("WebSocket: new_message received, age: \(Int(messageAge))ms, id: \(message.id)")
 
         newMessageHandler?(message, sender)
       } else {
