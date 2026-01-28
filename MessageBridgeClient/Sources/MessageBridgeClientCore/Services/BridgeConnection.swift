@@ -3,6 +3,12 @@ import Foundation
 /// Callback for receiving new messages via WebSocket
 public typealias NewMessageHandler = @Sendable (Message, String) -> Void
 
+/// Action type for tapback operations
+public enum TapbackActionType: String, Sendable {
+  case add
+  case remove
+}
+
 /// Protocol defining the bridge service interface for testability
 public protocol BridgeServiceProtocol: Sendable {
   func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws
@@ -14,6 +20,7 @@ public protocol BridgeServiceProtocol: Sendable {
   func stopWebSocket() async
   func fetchAttachment(id: Int64) async throws -> Data
   func markConversationAsRead(_ conversationId: String) async throws
+  func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType) async throws
 }
 
 /// Response wrapper for conversations endpoint
@@ -300,6 +307,42 @@ public actor BridgeConnection: BridgeServiceProtocol {
     }
   }
 
+  public func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType)
+    async throws
+  {
+    guard let serverURL, let apiKey else {
+      throw BridgeError.notConnected
+    }
+
+    // URL-encode the messageGUID since it may contain special characters
+    guard
+      let encodedMessageGUID = messageGUID.addingPercentEncoding(
+        withAllowedCharacters: .urlPathAllowed)
+    else {
+      throw BridgeError.requestFailed
+    }
+
+    var request = URLRequest(
+      url: serverURL.appendingPathComponent("messages/\(encodedMessageGUID)/tapback"))
+    request.httpMethod = "POST"
+    request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let body: [String: Any] = [
+      "type": type.rawValue,
+      "action": action.rawValue,
+    ]
+    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+    let (_, response) = try await urlSession.data(for: request)
+
+    guard let httpResponse = response as? HTTPURLResponse,
+      httpResponse.statusCode == 200
+    else {
+      throw BridgeError.tapbackFailed
+    }
+  }
+
   public func fetchAttachment(id: Int64) async throws -> Data {
     guard let serverURL, let apiKey else {
       throw BridgeError.notConnected
@@ -459,6 +502,7 @@ public enum BridgeError: LocalizedError {
   case requestFailed
   case sendFailed
   case attachmentNotFound
+  case tapbackFailed
 
   public var errorDescription: String? {
     switch self {
@@ -472,6 +516,8 @@ public enum BridgeError: LocalizedError {
       return "Failed to send message"
     case .attachmentNotFound:
       return "Attachment not found"
+    case .tapbackFailed:
+      return "Failed to send tapback"
     }
   }
 }

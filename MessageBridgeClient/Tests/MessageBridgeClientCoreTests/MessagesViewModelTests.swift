@@ -89,6 +89,21 @@ actor MockBridgeService: BridgeServiceProtocol {
     }
   }
 
+  var sendTapbackCalled = false
+  var lastTapbackType: TapbackType?
+  var lastTapbackMessageGUID: String?
+  var lastTapbackAction: TapbackActionType?
+
+  func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType) async throws {
+    sendTapbackCalled = true
+    lastTapbackType = type
+    lastTapbackMessageGUID = messageGUID
+    lastTapbackAction = action
+    if shouldThrowError {
+      throw BridgeError.tapbackFailed
+    }
+  }
+
   // Helper to simulate receiving a new message
   func simulateNewMessage(_ message: Message, sender: String) {
     newMessageHandler?(message, sender)

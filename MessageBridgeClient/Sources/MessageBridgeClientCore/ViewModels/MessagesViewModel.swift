@@ -315,4 +315,19 @@ public class MessagesViewModel: ObservableObject {
     }
   }
 
+  /// Send a tapback reaction to a message
+  /// - Parameters:
+  ///   - type: The type of tapback (love, like, dislike, laugh, emphasis, question)
+  ///   - messageGUID: The GUID of the message to react to
+  ///   - action: Whether to add or remove the tapback
+  public func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType) async {
+    do {
+      try await bridgeService.sendTapback(type: type, messageGUID: messageGUID, action: action)
+      logDebug("Tapback \(action.rawValue) sent successfully for message \(messageGUID)")
+    } catch {
+      logError("Failed to send tapback", error: error)
+      lastError = error
+    }
+  }
+
 }
