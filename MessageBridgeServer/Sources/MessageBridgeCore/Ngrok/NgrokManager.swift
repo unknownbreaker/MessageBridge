@@ -1,5 +1,9 @@
 import Foundation
 
+// Keychain constants at file scope to avoid actor isolation issues with static properties
+private let ngrokKeychainService = "com.messagebridge.server"
+private let ngrokKeychainAccount = "ngrok-authtoken"
+
 /// Manages the ngrok binary and tunnel process
 public actor NgrokManager: TunnelProvider {
   // MARK: - TunnelProvider Conformance
@@ -194,6 +198,12 @@ public actor NgrokManager: TunnelProvider {
   public func startTunnel(port: Int = 8080) async throws -> String {
     guard let binaryPath = findBinary() else {
       throw TunnelError.notInstalled(provider: id)
+    }
+
+    guard hasAuthToken else {
+      throw TunnelError.connectionFailed(
+        "ngrok authtoken not configured. Sign up at dashboard.ngrok.com and add your authtoken in Settings."
+      )
     }
 
     // Stop any existing tunnel
@@ -517,6 +527,145 @@ public actor NgrokManager: TunnelProvider {
   private func updateStatus(_ newStatus: TunnelStatus) {
     _status = newStatus
     statusChangeHandler?(newStatus)
+  }
+
+  // MARK: - Auth Token Management
+
+  /// Detect an existing authtoken from ngrok config files or Keychain.
+  /// Checks modern config path first, then legacy, then Keychain.
+  public nonisolated func detectAuthToken() -> String? {
+    // Modern ngrok v3 config path
+    let modernPath = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent(".config/ngrok/ngrok.yml").path
+
+    // Legacy ngrok v2 config path
+    let legacyPath = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent(".ngrok2/ngrok.yml").path
+
+    for path in [modernPath, legacyPath] {
+      if let token = parseAuthTokenFromConfig(at: path) {
+        return token
+      }
+    }
+
+    // Fall back to Keychain
+    return retrieveAuthTokenFromKeychain()
+  }
+
+  /// Save authtoken to Keychain and configure ngrok CLI.
+  public func saveAuthToken(_ token: String) async throws {
+    // Save to Keychain
+    try saveAuthTokenToKeychain(token)
+
+    // Configure ngrok CLI if binary is available
+    if let binaryPath = findBinary() {
+      let process = Process()
+      process.executableURL = URL(fileURLWithPath: binaryPath)
+      process.arguments = ["config", "add-authtoken", token]
+
+      let pipe = Pipe()
+      process.standardOutput = pipe
+      process.standardError = pipe
+
+      try process.run()
+      process.waitUntilExit()
+
+      if process.terminationStatus != 0 {
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? "Unknown error"
+        throw TunnelError.connectionFailed("Failed to configure ngrok authtoken: \(output)")
+      }
+    }
+  }
+
+  /// Remove authtoken from Keychain.
+  public nonisolated func removeAuthToken() {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: ngrokKeychainService,
+      kSecAttrAccount as String: ngrokKeychainAccount,
+    ]
+    SecItemDelete(query as CFDictionary)
+  }
+
+  /// Whether an authtoken is available (config file or Keychain).
+  public nonisolated var hasAuthToken: Bool {
+    detectAuthToken() != nil
+  }
+
+  // MARK: - Auth Token Helpers
+
+  /// Parse authtoken from an ngrok YAML config file.
+  private nonisolated func parseAuthTokenFromConfig(at path: String) -> String? {
+    guard let contents = try? String(contentsOfFile: path, encoding: .utf8) else {
+      return nil
+    }
+
+    // Look for "authtoken: <value>" line — simple parsing, no YAML library needed
+    for line in contents.components(separatedBy: .newlines) {
+      let trimmed = line.trimmingCharacters(in: .whitespaces)
+      if trimmed.hasPrefix("authtoken:") {
+        let value = trimmed.dropFirst("authtoken:".count)
+          .trimmingCharacters(in: .whitespaces)
+        if !value.isEmpty {
+          return value
+        }
+      }
+    }
+    return nil
+  }
+
+  private nonisolated func retrieveAuthTokenFromKeychain() -> String? {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: ngrokKeychainService,
+      kSecAttrAccount as String: ngrokKeychainAccount,
+      kSecReturnData as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne,
+    ]
+
+    var result: AnyObject?
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+    guard status == errSecSuccess,
+      let data = result as? Data,
+      let token = String(data: data, encoding: .utf8)
+    else {
+      return nil
+    }
+    return token
+  }
+
+  private nonisolated func saveAuthTokenToKeychain(_ token: String) throws {
+    guard let data = token.data(using: .utf8) else {
+      throw TunnelError.connectionFailed("Invalid authtoken data")
+    }
+
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: ngrokKeychainService,
+      kSecAttrAccount as String: ngrokKeychainAccount,
+      kSecValueData as String: data,
+      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+    ]
+
+    var status = SecItemAdd(query as CFDictionary, nil)
+
+    if status == errSecDuplicateItem {
+      let updateQuery: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: ngrokKeychainService,
+        kSecAttrAccount as String: ngrokKeychainAccount,
+      ]
+      let updateAttributes: [String: Any] = [
+        kSecValueData as String: data
+      ]
+      status = SecItemUpdate(updateQuery as CFDictionary, updateAttributes as CFDictionary)
+    }
+
+    guard status == errSecSuccess else {
+      throw TunnelError.connectionFailed("Failed to save authtoken to Keychain: \(status)")
+    }
   }
 }
 

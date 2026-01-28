@@ -267,6 +267,9 @@ class AppState: ObservableObject {
   @Published var cloudflaredInfo: CloudflaredInfo?
   @Published var ngrokInfo: NgrokInfo?
 
+  // ngrok authtoken
+  @Published var ngrokAuthTokenConfigured: Bool = false
+
   // Auto-update settings
   @Published var cloudflaredAutoUpdate: Bool = false
   @Published var ngrokAutoUpdate: Bool = false
@@ -470,6 +473,7 @@ class AppState: ObservableObject {
 
     // Check ngrok
     let ngrokInstalled = await ngrokManager.isInstalled()
+    ngrokAuthTokenConfigured = await ngrokManager.hasAuthToken
     if ngrokInstalled {
       ngrokInfo = await ngrokManager.getInfo()
       // Check if there's an existing ngrok process running and try to get its URL
@@ -541,6 +545,18 @@ class AppState: ObservableObject {
     addLog(level: .info, message: "Starting ngrok tunnel...")
     let url = try await ngrokManager.startTunnel(port: port)
     addLog(level: .info, message: "ngrok tunnel started: \(url)")
+  }
+
+  func saveNgrokAuthToken(_ token: String) async throws {
+    try await ngrokManager.saveAuthToken(token)
+    ngrokAuthTokenConfigured = true
+    addLog(level: .info, message: "ngrok authtoken configured")
+  }
+
+  func removeNgrokAuthToken() async {
+    await ngrokManager.removeAuthToken()
+    ngrokAuthTokenConfigured = false
+    addLog(level: .info, message: "ngrok authtoken removed")
   }
 
   func stopNgrokTunnel() async {

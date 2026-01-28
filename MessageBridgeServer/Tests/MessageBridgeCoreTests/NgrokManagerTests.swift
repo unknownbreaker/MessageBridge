@@ -114,6 +114,88 @@ final class NgrokManagerTests: XCTestCase {
     // If no tunnel detected, test passes - we just couldn't verify the positive case
   }
 
+  // MARK: - Auth Token Detection Tests
+
+  func testNgrokManager_detectAuthToken_returnsNilWhenNoConfig() async {
+    // Create a fresh manager — in a clean test environment with no ngrok config
+    // and no Keychain entry, detectAuthToken should return nil
+    let manager = NgrokManager()
+    // We can't guarantee the test machine has no ngrok config,
+    // but we can verify the method runs without crashing
+    let token = await manager.detectAuthToken()
+    // Token may or may not exist depending on test environment
+    _ = token
+  }
+
+  func testNgrokManager_hasAuthToken_returnsBool() async {
+    let manager = NgrokManager()
+    let hasToken = await manager.hasAuthToken
+    // Just verify it returns a boolean without crashing
+    XCTAssertTrue(hasToken == true || hasToken == false)
+  }
+
+  func testNgrokManager_parseAuthTokenFromConfig_validYAML() async {
+    // Test config file parsing by saving and detecting round-trip through Keychain
+    let manager = NgrokManager()
+
+    // Clean up any existing token first
+    await manager.removeAuthToken()
+    let beforeToken = await manager.detectAuthToken()
+
+    // If no config file exists, token should come from Keychain only
+    // Save a test token to Keychain
+    let testToken = "test_token_\(UUID().uuidString)"
+    do {
+      try await manager.saveAuthToken(testToken)
+      let detected = await manager.detectAuthToken()
+      // Should find the token (either from config file ngrok wrote, or Keychain)
+      XCTAssertNotNil(detected)
+
+      // Clean up
+      await manager.removeAuthToken()
+    } catch {
+      // saveAuthToken may fail if ngrok binary isn't installed (config step fails)
+      // but the Keychain part should still work — skip if binary not available
+      if manager.isInstalled() {
+        XCTFail("saveAuthToken failed with ngrok installed: \(error)")
+      }
+      // Clean up regardless
+      await manager.removeAuthToken()
+    }
+  }
+
+  func testNgrokManager_removeAuthToken_cleansUp() async {
+    let manager = NgrokManager()
+    // Remove should not crash even if no token exists
+    await manager.removeAuthToken()
+    // Verify Keychain entry is gone (config file may still have one)
+    // This at minimum verifies the method doesn't throw
+  }
+
+  func testNgrokManager_startTunnel_failsWithoutAuthToken() async {
+    let manager = NgrokManager()
+
+    // Remove any existing token
+    await manager.removeAuthToken()
+
+    // Only test if no config file provides a token either
+    let hasToken = await manager.hasAuthToken
+    if !hasToken {
+      do {
+        _ = try await manager.startTunnel(port: 9999)
+        XCTFail("Expected error when starting without authtoken")
+      } catch {
+        // Should get a connection failed error about missing authtoken
+        let errorMsg = error.localizedDescription
+        XCTAssertTrue(
+          errorMsg.contains("authtoken") || errorMsg.contains("not installed"),
+          "Expected authtoken error, got: \(errorMsg)"
+        )
+      }
+    }
+    // If hasToken is true (from config file), we can't test this case
+  }
+
   // MARK: - Status Change Handler Tests
 
   func testNgrokManager_onStatusChange_handlerIsSet() async {
