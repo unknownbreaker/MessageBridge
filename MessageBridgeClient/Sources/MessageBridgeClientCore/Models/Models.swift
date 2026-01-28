@@ -36,6 +36,49 @@ public struct Handle: Codable, Identifiable, Hashable, Sendable {
   }
 }
 
+// MARK: - TapbackType
+
+/// The type of tapback reaction (matching iMessage tapback types)
+public enum TapbackType: Int, Codable, Sendable, CaseIterable {
+  case love = 2000
+  case like = 2001
+  case dislike = 2002
+  case laugh = 2003
+  case emphasis = 2004
+  case question = 2005
+
+  public var emoji: String {
+    switch self {
+    case .love: return "❤️"
+    case .like: return "👍"
+    case .dislike: return "👎"
+    case .laugh: return "😂"
+    case .emphasis: return "‼️"
+    case .question: return "❓"
+    }
+  }
+}
+
+// MARK: - Tapback
+
+/// Represents a tapback reaction on a message
+public struct Tapback: Codable, Sendable, Equatable, Hashable, Identifiable {
+  public var id: String { "\(messageGUID)-\(sender)-\(type.rawValue)" }
+  public let type: TapbackType
+  public let sender: String
+  public let isFromMe: Bool
+  public let date: Date
+  public let messageGUID: String
+
+  public init(type: TapbackType, sender: String, isFromMe: Bool, date: Date, messageGUID: String) {
+    self.type = type
+    self.sender = sender
+    self.isFromMe = isFromMe
+    self.date = date
+    self.messageGUID = messageGUID
+  }
+}
+
 // MARK: - Attachment
 
 /// Represents a file attachment (image, video, audio, document) in a message
@@ -141,10 +184,11 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
   public let detectedCodes: [DetectedCode]?
   public let highlights: [TextHighlight]?
   public let mentions: [Mention]?
+  public var tapbacks: [Tapback]?
 
   enum CodingKeys: String, CodingKey {
     case id, guid, text, date, isFromMe, handleId, conversationId, attachments
-    case detectedCodes, highlights, mentions
+    case detectedCodes, highlights, mentions, tapbacks
   }
 
   public init(
@@ -152,7 +196,8 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     conversationId: String, attachments: [Attachment] = [],
     detectedCodes: [DetectedCode]? = nil,
     highlights: [TextHighlight]? = nil,
-    mentions: [Mention]? = nil
+    mentions: [Mention]? = nil,
+    tapbacks: [Tapback]? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -165,6 +210,7 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     self.detectedCodes = detectedCodes
     self.highlights = highlights
     self.mentions = mentions
+    self.tapbacks = tapbacks
   }
 
   public init(from decoder: Decoder) throws {
@@ -180,6 +226,7 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     detectedCodes = try container.decodeIfPresent([DetectedCode].self, forKey: .detectedCodes)
     highlights = try container.decodeIfPresent([TextHighlight].self, forKey: .highlights)
     mentions = try container.decodeIfPresent([Mention].self, forKey: .mentions)
+    tapbacks = try container.decodeIfPresent([Tapback].self, forKey: .tapbacks)
   }
 
   public var hasText: Bool {
