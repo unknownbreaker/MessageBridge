@@ -36,16 +36,20 @@ struct MessageThreadView: View {
       // Messages
       ScrollView {
         LazyVStack(spacing: 8) {
-          let reversedMessages = messages.reversed()
+          let reversedMessages = Array(messages.reversed())
           ForEach(Array(reversedMessages.enumerated()), id: \.element.id) { index, message in
-            let previousMessage = index > 0 ? Array(reversedMessages)[index - 1] : nil
+            let previousMessage = index > 0 ? reversedMessages[index - 1] : nil
             let showSenderInfo = shouldShowSenderInfo(
               for: message, previousMessage: previousMessage)
+            let isLastMessage = index == reversedMessages.count - 1
+            let isLastSentMessage = message.isFromMe && !reversedMessages.dropFirst(index + 1).contains { $0.isFromMe }
             MessageBubble(
               message: message,
               isGroupConversation: conversation.isGroup,
               sender: senderForMessage(message),
-              showSenderInfo: showSenderInfo
+              showSenderInfo: showSenderInfo,
+              isLastSentMessage: isLastSentMessage,
+              isLastMessage: isLastMessage
             )
           }
         }
@@ -118,6 +122,8 @@ struct MessageBubble: View {
   let isGroupConversation: Bool
   let sender: Handle?
   var showSenderInfo: Bool = true
+  var isLastSentMessage: Bool = false
+  var isLastMessage: Bool = false
 
   var body: some View {
     HStack(alignment: .bottom, spacing: 8) {
@@ -159,10 +165,21 @@ struct MessageBubble: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
 
-        // Below decorators (timestamp, etc.)
-        ForEach(DecoratorRegistry.shared.decorators(for: message, at: .below), id: \.id) {
+        // Decorators (timestamp, read receipts, etc.)
+        let decoratorContext = DecoratorContext(
+          isLastSentMessage: isLastSentMessage,
+          isLastMessage: isLastMessage,
+          conversationId: message.conversationId
+        )
+        ForEach(DecoratorRegistry.shared.decorators(for: message, at: .below, context: decoratorContext), id: \.id) {
           decorator in
-          decorator.decorate(message)
+          decorator.decorate(message, context: decoratorContext)
+        }
+
+        // Bottom trailing decorators (read receipts)
+        ForEach(DecoratorRegistry.shared.decorators(for: message, at: .bottomTrailing, context: decoratorContext), id: \.id) {
+          decorator in
+          decorator.decorate(message, context: decoratorContext)
         }
       }
       .contextMenu {

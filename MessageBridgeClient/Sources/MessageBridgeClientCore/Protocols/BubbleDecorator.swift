@@ -1,5 +1,21 @@
 import SwiftUI
 
+/// Context passed to decorators for decision-making.
+public struct DecoratorContext: Sendable {
+  /// Whether this message is the last one sent by the current user in the conversation
+  public let isLastSentMessage: Bool
+  /// Whether this message is the very last message in the conversation
+  public let isLastMessage: Bool
+  /// The conversation this message belongs to
+  public let conversationId: String
+
+  public init(isLastSentMessage: Bool, isLastMessage: Bool, conversationId: String) {
+    self.isLastSentMessage = isLastSentMessage
+    self.isLastMessage = isLastMessage
+    self.conversationId = conversationId
+  }
+}
+
 /// Position of a decorator relative to the message bubble.
 public enum DecoratorPosition: String, Codable, Sendable {
   case topLeading
@@ -17,6 +33,6 @@ public enum DecoratorPosition: String, Codable, Sendable {
 public protocol BubbleDecorator: Identifiable, Sendable {
   var id: String { get }
   var position: DecoratorPosition { get }
-  func shouldDecorate(_ message: Message) -> Bool
-  @MainActor func decorate(_ message: Message) -> AnyView
+  func shouldDecorate(_ message: Message, context: DecoratorContext) -> Bool
+  @MainActor func decorate(_ message: Message, context: DecoratorContext) -> AnyView
 }

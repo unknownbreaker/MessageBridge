@@ -10,13 +10,13 @@ public struct TapbackDecorator: BubbleDecorator {
 
   public init() {}
 
-  public func shouldDecorate(_ message: Message) -> Bool {
+  public func shouldDecorate(_ message: Message, context: DecoratorContext) -> Bool {
     guard let tapbacks = message.tapbacks else { return false }
     return !tapbacks.isEmpty
   }
 
   @MainActor
-  public func decorate(_ message: Message) -> AnyView {
+  public func decorate(_ message: Message, context: DecoratorContext) -> AnyView {
     AnyView(
       TapbackPill(tapbacks: message.tapbacks ?? [])
         .offset(x: 8, y: -8)

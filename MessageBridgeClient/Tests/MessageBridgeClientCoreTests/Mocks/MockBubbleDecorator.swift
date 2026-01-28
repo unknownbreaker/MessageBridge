@@ -13,13 +13,13 @@ final class MockBubbleDecorator: BubbleDecorator, @unchecked Sendable {
     self.position = position
   }
 
-  func shouldDecorate(_ message: Message) -> Bool {
+  func shouldDecorate(_ message: Message, context: DecoratorContext) -> Bool {
     shouldDecorateCallCount += 1
     return shouldDecorateResult
   }
 
   @MainActor
-  func decorate(_ message: Message) -> AnyView {
+  func decorate(_ message: Message, context: DecoratorContext) -> AnyView {
     AnyView(Text("Mock decoration"))
   }
 }
