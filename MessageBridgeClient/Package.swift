@@ -24,7 +24,7 @@ let package = Package(
     ),
     .testTarget(
       name: "MessageBridgeClientCoreTests",
-      dependencies: ["MessageBridgeClientCore"]
+      dependencies: ["MessageBridgeClientCore", "MessageBridgeClient"]
     ),
   ]
 )
