@@ -6,6 +6,10 @@ let package = Package(
   platforms: [
     .macOS(.v14)
   ],
+  products: [
+    .library(name: "MessageBridgeCore", targets: ["MessageBridgeCore"]),
+    .executable(name: "MessageBridgeServer", targets: ["MessageBridgeServer"]),
+  ],
   dependencies: [
     .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
     .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.24.0"),

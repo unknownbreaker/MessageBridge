@@ -16,14 +16,12 @@ public protocol NotificationCenterProtocol: Sendable {
 
 /// Default implementation using the real UNUserNotificationCenter
 public final class SystemNotificationCenter: NotificationCenterProtocol, @unchecked Sendable {
-  private let center: UNUserNotificationCenter
+  private let center = UNUserNotificationCenter.current()
 
-  public init() {
-    self.center = UNUserNotificationCenter.current()
-  }
+  public init() {}
 
   public func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
-    try await center.requestAuthorization(options: options)
+    return try await center.requestAuthorization(options: options)
   }
 
   public func add(_ request: UNNotificationRequest) async throws {

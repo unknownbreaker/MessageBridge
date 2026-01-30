@@ -1,0 +1,42 @@
+name: MessageBridgeClient
+options:
+  bundleIdPrefix: com.messagebridge
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: false
+
+packages:
+  MessageBridgeClientCore:
+    path: .
+
+targets:
+  MessageBridge:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/MessageBridgeClient
+        excludes:
+          - "**/*.docc"
+    resources:
+      - path: Assets.xcassets
+    dependencies:
+      - package: MessageBridgeClientCore
+        product: MessageBridgeClientCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.messagebridge.client
+        PRODUCT_NAME: MessageBridge
+        INFOPLIST_FILE: Info.plist
+        CODE_SIGN_ENTITLEMENTS: MessageBridge.entitlements
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: false
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+    info:
+      path: Info.plist

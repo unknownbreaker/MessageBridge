@@ -7,7 +7,8 @@ let package = Package(
     .macOS(.v14)
   ],
   products: [
-    .executable(name: "MessageBridgeClient", targets: ["MessageBridgeClient"])
+    .library(name: "MessageBridgeClientCore", targets: ["MessageBridgeClientCore"]),
+    .executable(name: "MessageBridgeClient", targets: ["MessageBridgeClient"]),
   ],
   targets: [
     .target(

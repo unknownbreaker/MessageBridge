@@ -1,0 +1,44 @@
+name: MessageBridgeServer
+options:
+  bundleIdPrefix: com.messagebridge
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: false
+
+packages:
+  MessageBridgeCore:
+    path: .
+
+targets:
+  MessageBridgeServer:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/MessageBridgeServer
+        excludes:
+          - "**/*.docc"
+    resources:
+      - path: Assets.xcassets
+    dependencies:
+      - package: MessageBridgeCore
+        product: MessageBridgeCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.messagebridge.server
+        PRODUCT_NAME: MessageBridgeServer
+        INFOPLIST_FILE: Info.plist
+        CODE_SIGN_ENTITLEMENTS: MessageBridgeServer.entitlements
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: false
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+    info:
+      path: Info.plist
+      properties:
+        NSContactsUsageDescription: MessageBridge needs access to your contacts to display sender names.

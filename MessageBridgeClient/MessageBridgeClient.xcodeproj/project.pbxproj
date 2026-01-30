@@ -1,0 +1,423 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05EBF7E9EB5CBF0B522F5405 /* AttachmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BAECDDD5E4DF7E9E7EFC59 /* AttachmentView.swift */; };
+		196DAE2631700C90C1FB777C /* ComposerToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96B345581BD36BE289F568E /* ComposerToolbar.swift */; };
+		23B81DFB52C465D2F9AA1429 /* MessageBridgeClientCore in Frameworks */ = {isa = PBXBuildFile; productRef = D1FD14E3F5D24716D8F3193A /* MessageBridgeClientCore */; };
+		2589A533DFECD3A7BC3DA67A /* ExpandingTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE3777583A04593187E830A /* ExpandingTextEditor.swift */; };
+		2FC8EE6704061A9DD7D0F98F /* MessageBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016F9A3C4C24B6CB916FE913 /* MessageBridgeApp.swift */; };
+		3BB91DED4407337BBA526910 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9B46C60401F589EBF3BE74BC /* AppIcon.icns */; };
+		4303A216A3E99B50D2798D50 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A149B082B0838A9989D78608 /* ContentView.swift */; };
+		5A702A2C939C2CFF094B3A4D /* SendButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE0667877BD5816BB5FE3A8 /* SendButton.swift */; };
+		6B7E1354BB786F73ED15A2A0 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B33696328C61BF7344E77DA /* ConversationListView.swift */; };
+		803BFD217C8A8E3D349E0879 /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A9EEC86331702C79F5E674 /* ComposerView.swift */; };
+		8632136486D56B3C8DBCEB8D /* ContactDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00DC894DD6008B11C0C8EDFD /* ContactDetailsView.swift */; };
+		A01C6662BEFD9CF0ACFBD202 /* MessageThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B76EE25F4E1E111C61F9DD /* MessageThreadView.swift */; };
+		B26CFB38AFB3CB17844AFE90 /* LogViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75796E17EC64B93C4CB97DA0 /* LogViewerView.swift */; };
+		E4A70B04BFD8D0BDF3B51A93 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD9E719B9BF2034F33726D9 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		00DC894DD6008B11C0C8EDFD /* ContactDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactDetailsView.swift; sourceTree = "<group>"; };
+		016F9A3C4C24B6CB916FE913 /* MessageBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBridgeApp.swift; sourceTree = "<group>"; };
+		3BD9E719B9BF2034F33726D9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		45B76EE25F4E1E111C61F9DD /* MessageThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageThreadView.swift; sourceTree = "<group>"; };
+		4CE3777583A04593187E830A /* ExpandingTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpandingTextEditor.swift; sourceTree = "<group>"; };
+		6B33696328C61BF7344E77DA /* ConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListView.swift; sourceTree = "<group>"; };
+		75796E17EC64B93C4CB97DA0 /* LogViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewerView.swift; sourceTree = "<group>"; };
+		75BAECDDD5E4DF7E9E7EFC59 /* AttachmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentView.swift; sourceTree = "<group>"; };
+		7B47D43B26951E9A734CA707 /* MessageBridgeClient */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MessageBridgeClient; path = .; sourceTree = SOURCE_ROOT; };
+		9B46C60401F589EBF3BE74BC /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		A149B082B0838A9989D78608 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D12BBCACEF74356DDDD5C473 /* MessageBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MessageBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D5A9EEC86331702C79F5E674 /* ComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerView.swift; sourceTree = "<group>"; };
+		D96B345581BD36BE289F568E /* ComposerToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerToolbar.swift; sourceTree = "<group>"; };
+		FAE0667877BD5816BB5FE3A8 /* SendButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendButton.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		79FBFA87EE74E32303F503DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				23B81DFB52C465D2F9AA1429 /* MessageBridgeClientCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		08CF591EFAC727CA9D3D40C1 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				7B47D43B26951E9A734CA707 /* MessageBridgeClient */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		35B558B873B26CD7F593411C = {
+			isa = PBXGroup;
+			children = (
+				C3A9FEFB1A70B46CBB58DC71 /* MessageBridgeClient */,
+				08CF591EFAC727CA9D3D40C1 /* Packages */,
+				F585FE9D2E5C422B5AF7F1A3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4940184A5C39528515294A24 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				75BAECDDD5E4DF7E9E7EFC59 /* AttachmentView.swift */,
+				00DC894DD6008B11C0C8EDFD /* ContactDetailsView.swift */,
+				A149B082B0838A9989D78608 /* ContentView.swift */,
+				6B33696328C61BF7344E77DA /* ConversationListView.swift */,
+				75796E17EC64B93C4CB97DA0 /* LogViewerView.swift */,
+				45B76EE25F4E1E111C61F9DD /* MessageThreadView.swift */,
+				3BD9E719B9BF2034F33726D9 /* SettingsView.swift */,
+				54B87731F6815C0EE88FC0CB /* Composer */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		54B87731F6815C0EE88FC0CB /* Composer */ = {
+			isa = PBXGroup;
+			children = (
+				D96B345581BD36BE289F568E /* ComposerToolbar.swift */,
+				D5A9EEC86331702C79F5E674 /* ComposerView.swift */,
+				4CE3777583A04593187E830A /* ExpandingTextEditor.swift */,
+				FAE0667877BD5816BB5FE3A8 /* SendButton.swift */,
+			);
+			path = Composer;
+			sourceTree = "<group>";
+		};
+		A8BE00BF8BFB68B42408E81A /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				9B46C60401F589EBF3BE74BC /* AppIcon.icns */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		C3A9FEFB1A70B46CBB58DC71 /* MessageBridgeClient */ = {
+			isa = PBXGroup;
+			children = (
+				C6258D1618E382A8B85E09BA /* App */,
+				A8BE00BF8BFB68B42408E81A /* Resources */,
+				4940184A5C39528515294A24 /* Views */,
+			);
+			name = MessageBridgeClient;
+			path = Sources/MessageBridgeClient;
+			sourceTree = "<group>";
+		};
+		C6258D1618E382A8B85E09BA /* App */ = {
+			isa = PBXGroup;
+			children = (
+				016F9A3C4C24B6CB916FE913 /* MessageBridgeApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		F585FE9D2E5C422B5AF7F1A3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D12BBCACEF74356DDDD5C473 /* MessageBridge.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8E417DE00E5B8488A1C0FD32 /* MessageBridge */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FBB4D29185A0E4E9816BB6B6 /* Build configuration list for PBXNativeTarget "MessageBridge" */;
+			buildPhases = (
+				C1CF32C0F3F2CF1A67B9091A /* Sources */,
+				7F52ED9538845FA2C6619991 /* Resources */,
+				79FBFA87EE74E32303F503DC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MessageBridge;
+			packageProductDependencies = (
+				D1FD14E3F5D24716D8F3193A /* MessageBridgeClientCore */,
+			);
+			productName = MessageBridge;
+			productReference = D12BBCACEF74356DDDD5C473 /* MessageBridge.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		61CB35CC9D09D5CA9A7399DA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = AB763E3B5B1F58886B6EFE54 /* Build configuration list for PBXProject "MessageBridgeClient" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 35B558B873B26CD7F593411C;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C96BC3050806AC77C00115AF /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8E417DE00E5B8488A1C0FD32 /* MessageBridge */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7F52ED9538845FA2C6619991 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3BB91DED4407337BBA526910 /* AppIcon.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C1CF32C0F3F2CF1A67B9091A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				05EBF7E9EB5CBF0B522F5405 /* AttachmentView.swift in Sources */,
+				196DAE2631700C90C1FB777C /* ComposerToolbar.swift in Sources */,
+				803BFD217C8A8E3D349E0879 /* ComposerView.swift in Sources */,
+				8632136486D56B3C8DBCEB8D /* ContactDetailsView.swift in Sources */,
+				4303A216A3E99B50D2798D50 /* ContentView.swift in Sources */,
+				6B7E1354BB786F73ED15A2A0 /* ConversationListView.swift in Sources */,
+				2589A533DFECD3A7BC3DA67A /* ExpandingTextEditor.swift in Sources */,
+				B26CFB38AFB3CB17844AFE90 /* LogViewerView.swift in Sources */,
+				2FC8EE6704061A9DD7D0F98F /* MessageBridgeApp.swift in Sources */,
+				A01C6662BEFD9CF0ACFBD202 /* MessageThreadView.swift in Sources */,
+				5A702A2C939C2CFF094B3A4D /* SendButton.swift in Sources */,
+				E4A70B04BFD8D0BDF3B51A93 /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0CEA2CC7620D08FCDDE08A0A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		3B02A028DC2957E93F7D49F9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		6F01176C00AA52D181FC184D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = MessageBridge.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.messagebridge.client;
+				PRODUCT_NAME = MessageBridge;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		E0B05BCC0FEA0F9445F5DDCE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = MessageBridge.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.messagebridge.client;
+				PRODUCT_NAME = MessageBridge;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AB763E3B5B1F58886B6EFE54 /* Build configuration list for PBXProject "MessageBridgeClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3B02A028DC2957E93F7D49F9 /* Debug */,
+				0CEA2CC7620D08FCDDE08A0A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FBB4D29185A0E4E9816BB6B6 /* Build configuration list for PBXNativeTarget "MessageBridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6F01176C00AA52D181FC184D /* Debug */,
+				E0B05BCC0FEA0F9445F5DDCE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		C96BC3050806AC77C00115AF /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D1FD14E3F5D24716D8F3193A /* MessageBridgeClientCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MessageBridgeClientCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 61CB35CC9D09D5CA9A7399DA /* Project object */;
+}
