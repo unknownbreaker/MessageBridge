@@ -179,7 +179,9 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             m.attributedBody,
             m.date,
             m.is_from_me,
-            m.handle_id
+            m.handle_id,
+            m.balloon_bundle_id,
+            m.payload_data
         FROM message m
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
@@ -211,6 +213,29 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         let dateDeliveredRaw: Int64? = row["date_delivered"]
         let dateReadRaw: Int64? = row["date_read"]
 
+        // Extract link preview from payload_data if this is a URL balloon
+        var linkPreview: LinkPreview? = nil
+        let balloonBundleId: String? = row["balloon_bundle_id"]
+        if balloonBundleId == "com.apple.messages.URLBalloonProvider",
+          let payloadData: Data = row["payload_data"]
+        {
+          linkPreview = LinkPreviewExtractor.extract(from: payloadData)
+        }
+
+        // Get preview image from plugin payload attachments
+        if linkPreview != nil {
+          let previewImageBase64 = self.fetchLinkPreviewImage(db: db, messageId: messageId)
+          if let imageBase64 = previewImageBase64 {
+            linkPreview = LinkPreview(
+              url: linkPreview!.url,
+              title: linkPreview!.title,
+              summary: linkPreview!.summary,
+              siteName: linkPreview!.siteName,
+              imageBase64: imageBase64
+            )
+          }
+        }
+
         return Message(
           id: messageId,
           guid: row["guid"],
@@ -219,7 +244,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
           isFromMe: (row["is_from_me"] as Int?) == 1,
           handleId: row["handle_id"],
           conversationId: conversationId,
-          attachments: attachments
+          attachments: attachments,
+          linkPreview: linkPreview
         )
       }
     }
@@ -668,6 +694,28 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
       return (attachment, expandedPath)
     }
+  }
+
+  /// Fetch the preview image for a link preview message.
+  /// Looks for pluginPayloadAttachment image files and generates a thumbnail.
+  private nonisolated func fetchLinkPreviewImage(db: Database, messageId: Int64) -> String? {
+    let sql = """
+      SELECT a.filename as file_path, a.mime_type
+      FROM attachment a
+      JOIN message_attachment_join maj ON a.ROWID = maj.attachment_id
+      WHERE maj.message_id = ?
+        AND a.transfer_name LIKE '%pluginPayloadAttachment%'
+        AND (a.mime_type LIKE 'image/%' OR a.uti LIKE '%image%')
+      LIMIT 1
+      """
+
+    guard let row = try? Row.fetchOne(db, sql: sql, arguments: [messageId]),
+      let filePath: String = row["file_path"]
+    else {
+      return nil
+    }
+
+    return generateThumbnail(forFilePath: filePath)
   }
 
   /// Generate a thumbnail for an image file (max 300x300)
