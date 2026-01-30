@@ -17,6 +17,22 @@ public class MessagesViewModel: ObservableObject {
   @Published public var lastError: Error?
   @Published public var selectedConversationId: String?
 
+  public struct PaginationState {
+    public var offset: Int = 0
+    public var hasMore: Bool = true
+    public var isLoadingMore: Bool = false
+
+    public init(offset: Int = 0, hasMore: Bool = true, isLoadingMore: Bool = false) {
+      self.offset = offset
+      self.hasMore = hasMore
+      self.isLoadingMore = isLoadingMore
+    }
+  }
+
+  public private(set) var paginationState: [String: PaginationState] = [:]
+
+  private let pageSize = 30
+
   private let bridgeService: any BridgeServiceProtocol
   private let notificationManager: NotificationManager
   private var cancellables = Set<AnyCancellable>()
@@ -332,8 +348,13 @@ public class MessagesViewModel: ObservableObject {
     logDebug("Loading messages for conversation: \(conversationId)")
     do {
       let msgs = try await bridgeService.fetchMessages(
-        conversationId: conversationId, limit: 50, offset: 0)
+        conversationId: conversationId, limit: pageSize, offset: 0)
       messages[conversationId] = msgs
+      paginationState[conversationId] = PaginationState(
+        offset: msgs.count,
+        hasMore: msgs.count >= pageSize,
+        isLoadingMore: false
+      )
       logDebug("Loaded \(msgs.count) messages for conversation \(conversationId)")
     } catch {
       logError("Failed to load messages for conversation \(conversationId)", error: error)

@@ -496,6 +496,43 @@ final class MessagesViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.messages["chat-1"]?.first?.text, "Hey there!")
     XCTAssertNil(viewModel.messages["chat-2"])
   }
+
+  // MARK: - Pagination Tests
+
+  func testLoadMessages_setsPaginationState() async {
+    let mockService = MockBridgeService()
+    // Return exactly 30 messages (full page = hasMore)
+    let messages = (0..<30).map { i in
+      Message(
+        id: Int64(i), guid: "msg-\(i)", text: "Message \(i)",
+        date: Date(), isFromMe: false, handleId: nil, conversationId: "chat-1")
+    }
+    await mockService.setMessagesToReturn(messages)
+    let viewModel = createViewModel(mockService: mockService)
+
+    await viewModel.loadMessages(for: "chat-1")
+
+    XCTAssertEqual(viewModel.messages["chat-1"]?.count, 30)
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.offset, 30)
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.hasMore, true)
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.isLoadingMore, false)
+  }
+
+  func testLoadMessages_lessThanPageSize_setsHasMoreFalse() async {
+    let mockService = MockBridgeService()
+    // Return fewer than 30 messages = no more pages
+    let messages = (0..<10).map { i in
+      Message(
+        id: Int64(i), guid: "msg-\(i)", text: "Message \(i)",
+        date: Date(), isFromMe: false, handleId: nil, conversationId: "chat-1")
+    }
+    await mockService.setMessagesToReturn(messages)
+    let viewModel = createViewModel(mockService: mockService)
+
+    await viewModel.loadMessages(for: "chat-1")
+
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.hasMore, false)
+  }
 }
 
 // MARK: - MockBridgeService Helpers
@@ -507,5 +544,9 @@ extension MockBridgeService {
 
   func setConversationsToReturn(_ conversations: [Conversation]) {
     conversationsToReturn = conversations
+  }
+
+  func setMessagesToReturn(_ messages: [Message]) {
+    messagesToReturn = messages
   }
 }
