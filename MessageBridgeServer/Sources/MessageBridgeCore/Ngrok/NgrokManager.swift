@@ -558,12 +558,12 @@ public actor NgrokManager: TunnelProvider {
   }
 
   /// Save authtoken to Keychain and configure ngrok CLI.
-  public func saveAuthToken(_ token: String) async throws {
+  public func saveAuthToken(_ token: String, configFilePath: String? = nil) async throws {
     // Save to Keychain
     try saveAuthTokenToKeychain(token)
 
     // Configure ngrok CLI if binary is available
-    if let binaryPath = findBinary() {
+    if let binaryPath = findBinary(), configFilePath == nil {
       let process = Process()
       process.executableURL = URL(fileURLWithPath: binaryPath)
       process.arguments = ["config", "add-authtoken", token]
@@ -580,6 +580,9 @@ public actor NgrokManager: TunnelProvider {
         let output = String(data: data, encoding: .utf8) ?? "Unknown error"
         throw TunnelError.connectionFailed("Failed to configure ngrok authtoken: \(output)")
       }
+    } else {
+      // Binary not found or explicit config path — write directly to config file
+      try writeAuthTokenToConfigFile(token, path: configFilePath)
     }
   }
 
@@ -671,6 +674,44 @@ public actor NgrokManager: TunnelProvider {
     guard status == errSecSuccess else {
       throw TunnelError.connectionFailed("Failed to save authtoken to Keychain: \(status)")
     }
+  }
+
+  /// Write authtoken directly to ngrok YAML config file.
+  /// Used as fallback when the ngrok binary is not available.
+  private nonisolated func writeAuthTokenToConfigFile(_ token: String, path: String? = nil)
+    throws
+  {
+    let configPath =
+      path
+      ?? NSString(string: "~/.config/ngrok/ngrok.yml").expandingTildeInPath
+
+    let configURL = URL(fileURLWithPath: configPath)
+    let parentDir = configURL.deletingLastPathComponent()
+
+    // Create parent directory if needed
+    try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+
+    let newContent: String
+    if FileManager.default.fileExists(atPath: configPath),
+      let existing = try? String(contentsOfFile: configPath, encoding: .utf8)
+    {
+      // Parse existing config and replace or insert authtoken
+      var lines = existing.components(separatedBy: "\n")
+      if let index = lines.firstIndex(where: {
+        $0.trimmingCharacters(in: .whitespaces).hasPrefix("authtoken:")
+      }) {
+        lines[index] = "authtoken: \(token)"
+      } else {
+        // Insert after first line (typically "version:")
+        let insertIndex = lines.count > 1 ? 1 : lines.count
+        lines.insert("authtoken: \(token)", at: insertIndex)
+      }
+      newContent = lines.joined(separator: "\n")
+    } else {
+      newContent = "version: \"2\"\nauthtoken: \(token)\n"
+    }
+
+    try newContent.write(toFile: configPath, atomically: true, encoding: .utf8)
   }
 }
 
