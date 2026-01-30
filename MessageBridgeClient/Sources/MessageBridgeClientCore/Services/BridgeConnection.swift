@@ -82,6 +82,7 @@ struct ProcessedMessageDTO: Codable {
     let attachments: [Attachment]?
     let dateDelivered: Date?
     let dateRead: Date?
+    let linkPreview: LinkPreview?
   }
 
   func toMessage() -> Message {
@@ -98,7 +99,8 @@ struct ProcessedMessageDTO: Codable {
       highlights: highlights,
       mentions: mentions,
       dateDelivered: message.dateDelivered,
-      dateRead: message.dateRead
+      dateRead: message.dateRead,
+      linkPreview: message.linkPreview
     )
   }
 }
