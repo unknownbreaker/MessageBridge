@@ -210,6 +210,13 @@ struct MenuContentView: View {
       appState.copyAPIKey()
     }
 
+    if appState.tunnelStatus.isRunning {
+      Button("Copy Tunnel URL") {
+        debugLog("Copy Tunnel URL clicked")
+        appState.copyTunnelURL()
+      }
+    }
+
     Divider()
 
     Button("View Logs...") {
