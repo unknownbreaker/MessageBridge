@@ -518,6 +518,111 @@ final class MessagesViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.paginationState["chat-1"]?.isLoadingMore, false)
   }
 
+  func testLoadMoreMessages_appendsOlderMessages() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    // Simulate initial load already happened
+    let initialMessages = (0..<30).map { i in
+      Message(
+        id: Int64(100 + i), guid: "msg-\(100 + i)", text: "New \(i)",
+        date: Date(), isFromMe: false, handleId: nil, conversationId: "chat-1")
+    }
+    viewModel.messages["chat-1"] = initialMessages
+    viewModel.paginationState["chat-1"] = MessagesViewModel.PaginationState(
+      offset: 30, hasMore: true)
+
+    // Mock will return the next page
+    let olderMessages = (0..<30).map { i in
+      Message(
+        id: Int64(i), guid: "msg-\(i)", text: "Old \(i)",
+        date: Date(), isFromMe: false, handleId: nil, conversationId: "chat-1")
+    }
+    await mockService.setMessagesToReturn(olderMessages)
+
+    await viewModel.loadMoreMessages(for: "chat-1")
+
+    // Should have 60 total: 30 initial + 30 older appended at end
+    XCTAssertEqual(viewModel.messages["chat-1"]?.count, 60)
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.offset, 60)
+  }
+
+  func testLoadMoreMessages_whenNoMore_doesNothing() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    viewModel.messages["chat-1"] = []
+    viewModel.paginationState["chat-1"] = MessagesViewModel.PaginationState(
+      offset: 10, hasMore: false)
+
+    await viewModel.loadMoreMessages(for: "chat-1")
+
+    let fetchCalled = await mockService.fetchMessagesCalled
+    XCTAssertFalse(fetchCalled)
+  }
+
+  func testLoadMoreMessages_whenAlreadyLoading_doesNothing() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    viewModel.messages["chat-1"] = []
+    viewModel.paginationState["chat-1"] = MessagesViewModel.PaginationState(
+      offset: 30, hasMore: true, isLoadingMore: true)
+
+    await viewModel.loadMoreMessages(for: "chat-1")
+
+    let fetchCalled = await mockService.fetchMessagesCalled
+    XCTAssertFalse(fetchCalled)
+  }
+
+  func testLoadMoreMessages_deduplicatesById() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    let existingMessage = Message(
+      id: 5, guid: "msg-5", text: "Existing",
+      date: Date(), isFromMe: false, handleId: nil, conversationId: "chat-1")
+    viewModel.messages["chat-1"] = [existingMessage]
+    viewModel.paginationState["chat-1"] = MessagesViewModel.PaginationState(
+      offset: 1, hasMore: true)
+
+    // Return a page that includes a duplicate
+    let duplicate = Message(
+      id: 5, guid: "msg-5", text: "Existing",
+      date: Date(), isFromMe: false, handleId: nil, conversationId: "chat-1")
+    let newMessage = Message(
+      id: 4, guid: "msg-4", text: "Older",
+      date: Date(), isFromMe: false, handleId: nil, conversationId: "chat-1")
+    await mockService.setMessagesToReturn([duplicate, newMessage])
+
+    await viewModel.loadMoreMessages(for: "chat-1")
+
+    // Should have 2, not 3 — duplicate skipped
+    XCTAssertEqual(viewModel.messages["chat-1"]?.count, 2)
+  }
+
+  func testLoadMoreMessages_error_keepsExistingState() async {
+    let mockService = MockBridgeService()
+    await mockService.setShouldThrowError(true)
+    let viewModel = createViewModel(mockService: mockService)
+
+    viewModel.messages["chat-1"] = [
+      Message(
+        id: 1, guid: "msg-1", text: "Hello", date: Date(),
+        isFromMe: false, handleId: nil, conversationId: "chat-1")
+    ]
+    viewModel.paginationState["chat-1"] = MessagesViewModel.PaginationState(
+      offset: 1, hasMore: true)
+
+    await viewModel.loadMoreMessages(for: "chat-1")
+
+    // Messages unchanged, offset unchanged, still hasMore
+    XCTAssertEqual(viewModel.messages["chat-1"]?.count, 1)
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.offset, 1)
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.hasMore, true)
+    XCTAssertEqual(viewModel.paginationState["chat-1"]?.isLoadingMore, false)
+  }
+
   func testLoadMessages_lessThanPageSize_setsHasMoreFalse() async {
     let mockService = MockBridgeService()
     // Return fewer than 30 messages = no more pages

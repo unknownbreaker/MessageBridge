@@ -29,7 +29,7 @@ public class MessagesViewModel: ObservableObject {
     }
   }
 
-  public private(set) var paginationState: [String: PaginationState] = [:]
+  public var paginationState: [String: PaginationState] = [:]
 
   private let pageSize = 30
 
@@ -358,6 +358,36 @@ public class MessagesViewModel: ObservableObject {
       logDebug("Loaded \(msgs.count) messages for conversation \(conversationId)")
     } catch {
       logError("Failed to load messages for conversation \(conversationId)", error: error)
+    }
+  }
+
+  public func loadMoreMessages(for conversationId: String) async {
+    guard var state = paginationState[conversationId],
+      state.hasMore, !state.isLoadingMore
+    else { return }
+
+    state.isLoadingMore = true
+    paginationState[conversationId] = state
+
+    do {
+      let olderMessages = try await bridgeService.fetchMessages(
+        conversationId: conversationId, limit: pageSize, offset: state.offset)
+
+      // Deduplicate by ID
+      let existingIds = Set(messages[conversationId, default: []].map { $0.id })
+      let newMessages = olderMessages.filter { !existingIds.contains($0.id) }
+
+      messages[conversationId, default: []].append(contentsOf: newMessages)
+      paginationState[conversationId] = PaginationState(
+        offset: state.offset + olderMessages.count,
+        hasMore: olderMessages.count >= pageSize,
+        isLoadingMore: false
+      )
+      logDebug("Loaded \(newMessages.count) more messages for \(conversationId)")
+    } catch {
+      state.isLoadingMore = false
+      paginationState[conversationId] = state
+      logError("Failed to load more messages for \(conversationId)", error: error)
     }
   }
 
