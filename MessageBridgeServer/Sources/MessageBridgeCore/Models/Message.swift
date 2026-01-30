@@ -14,11 +14,12 @@ public struct Message: Content, Identifiable, Sendable {
   public var tapbacks: [Tapback]
   public var dateDelivered: Date?
   public var dateRead: Date?
+  public var linkPreview: LinkPreview?
 
   public init(
     id: Int64, guid: String, text: String?, date: Date, isFromMe: Bool, handleId: Int64?,
     conversationId: String, attachments: [Attachment] = [], tapbacks: [Tapback] = [],
-    dateDelivered: Date? = nil, dateRead: Date? = nil
+    dateDelivered: Date? = nil, dateRead: Date? = nil, linkPreview: LinkPreview? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -31,6 +32,7 @@ public struct Message: Content, Identifiable, Sendable {
     self.tapbacks = tapbacks
     self.dateDelivered = dateDelivered
     self.dateRead = dateRead
+    self.linkPreview = linkPreview
   }
 
   /// Whether this message has text content (vs attachment-only or reaction)
