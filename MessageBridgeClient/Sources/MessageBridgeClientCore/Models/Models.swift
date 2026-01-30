@@ -170,14 +170,56 @@ public enum AttachmentType: String, Codable, Sendable {
   case document
 }
 
+// MARK: - LinkPreview
+
+/// Rich link preview metadata from server (extracted from iMessage payload_data)
+public struct LinkPreview: Codable, Hashable, Sendable {
+  public let url: String
+  public let title: String?
+  public let summary: String?
+  public let siteName: String?
+  public let imageBase64: String?
+
+  public init(
+    url: String,
+    title: String? = nil,
+    summary: String? = nil,
+    siteName: String? = nil,
+    imageBase64: String? = nil
+  ) {
+    self.url = url
+    self.title = title
+    self.summary = summary
+    self.siteName = siteName
+    self.imageBase64 = imageBase64
+  }
+
+  /// Extract domain from URL for display (e.g., "apple.com" from "https://www.apple.com/...")
+  public var domain: String {
+    guard let urlObj = URL(string: url), let host = urlObj.host() else {
+      return url
+    }
+    if host.hasPrefix("www.") {
+      return String(host.dropFirst(4))
+    }
+    return host
+  }
+
+  /// Decoded image data from base64
+  public var imageData: Data? {
+    guard let imageBase64 = imageBase64 else { return nil }
+    return Data(base64Encoded: imageBase64)
+  }
+}
+
 // MARK: - DeliveryStatus
 
 /// Delivery status of a sent message
 public enum DeliveryStatus: String, Codable, Sendable {
-  case none       // Received messages (no status shown)
-  case sent       // Sent, no delivery confirmation yet
+  case none  // Received messages (no status shown)
+  case sent  // Sent, no delivery confirmation yet
   case delivered  // Delivered to recipient's device
-  case read       // Recipient opened conversation
+  case read  // Recipient opened conversation
 }
 
 // MARK: - Message
@@ -197,11 +239,12 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
   public var tapbacks: [Tapback]?
   public let dateDelivered: Date?
   public let dateRead: Date?
+  public let linkPreview: LinkPreview?
 
   enum CodingKeys: String, CodingKey {
     case id, guid, text, date, isFromMe, handleId, conversationId, attachments
     case detectedCodes, highlights, mentions, tapbacks
-    case dateDelivered, dateRead
+    case dateDelivered, dateRead, linkPreview
   }
 
   public init(
@@ -212,7 +255,8 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     mentions: [Mention]? = nil,
     tapbacks: [Tapback]? = nil,
     dateDelivered: Date? = nil,
-    dateRead: Date? = nil
+    dateRead: Date? = nil,
+    linkPreview: LinkPreview? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -228,6 +272,7 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     self.tapbacks = tapbacks
     self.dateDelivered = dateDelivered
     self.dateRead = dateRead
+    self.linkPreview = linkPreview
   }
 
   public init(from decoder: Decoder) throws {
@@ -246,6 +291,7 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     tapbacks = try container.decodeIfPresent([Tapback].self, forKey: .tapbacks)
     dateDelivered = try container.decodeIfPresent(Date.self, forKey: .dateDelivered)
     dateRead = try container.decodeIfPresent(Date.self, forKey: .dateRead)
+    linkPreview = try container.decodeIfPresent(LinkPreview.self, forKey: .linkPreview)
   }
 
   public var hasText: Bool {
