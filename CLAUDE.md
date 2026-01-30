@@ -12,14 +12,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Link Preview & Attachment Filtering
-- Filtered junk attachments (pluginPayloadAttachment, stickers, zero-byte) server-side via `Attachment.shouldFilter`
-- Added `LinkPreview` model to server and client `Message`
-- Server extracts `LPLinkMetadata` from `message.payload_data` via `NSKeyedUnarchiver`
-- Server generates preview image thumbnails from pluginPayloadAttachment files
-- Client renders iMessage-style link preview cards (image + title + domain)
-- Removed unused `LinkPreviewCache` and `LinkPreviewView` (no more client-side URL fetching)
-- All 496 server tests + 319 client tests pass
+**Last Session:** Tunnel URL Copy & ngrok Token Persistence
+- Added "Copy Tunnel URL" button to menu bar popover (visible when tunnel is running)
+- Fixed ngrok auth token persistence across Xcode rebuilds by writing directly to `~/.config/ngrok/ngrok.yml` when binary unavailable
+- Added Keychain self-healing: `detectAuthToken` re-saves to Keychain when found in config file but missing from Keychain
+- All 500 server tests + 319 client tests pass
 
 **Known Blockers:** None
 
