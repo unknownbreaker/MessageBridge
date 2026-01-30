@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Renderer for messages containing URLs.
+/// Renderer for messages with rich link previews.
 ///
-/// Displays the message text followed by a simple link card.
-/// Uses the existing URLDetector for URL detection.
+/// Displays an iMessage-style card with image, title, and domain.
+/// Uses server-provided metadata extracted from iMessage's payload_data.
 public struct LinkPreviewRenderer: MessageRenderer {
   public let id = "link-preview"
   public let priority = 100
@@ -11,48 +11,80 @@ public struct LinkPreviewRenderer: MessageRenderer {
   public init() {}
 
   public func canRender(_ message: Message) -> Bool {
-    guard let text = message.text, !text.isEmpty else { return false }
-    return URLDetector.containsURL(in: text)
+    message.linkPreview != nil
   }
 
   @MainActor
   public func render(_ message: Message) -> AnyView {
-    let text = message.text ?? ""
-    let url = URLDetector.firstURL(in: text)
+    guard let preview = message.linkPreview else {
+      return AnyView(EmptyView())
+    }
 
     return AnyView(
       VStack(alignment: .leading, spacing: 4) {
-        Text(text)
-          .textSelection(.enabled)
-
-        if let url = url {
-          Link(destination: url) {
-            HStack(spacing: 8) {
-              Image(systemName: "link")
-                .foregroundStyle(.blue)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(url.host ?? url.absoluteString)
-                  .font(.caption)
-                  .fontWeight(.medium)
-                  .foregroundStyle(.primary)
-                  .lineLimit(1)
-                Text(url.absoluteString)
-                  .font(.caption2)
-                  .foregroundStyle(.secondary)
-                  .lineLimit(1)
-              }
-              Spacer()
-              Image(systemName: "arrow.up.right")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            .padding(10)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-          }
-          .frame(maxWidth: 280)
+        if let text = message.text, !text.isEmpty {
+          Text(text)
+            .textSelection(.enabled)
         }
+
+        LinkPreviewCard(preview: preview)
       }
     )
+  }
+}
+
+struct LinkPreviewCard: View {
+  let preview: LinkPreview
+
+  var body: some View {
+    Link(destination: URL(string: preview.url) ?? URL(string: "about:blank")!) {
+      VStack(alignment: .leading, spacing: 0) {
+        if let imageData = preview.imageData,
+          let nsImage = NSImage(data: imageData)
+        {
+          Image(nsImage: nsImage)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(maxWidth: 280, maxHeight: 200)
+            .clipped()
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+          if let title = preview.title, !title.isEmpty {
+            Text(title)
+              .font(.subheadline)
+              .fontWeight(.semibold)
+              .foregroundStyle(.primary)
+              .lineLimit(2)
+              .multilineTextAlignment(.leading)
+          }
+
+          if let summary = preview.summary, !summary.isEmpty {
+            Text(summary)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(2)
+              .multilineTextAlignment(.leading)
+          }
+
+          HStack(spacing: 4) {
+            Image(systemName: "link")
+              .font(.caption2)
+            Text(preview.domain)
+              .font(.caption)
+          }
+          .foregroundStyle(.secondary)
+        }
+        .padding(10)
+      }
+      .frame(maxWidth: 280)
+      .background(Color(nsColor: .controlBackgroundColor))
+      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .overlay(
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+      )
+    }
+    .buttonStyle(.plain)
   }
 }
