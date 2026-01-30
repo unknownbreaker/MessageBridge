@@ -4,6 +4,8 @@ import SwiftUI
 ///
 /// Displays an iMessage-style card with image, title, and domain.
 /// Uses server-provided metadata extracted from iMessage's payload_data.
+/// The URL is stripped from the message text — if the text is only a URL,
+/// no text is shown. If there's additional text, it appears below the card.
 public struct LinkPreviewRenderer: MessageRenderer {
   public let id = "link-preview"
   public let priority = 100
@@ -20,25 +22,32 @@ public struct LinkPreviewRenderer: MessageRenderer {
       return AnyView(EmptyView())
     }
 
-    return AnyView(
-      VStack(alignment: .leading, spacing: 4) {
-        if let text = message.text, !text.isEmpty {
-          Text(text)
-            .textSelection(.enabled)
-        }
+    let strippedText = Self.stripURL(preview.url, from: message.text)
 
-        LinkPreviewCard(preview: preview)
-      }
+    return AnyView(
+      LinkPreviewCard(preview: preview, strippedText: strippedText, isFromMe: message.isFromMe)
     )
+  }
+
+  /// Remove the link preview URL from the message text.
+  /// Returns nil if the remaining text is empty (i.e., the message was only a URL).
+  static func stripURL(_ url: String, from text: String?) -> String? {
+    guard let text = text else { return nil }
+    let stripped = text.replacingOccurrences(of: url, with: "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return stripped.isEmpty ? nil : stripped
   }
 }
 
 struct LinkPreviewCard: View {
   let preview: LinkPreview
+  let strippedText: String?
+  let isFromMe: Bool
 
   var body: some View {
     Link(destination: URL(string: preview.url) ?? URL(string: "about:blank")!) {
       VStack(alignment: .leading, spacing: 0) {
+        // Preview image — bleeds to edges of the bubble
         if let imageData = preview.imageData,
           let nsImage = NSImage(data: imageData)
         {
@@ -49,20 +58,13 @@ struct LinkPreviewCard: View {
             .clipped()
         }
 
-        VStack(alignment: .leading, spacing: 4) {
+        // Title and domain
+        VStack(alignment: .leading, spacing: 2) {
           if let title = preview.title, !title.isEmpty {
             Text(title)
               .font(.subheadline)
               .fontWeight(.semibold)
-              .foregroundStyle(.primary)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-          }
-
-          if let summary = preview.summary, !summary.isEmpty {
-            Text(summary)
-              .font(.caption)
-              .foregroundStyle(.secondary)
+              .foregroundStyle(isFromMe ? .white : .primary)
               .lineLimit(2)
               .multilineTextAlignment(.leading)
           }
@@ -73,17 +75,24 @@ struct LinkPreviewCard: View {
             Text(preview.domain)
               .font(.caption)
           }
-          .foregroundStyle(.secondary)
+          .foregroundStyle(isFromMe ? .white.opacity(0.7) : .secondary)
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+
+        // Stripped message text below the card
+        if let text = strippedText {
+          Divider()
+            .opacity(0.3)
+          Text(text)
+            .font(.body)
+            .foregroundStyle(isFromMe ? .white : .primary)
+            .textSelection(.enabled)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+        }
       }
       .frame(maxWidth: 280)
-      .background(Color(nsColor: .controlBackgroundColor))
-      .clipShape(RoundedRectangle(cornerRadius: 12))
-      .overlay(
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-      )
     }
     .buttonStyle(.plain)
   }

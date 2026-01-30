@@ -35,6 +35,36 @@ final class LinkPreviewRendererTests: XCTestCase {
     XCTAssertFalse(renderer.canRender(message))
   }
 
+  // MARK: - URL Stripping
+
+  func testStripURL_textIsOnlyURL_returnsNil() {
+    let result = LinkPreviewRenderer.stripURL("https://apple.com", from: "https://apple.com")
+    XCTAssertNil(result)
+  }
+
+  func testStripURL_textHasURLAndWords_returnsWordsOnly() {
+    let result = LinkPreviewRenderer.stripURL(
+      "https://apple.com", from: "Check this out https://apple.com")
+    XCTAssertEqual(result, "Check this out")
+  }
+
+  func testStripURL_textIsNil_returnsNil() {
+    let result = LinkPreviewRenderer.stripURL("https://apple.com", from: nil)
+    XCTAssertNil(result)
+  }
+
+  func testStripURL_urlNotInText_returnsFullText() {
+    let result = LinkPreviewRenderer.stripURL(
+      "https://apple.com", from: "Check this out")
+    XCTAssertEqual(result, "Check this out")
+  }
+
+  func testStripURL_urlWithSurroundingWhitespace_trimmed() {
+    let result = LinkPreviewRenderer.stripURL(
+      "https://apple.com", from: "  https://apple.com  ")
+    XCTAssertNil(result)
+  }
+
   private func makeMessage(_ text: String?, linkPreview: LinkPreview? = nil) -> Message {
     Message(
       id: 1, guid: "g1", text: text, date: Date(), isFromMe: true, handleId: nil,

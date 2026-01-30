@@ -178,11 +178,13 @@ struct MessageBubble: View {
         }
 
         // Display text if present - delegated to RendererRegistry
-        if message.hasText {
-          RendererRegistry.shared.renderer(for: message)
-            .render(message)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+        if message.hasText || message.linkPreview != nil {
+          let renderer = RendererRegistry.shared.renderer(for: message)
+          let isLinkPreview = message.linkPreview != nil
+
+          renderer.render(message)
+            .padding(.horizontal, isLinkPreview ? 0 : 12)
+            .padding(.vertical, isLinkPreview ? 0 : 8)
             .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
             .foregroundStyle(message.isFromMe ? .white : .primary)
             .clipShape(RoundedRectangle(cornerRadius: 16))
