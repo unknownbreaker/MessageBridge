@@ -533,22 +533,31 @@ public actor NgrokManager: TunnelProvider {
 
   /// Detect an existing authtoken from ngrok config files or Keychain.
   /// Checks modern config path first, then legacy, then Keychain.
-  public nonisolated func detectAuthToken() -> String? {
-    // macOS ngrok v3 config path (platform-native)
-    let macOSPath = FileManager.default.urls(
-      for: .applicationSupportDirectory, in: .userDomainMask
-    ).first?.appendingPathComponent("ngrok/ngrok.yml").path
+  /// If found in config but not Keychain, re-saves to Keychain (self-healing).
+  public nonisolated func detectAuthToken(configPaths: [String]? = nil) -> String? {
+    let paths: [String]
+    if let configPaths = configPaths {
+      paths = configPaths
+    } else {
+      let macOSPath = FileManager.default.urls(
+        for: .applicationSupportDirectory, in: .userDomainMask
+      ).first?.appendingPathComponent("ngrok/ngrok.yml").path
 
-    // XDG ngrok v3 config path (Linux convention, sometimes used on macOS)
-    let xdgPath = FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent(".config/ngrok/ngrok.yml").path
+      let xdgPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".config/ngrok/ngrok.yml").path
 
-    // Legacy ngrok v2 config path
-    let legacyPath = FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent(".ngrok2/ngrok.yml").path
+      let legacyPath = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".ngrok2/ngrok.yml").path
 
-    for path in [macOSPath, xdgPath, legacyPath].compactMap({ $0 }) {
+      paths = [macOSPath, xdgPath, legacyPath].compactMap { $0 }
+    }
+
+    for path in paths {
       if let token = parseAuthTokenFromConfig(at: path) {
+        // Self-heal: if Keychain doesn't have it, re-save
+        if retrieveAuthTokenFromKeychain() == nil {
+          try? saveAuthTokenToKeychain(token)
+        }
         return token
       }
     }

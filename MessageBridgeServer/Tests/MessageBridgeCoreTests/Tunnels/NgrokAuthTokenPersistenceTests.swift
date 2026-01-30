@@ -42,4 +42,20 @@ final class NgrokAuthTokenPersistenceTests: XCTestCase {
     XCTAssertTrue(contents.contains("authtoken: new-token-789"))
     XCTAssertFalse(contents.contains("old-token"))
   }
+
+  func testDetectAuthTokenFindsTokenFromConfigFile() throws {
+    // Given: a config file with a token
+    try FileManager.default.createDirectory(at: testConfigDir, withIntermediateDirectories: true)
+    let configPath = testConfigDir.appendingPathComponent("ngrok.yml")
+    try "authtoken: found-me-123\n".write(
+      toFile: configPath.path, atomically: true, encoding: .utf8)
+
+    let manager = NgrokManager()
+
+    // When: detecting with custom config path
+    let token = manager.detectAuthToken(configPaths: [configPath.path])
+
+    // Then: token is found
+    XCTAssertEqual(token, "found-me-123")
+  }
 }
