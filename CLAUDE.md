@@ -12,13 +12,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** M4.2 Read Receipts
-- Added `dateDelivered` and `dateRead` to Message models (server + client)
-- Added `DecoratorContext` to BubbleDecorator protocol for position-aware decorating
-- Implemented ReadReceiptDecorator (bottomTrailing position, iMessage-native style)
-- Wired up decorator context passing in MessageBubble
-- Mark-as-read was already implemented via selectConversation()
-- All client tests + all server tests pass
+**Last Session:** Link Preview & Attachment Filtering
+- Filtered junk attachments (pluginPayloadAttachment, stickers, zero-byte) server-side via `Attachment.shouldFilter`
+- Added `LinkPreview` model to server and client `Message`
+- Server extracts `LPLinkMetadata` from `message.payload_data` via `NSKeyedUnarchiver`
+- Server generates preview image thumbnails from pluginPayloadAttachment files
+- Client renders iMessage-style link preview cards (image + title + domain)
+- Removed unused `LinkPreviewCache` and `LinkPreviewView` (no more client-side URL fetching)
+- All 496 server tests + 319 client tests pass
 
 **Known Blockers:** None
 
