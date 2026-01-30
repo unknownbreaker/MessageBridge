@@ -3,7 +3,8 @@ import XCTest
 @testable import MessageBridgeClientCore
 
 final class BubbleDecoratorTests: XCTestCase {
-  let context = DecoratorContext(isLastSentMessage: false, isLastMessage: false, conversationId: "c1")
+  let context = DecoratorContext(
+    isLastSentMessage: false, isLastMessage: false, conversationId: "c1")
 
   func testMock_hasId() {
     XCTAssertEqual(MockBubbleDecorator(id: "test").id, "test")

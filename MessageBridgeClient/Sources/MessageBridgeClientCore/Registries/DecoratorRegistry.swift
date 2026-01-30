@@ -15,12 +15,16 @@ public final class DecoratorRegistry: @unchecked Sendable {
     decorators.append(decorator)
   }
 
-  public func decorators(for message: Message, at position: DecoratorPosition, context: DecoratorContext)
+  public func decorators(
+    for message: Message, at position: DecoratorPosition, context: DecoratorContext
+  )
     -> [any BubbleDecorator]
   {
     lock.lock()
     defer { lock.unlock() }
-    return decorators.filter { $0.position == position && $0.shouldDecorate(message, context: context) }
+    return decorators.filter {
+      $0.position == position && $0.shouldDecorate(message, context: context)
+    }
   }
 
   public var all: [any BubbleDecorator] {

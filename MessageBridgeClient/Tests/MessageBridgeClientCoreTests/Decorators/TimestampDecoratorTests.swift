@@ -4,7 +4,8 @@ import XCTest
 
 final class TimestampDecoratorTests: XCTestCase {
   let decorator = TimestampDecorator()
-  let context = DecoratorContext(isLastSentMessage: false, isLastMessage: false, conversationId: "c1")
+  let context = DecoratorContext(
+    isLastSentMessage: false, isLastMessage: false, conversationId: "c1")
 
   func testId() { XCTAssertEqual(decorator.id, "timestamp") }
   func testPosition_isBelow() { XCTAssertEqual(decorator.position, .below) }

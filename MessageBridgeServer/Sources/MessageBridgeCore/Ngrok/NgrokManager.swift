@@ -534,15 +534,20 @@ public actor NgrokManager: TunnelProvider {
   /// Detect an existing authtoken from ngrok config files or Keychain.
   /// Checks modern config path first, then legacy, then Keychain.
   public nonisolated func detectAuthToken() -> String? {
-    // Modern ngrok v3 config path
-    let modernPath = FileManager.default.homeDirectoryForCurrentUser
+    // macOS ngrok v3 config path (platform-native)
+    let macOSPath = FileManager.default.urls(
+      for: .applicationSupportDirectory, in: .userDomainMask
+    ).first?.appendingPathComponent("ngrok/ngrok.yml").path
+
+    // XDG ngrok v3 config path (Linux convention, sometimes used on macOS)
+    let xdgPath = FileManager.default.homeDirectoryForCurrentUser
       .appendingPathComponent(".config/ngrok/ngrok.yml").path
 
     // Legacy ngrok v2 config path
     let legacyPath = FileManager.default.homeDirectoryForCurrentUser
       .appendingPathComponent(".ngrok2/ngrok.yml").path
 
-    for path in [modernPath, legacyPath] {
+    for path in [macOSPath, xdgPath, legacyPath].compactMap({ $0 }) {
       if let token = parseAuthTokenFromConfig(at: path) {
         return token
       }

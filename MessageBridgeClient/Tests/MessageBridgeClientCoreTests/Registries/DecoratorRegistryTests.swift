@@ -3,7 +3,8 @@ import XCTest
 @testable import MessageBridgeClientCore
 
 final class DecoratorRegistryTests: XCTestCase {
-  let context = DecoratorContext(isLastSentMessage: false, isLastMessage: false, conversationId: "c1")
+  let context = DecoratorContext(
+    isLastSentMessage: false, isLastMessage: false, conversationId: "c1")
 
   override func setUp() {
     super.setUp()
@@ -33,9 +34,12 @@ final class DecoratorRegistryTests: XCTestCase {
     DecoratorRegistry.shared.register(MockBubbleDecorator(id: "below", position: .below))
     DecoratorRegistry.shared.register(MockBubbleDecorator(id: "top", position: .topTrailing))
     let msg = makeMessage()
-    XCTAssertEqual(DecoratorRegistry.shared.decorators(for: msg, at: .below, context: context).count, 1)
-    XCTAssertEqual(DecoratorRegistry.shared.decorators(for: msg, at: .below, context: context)[0].id, "below")
-    XCTAssertEqual(DecoratorRegistry.shared.decorators(for: msg, at: .topTrailing, context: context).count, 1)
+    XCTAssertEqual(
+      DecoratorRegistry.shared.decorators(for: msg, at: .below, context: context).count, 1)
+    XCTAssertEqual(
+      DecoratorRegistry.shared.decorators(for: msg, at: .below, context: context)[0].id, "below")
+    XCTAssertEqual(
+      DecoratorRegistry.shared.decorators(for: msg, at: .topTrailing, context: context).count, 1)
   }
 
   func testDecorators_filtersByShouldDecorate() {
@@ -44,7 +48,8 @@ final class DecoratorRegistryTests: XCTestCase {
     hide.shouldDecorateResult = false
     DecoratorRegistry.shared.register(show)
     DecoratorRegistry.shared.register(hide)
-    let results = DecoratorRegistry.shared.decorators(for: makeMessage(), at: .below, context: context)
+    let results = DecoratorRegistry.shared.decorators(
+      for: makeMessage(), at: .below, context: context)
     XCTAssertEqual(results.count, 1)
     XCTAssertEqual(results[0].id, "show")
   }
@@ -52,12 +57,16 @@ final class DecoratorRegistryTests: XCTestCase {
   func testDecorators_returnsMultipleAtSamePosition() {
     DecoratorRegistry.shared.register(MockBubbleDecorator(id: "a", position: .below))
     DecoratorRegistry.shared.register(MockBubbleDecorator(id: "b", position: .below))
-    XCTAssertEqual(DecoratorRegistry.shared.decorators(for: makeMessage(), at: .below, context: context).count, 2)
+    XCTAssertEqual(
+      DecoratorRegistry.shared.decorators(for: makeMessage(), at: .below, context: context).count, 2
+    )
   }
 
   func testDecorators_emptyForUnusedPosition() {
     DecoratorRegistry.shared.register(MockBubbleDecorator(id: "a", position: .below))
-    XCTAssertTrue(DecoratorRegistry.shared.decorators(for: makeMessage(), at: .overlay, context: context).isEmpty)
+    XCTAssertTrue(
+      DecoratorRegistry.shared.decorators(for: makeMessage(), at: .overlay, context: context)
+        .isEmpty)
   }
 
   private func makeMessage() -> Message {
