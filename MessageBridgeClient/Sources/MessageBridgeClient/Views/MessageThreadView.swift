@@ -34,28 +34,51 @@ struct MessageThreadView: View {
       Divider()
 
       // Messages
-      ScrollView {
-        LazyVStack(spacing: 8) {
-          let reversedMessages = Array(messages.reversed())
-          ForEach(Array(reversedMessages.enumerated()), id: \.element.id) { index, message in
-            let previousMessage = index > 0 ? reversedMessages[index - 1] : nil
-            let showSenderInfo = shouldShowSenderInfo(
-              for: message, previousMessage: previousMessage)
-            let isLastMessage = index == reversedMessages.count - 1
-            let isLastSentMessage = message.isFromMe && !reversedMessages.dropFirst(index + 1).contains { $0.isFromMe }
-            MessageBubble(
-              message: message,
-              isGroupConversation: conversation.isGroup,
-              sender: senderForMessage(message),
-              showSenderInfo: showSenderInfo,
-              isLastSentMessage: isLastSentMessage,
-              isLastMessage: isLastMessage
-            )
+      ScrollViewReader { proxy in
+        ScrollView {
+          LazyVStack(spacing: 8) {
+            // Load-more sentinel at top of list
+            if let state = viewModel.paginationState[conversation.id] {
+              if state.isLoadingMore {
+                ProgressView()
+                  .frame(maxWidth: .infinity)
+                  .padding(.vertical, 8)
+              }
+
+              if state.hasMore && !state.isLoadingMore {
+                Color.clear
+                  .frame(height: 1)
+                  .onAppear {
+                    Task {
+                      await viewModel.loadMoreMessages(for: conversation.id)
+                    }
+                  }
+              }
+            }
+
+            let reversedMessages = Array(messages.reversed())
+            ForEach(Array(reversedMessages.enumerated()), id: \.element.id) { index, message in
+              let previousMessage = index > 0 ? reversedMessages[index - 1] : nil
+              let showSenderInfo = shouldShowSenderInfo(
+                for: message, previousMessage: previousMessage)
+              let isLastMessage = index == reversedMessages.count - 1
+              let isLastSentMessage =
+                message.isFromMe && !reversedMessages.dropFirst(index + 1).contains { $0.isFromMe }
+              MessageBubble(
+                message: message,
+                isGroupConversation: conversation.isGroup,
+                sender: senderForMessage(message),
+                showSenderInfo: showSenderInfo,
+                isLastSentMessage: isLastSentMessage,
+                isLastMessage: isLastMessage
+              )
+              .id(message.id)
+            }
           }
+          .padding()
         }
-        .padding()
+        .defaultScrollAnchor(.bottom)
       }
-      .defaultScrollAnchor(.bottom)
 
       Divider()
 
@@ -171,13 +194,19 @@ struct MessageBubble: View {
           isLastMessage: isLastMessage,
           conversationId: message.conversationId
         )
-        ForEach(DecoratorRegistry.shared.decorators(for: message, at: .below, context: decoratorContext), id: \.id) {
+        ForEach(
+          DecoratorRegistry.shared.decorators(for: message, at: .below, context: decoratorContext),
+          id: \.id
+        ) {
           decorator in
           decorator.decorate(message, context: decoratorContext)
         }
 
         // Bottom trailing decorators (read receipts)
-        ForEach(DecoratorRegistry.shared.decorators(for: message, at: .bottomTrailing, context: decoratorContext), id: \.id) {
+        ForEach(
+          DecoratorRegistry.shared.decorators(
+            for: message, at: .bottomTrailing, context: decoratorContext), id: \.id
+        ) {
           decorator in
           decorator.decorate(message, context: decoratorContext)
         }
