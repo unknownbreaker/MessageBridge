@@ -83,6 +83,15 @@ public struct Attachment: Content, Identifiable, Sendable {
   public var isAudio: Bool { attachmentType == .audio }
   public var isDocument: Bool { attachmentType == .document }
 
+  /// Whether this attachment should be filtered from display.
+  /// Filters: link preview payloads, stickers, zero-byte ghosts.
+  public var shouldFilter: Bool {
+    if isSticker { return true }
+    if size <= 0 { return true }
+    if filename.contains("pluginPayloadAttachment") { return true }
+    return false
+  }
+
   /// Human-readable file size (e.g., "1.2 MB")
   public var formattedSize: String {
     let formatter = ByteCountFormatter()

@@ -610,7 +610,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         isSticker: (row["is_sticker"] as Int?) == 1,
         thumbnailBase64: thumbnailBase64
       )
-    }
+    }.filter { !$0.shouldFilter }
   }
 
   /// Fetch a single attachment by ID (for serving files)
