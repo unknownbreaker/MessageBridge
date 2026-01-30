@@ -209,6 +209,19 @@ final class MessagesViewModelTests: XCTestCase {
     XCTAssertNil(viewModel.selectedConversationId)
   }
 
+  func testDisconnect_clearsPaginationState() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    viewModel.paginationState["chat-1"] = MessagesViewModel.PaginationState(
+      offset: 30, hasMore: true)
+
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+    await viewModel.disconnect()
+
+    XCTAssertTrue(viewModel.paginationState.isEmpty)
+  }
+
   func testConnecting_setsStatusToConnecting() async {
     let mockService = MockBridgeService()
     let viewModel = createViewModel(mockService: mockService)

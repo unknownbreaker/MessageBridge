@@ -98,6 +98,7 @@ public class MessagesViewModel: ObservableObject {
     connectionStatus = .disconnected
     conversations = []
     messages = [:]
+    paginationState = [:]
     selectedConversationId = nil
     updateDockBadge()  // Clear badge on disconnect
     logInfo("Disconnected from server")
