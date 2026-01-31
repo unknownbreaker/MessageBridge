@@ -33,7 +33,7 @@ struct SingleImageView: View {
         Image(nsImage: nsImage)
           .resizable()
           .aspectRatio(contentMode: .fit)
-          .frame(maxWidth: 250, maxHeight: 250)
+          .frame(maxWidth: 375, maxHeight: 375)
           .clipShape(RoundedRectangle(cornerRadius: 12))
           .onTapGesture { isShowingCarousel = true }
       } else {

@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Renderer for messages with 2+ image attachments.
 ///
-/// Displays images in a grid layout (2 columns). Shows up to 4 images,
-/// with a "+N" overlay on the last cell if there are more.
-/// Non-image attachments in the group are rendered below the grid
+/// Displays images in a horizontally-scrollable strip inside the bubble.
+/// Tapping any image opens the fullscreen carousel at that index.
+/// Non-image attachments in the group are rendered below the strip
 /// via the registry.
 public struct ImageGalleryRenderer: AttachmentRenderer {
   public let id = "image-gallery"
@@ -23,7 +23,7 @@ public struct ImageGalleryRenderer: AttachmentRenderer {
 
     return AnyView(
       VStack(spacing: 4) {
-        ImageGridView(attachments: images)
+        ImageStripView(attachments: images)
 
         if !nonImages.isEmpty {
           ForEach(nonImages) { attachment in
@@ -37,66 +37,46 @@ public struct ImageGalleryRenderer: AttachmentRenderer {
   }
 }
 
-struct ImageGridView: View {
+struct ImageStripView: View {
   let attachments: [Attachment]
-  private let maxDisplay = 4
 
   @State private var isShowingCarousel = false
   @State private var carouselStartIndex = 0
 
   var body: some View {
-    let displayAttachments = Array(attachments.prefix(maxDisplay))
-    let overflow = attachments.count - maxDisplay
-
-    LazyVGrid(columns: columns, spacing: 2) {
-      ForEach(Array(displayAttachments.enumerated()), id: \.element.id) { index, attachment in
-        ZStack {
-          ImageThumbnailCell(attachment: attachment)
-            .aspectRatio(1, contentMode: .fill)
-            .clipped()
-
-          if index == maxDisplay - 1 && overflow > 0 {
-            Color.black.opacity(0.5)
-            Text("+\(overflow)")
-              .font(.title2.bold())
-              .foregroundStyle(.white)
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 2) {
+        ForEach(Array(attachments.enumerated()), id: \.element.id) { index, attachment in
+          Group {
+            if let data = attachment.thumbnailData, let nsImage = NSImage(data: data) {
+              Image(nsImage: nsImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(height: 375)
+                .frame(maxWidth: 330)
+                .clipped()
+            } else {
+              Rectangle()
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .frame(width: 140, height: 375)
+                .overlay {
+                  Image(systemName: "photo")
+                    .foregroundStyle(.secondary)
+                }
+            }
           }
-        }
-        .onTapGesture {
-          carouselStartIndex = index
-          isShowingCarousel = true
+          .clipShape(RoundedRectangle(cornerRadius: 4))
+          .onTapGesture {
+            carouselStartIndex = index
+            isShowingCarousel = true
+          }
         }
       }
     }
-    .frame(maxWidth: 280)
+    .frame(maxWidth: 420, maxHeight: 375)
     .clipShape(RoundedRectangle(cornerRadius: 8))
     .sheet(isPresented: $isShowingCarousel) {
       CarouselView(attachments: attachments, startIndex: carouselStartIndex)
-    }
-  }
-
-  private var columns: [GridItem] {
-    let count = min(attachments.count, maxDisplay)
-    let columnCount = count <= 1 ? 1 : 2
-    return Array(repeating: GridItem(.flexible(), spacing: 2), count: columnCount)
-  }
-}
-
-struct ImageThumbnailCell: View {
-  let attachment: Attachment
-
-  var body: some View {
-    if let data = attachment.thumbnailData, let nsImage = NSImage(data: data) {
-      Image(nsImage: nsImage)
-        .resizable()
-        .aspectRatio(contentMode: .fill)
-    } else {
-      Rectangle()
-        .fill(Color(nsColor: .controlBackgroundColor))
-        .overlay {
-          Image(systemName: "photo")
-            .foregroundStyle(.secondary)
-        }
     }
   }
 }
