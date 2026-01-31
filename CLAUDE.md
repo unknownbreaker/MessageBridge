@@ -12,11 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Tunnel URL Copy & ngrok Token Persistence
-- Added "Copy Tunnel URL" button to menu bar popover (visible when tunnel is running)
-- Fixed ngrok auth token persistence across Xcode rebuilds by writing directly to `~/.config/ngrok/ngrok.yml` when binary unavailable
-- Added Keychain self-healing: `detectAuthToken` re-saves to Keychain when found in config file but missing from Keychain
-- All 500 server tests + 319 client tests pass
+**Last Session:** Link Preview URL Stripping & Missing Thumbnails
+- Fixed URL not being stripped from message bubble: plist stores canonical/resolved URL (Instagram adds usernames, youtu.be → youtube.com, share links → different domains), so replaced naive string match with NSDataDetector-based first-URL stripping
+- Fixed missing preview thumbnails: Messages.app stores og:image as pluginPayloadAttachment files with NO mime_type/UTI set; removed MIME filter, now picks largest attachment (og:image over favicon)
+- Added plist image extraction fallback for embedded image data in payload_data
+- Removed `.help()` on styled Text views causing SwiftUI console warnings
+- All 500 server tests + 330 client tests pass (11 new)
 
 **Known Blockers:** None
 
