@@ -22,7 +22,6 @@ struct MessageThreadView: View {
           .onTapGesture(count: 2) {
             showContactDetails = true
           }
-          .help("Double-click to view contact details")
         Spacer()
       }
       .padding()

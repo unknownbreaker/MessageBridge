@@ -697,25 +697,39 @@ public actor ChatDatabase: ChatDatabaseProtocol {
   }
 
   /// Fetch the preview image for a link preview message.
-  /// Looks for pluginPayloadAttachment image files and generates a thumbnail.
+  ///
+  /// Messages.app stores link preview images as `pluginPayloadAttachment` files
+  /// with **no MIME type or UTI** (they use a dynamic UTI). Each message typically
+  /// has multiple attachments: a small favicon/icon and the larger og:image preview.
+  /// We pick the largest file (by total_bytes) since that's the actual preview image.
   private nonisolated func fetchLinkPreviewImage(db: Database, messageId: Int64) -> String? {
+    // Get all pluginPayloadAttachment files for this message, ordered by size descending.
+    // The largest is typically the og:image preview; smaller ones are favicons/icons.
+    // We don't filter by mime_type/uti because Messages.app leaves them empty.
     let sql = """
-      SELECT a.filename as file_path, a.mime_type
+      SELECT a.filename as file_path, a.total_bytes as size
       FROM attachment a
       JOIN message_attachment_join maj ON a.ROWID = maj.attachment_id
       WHERE maj.message_id = ?
         AND a.transfer_name LIKE '%pluginPayloadAttachment%'
-        AND (a.mime_type LIKE 'image/%' OR a.uti LIKE '%image%')
-      LIMIT 1
+        AND a.total_bytes > 0
+      ORDER BY a.total_bytes DESC
       """
 
-    guard let row = try? Row.fetchOne(db, sql: sql, arguments: [messageId]),
-      let filePath: String = row["file_path"]
-    else {
+    guard let rows = try? Row.fetchAll(db, sql: sql, arguments: [messageId]) else {
       return nil
     }
 
-    return generateThumbnail(forFilePath: filePath)
+    // Try each attachment starting from the largest — generate thumbnail from the
+    // first one that is actually a valid image file on disk
+    for row in rows {
+      guard let filePath: String = row["file_path"] else { continue }
+      if let thumbnail = generateThumbnail(forFilePath: filePath) {
+        return thumbnail
+      }
+    }
+
+    return nil
   }
 
   /// Generate a thumbnail for an image file (max 300x300)

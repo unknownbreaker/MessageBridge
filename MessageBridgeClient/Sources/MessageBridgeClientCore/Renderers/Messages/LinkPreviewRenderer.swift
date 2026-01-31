@@ -31,10 +31,46 @@ public struct LinkPreviewRenderer: MessageRenderer {
 
   /// Remove the link preview URL from the message text.
   /// Returns nil if the remaining text is empty (i.e., the message was only a URL).
+  ///
+  /// The plist URL (canonical/resolved) often differs drastically from the text URL
+  /// (original): Instagram adds usernames to the path, youtu.be redirects to
+  /// youtube.com, share links resolve to completely different domains, etc.
+  /// So we can't rely on comparing the two URLs at all.
+  ///
+  /// Instead, since we already know this message has a link preview (canRender
+  /// confirmed it), we strip the first URL detected in the text. If the text
+  /// contains additional non-URL content, it's preserved below the card.
   static func stripURL(_ url: String, from text: String?) -> String? {
     guard let text = text else { return nil }
-    let stripped = text.replacingOccurrences(of: url, with: "")
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // Detect URLs in the text using NSDataDetector (same engine Apple uses)
+    guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    else {
+      // Fallback: simple string replacement
+      let stripped = text.replacingOccurrences(of: url, with: "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      return stripped.isEmpty ? nil : stripped
+    }
+
+    let nsRange = NSRange(text.startIndex..., in: text)
+    let matches = detector.matches(in: text, range: nsRange)
+
+    // Strip the first URL found — this is the one that generated the link preview
+    guard let firstMatch = matches.first,
+      let matchRange = Range(firstMatch.range, in: text)
+    else {
+      // No URL detected — return text as-is
+      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      return trimmed.isEmpty ? nil : trimmed
+    }
+
+    var result = text
+    result.replaceSubrange(matchRange, with: "")
+    // Collapse runs of whitespace left by URL removal
+    while result.contains("  ") {
+      result = result.replacingOccurrences(of: "  ", with: " ")
+    }
+    let stripped = result.trimmingCharacters(in: .whitespacesAndNewlines)
     return stripped.isEmpty ? nil : stripped
   }
 }

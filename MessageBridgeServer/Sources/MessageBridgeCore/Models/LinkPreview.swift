@@ -105,11 +105,83 @@ public enum LinkPreviewExtractor {
 
     guard let url = urlString, !url.isEmpty else { return nil }
 
+    // Try to extract embedded image data from the plist.
+    // iMessage stores preview images under "image" or "iconMetadata" keys,
+    // which reference a dict containing an "NS.data" key pointing to raw Data.
+    let imageBase64 = extractImageData(from: meta, objects: objects, resolveUID: resolveUID)
+
     return LinkPreview(
       url: url,
       title: resolveUID(meta["title"]) as? String,
       summary: resolveUID(meta["summary"]) as? String,
-      siteName: resolveUID(meta["siteName"]) as? String
+      siteName: resolveUID(meta["siteName"]) as? String,
+      imageBase64: imageBase64
     )
+  }
+
+  /// Search metadata and $objects for embedded image data.
+  private static func extractImageData(
+    from meta: [String: Any],
+    objects: [Any],
+    resolveUID: (Any?) -> Any?
+  ) -> String? {
+    // Check common keys that hold image references
+    let imageKeys = ["image", "iconMetadata", "icon", "specialization"]
+    for key in imageKeys {
+      guard let ref = meta[key] else { continue }
+      if let imageData = resolveImageFromValue(
+        resolveUID(ref), objects: objects, resolveUID: resolveUID)
+      {
+        return imageData.base64EncodedString()
+      }
+    }
+
+    return nil
+  }
+
+  private static func resolveImageFromValue(
+    _ value: Any?,
+    objects: [Any],
+    resolveUID: (Any?) -> Any?
+  ) -> Data? {
+    guard let value = value else { return nil }
+
+    // Direct Data
+    if let data = value as? Data, looksLikeImage(data) {
+      return data
+    }
+
+    // Dict with NS.data key (NSData archive)
+    if let dict = value as? [String: Any] {
+      if let nsData = resolveUID(dict["NS.data"]) as? Data, looksLikeImage(nsData) {
+        return nsData
+      }
+      // Recurse into sub-keys that might hold image data
+      for subKey in ["imageData", "data", "NS.data", "resourceData"] {
+        if let resolved = resolveUID(dict[subKey]) {
+          if let data = resolved as? Data, looksLikeImage(data) {
+            return data
+          }
+          if let subDict = resolved as? [String: Any],
+            let data = resolveUID(subDict["NS.data"]) as? Data, looksLikeImage(data)
+          {
+            return data
+          }
+        }
+      }
+    }
+
+    return nil
+  }
+
+  /// Check for JPEG (FF D8) or PNG (89 50 4E 47) magic bytes
+  private static func looksLikeImage(_ data: Data) -> Bool {
+    guard data.count > 4 else { return false }
+    let bytes = [UInt8](data.prefix(4))
+    // JPEG
+    if bytes[0] == 0xFF && bytes[1] == 0xD8 { return true }
+    // PNG
+    if bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 { return true }
+    return false
   }
 }

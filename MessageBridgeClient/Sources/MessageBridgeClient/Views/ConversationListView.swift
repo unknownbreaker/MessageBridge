@@ -106,7 +106,6 @@ struct ConversationRow: View {
             .onTapGesture(count: 2) {
               showContactDetails = true
             }
-            .help("Double-click to view contact details")
             .popover(isPresented: $showContactDetails) {
               ContactDetailsView(handles: conversation.participants)
             }
