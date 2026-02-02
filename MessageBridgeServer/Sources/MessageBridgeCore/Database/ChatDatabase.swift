@@ -6,6 +6,7 @@ import GRDB
 public actor ChatDatabase: ChatDatabaseProtocol {
   private nonisolated let dbPool: DatabasePool
   private let contactManager: ContactManager
+  private var lastImagentRestart: Date = .distantPast
 
   public struct Stats {
     public let conversationCount: Int
@@ -497,47 +498,83 @@ public actor ChatDatabase: ChatDatabaseProtocol {
     }.value
     // Open the conversation in Messages.app (in background) to trigger native read-marking
     // This is more reliable than database updates since Messages.app syncs via iCloud
-    await openConversationInMessagesApp(conversationId: conversationId)
+    await syncReadStateWithMessagesApp(conversationId: conversationId)
 
     serverLog(
       "Marked \(messagesMarked) message(s) as read, chat updated: \(chatUpdated) for: \(conversationId)"
     )
   }
 
-  /// Opens a conversation in Messages.app without bringing it to the foreground
-  /// This triggers Messages.app's internal read-marking mechanism
-  private func openConversationInMessagesApp(conversationId: String) async {
-    // Use messages:// URL scheme which works for both group chats and 1:1 conversations
-    // Group chats: messages://open?chat=<chat_id>
-    // 1:1 chats: messages://open?address=<phone_or_email>
+  /// Nudges Messages.app to pick up the read-state changes written to chat.db.
+  ///
+  /// For 1:1 chats the messages:// URL scheme reliably navigates Messages.app to the
+  /// conversation (without activating the window), which triggers its internal read-marking.
+  ///
+  /// For group chats (especially pinned ones) the URL scheme doesn't work — Messages.app
+  /// opens a blank compose window instead. Restarting the `imagent` daemon forces
+  /// Messages.app to re-read the database, picking up our is_read / last_read_message_timestamp
+  /// changes for all conversations at once.
+  private func syncReadStateWithMessagesApp(conversationId: String) async {
+    let isGroupChat = conversationId.lowercased().hasPrefix("chat")
 
-    let url: String
-    if conversationId.hasPrefix("chat") {
-      // Group chat - use chat parameter
-      url = "messages://open?chat=\(conversationId)"
+    if isGroupChat {
+      await restartImagent()
     } else {
-      // 1:1 chat - use address parameter (URL encode for special chars like +)
-      let encoded =
-        conversationId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
-        ?? conversationId
-      url = "messages://open?address=\(encoded)"
+      await openConversationViaURLScheme(conversationId: conversationId)
     }
+  }
 
-    // Use NSWorkspace to open the URL without activating Messages.app
-    // The .withoutActivation option keeps the current app in the foreground
-    guard let messagesURL = URL(string: url) else {
-      serverLogWarning("Invalid URL for conversation: \(url)")
+  /// Opens a 1:1 conversation via the messages:// URL scheme without activating Messages.app.
+  private func openConversationViaURLScheme(conversationId: String) async {
+    let encoded =
+      conversationId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+      ?? conversationId
+    let urlString = "messages://open?address=\(encoded)"
+
+    guard let messagesURL = URL(string: urlString) else {
+      serverLogWarning("Invalid URL for conversation: \(urlString)")
       return
     }
 
     let configuration = NSWorkspace.OpenConfiguration()
-    configuration.activates = false  // Don't bring Messages to foreground
+    configuration.activates = false
 
     do {
       try await NSWorkspace.shared.open(messagesURL, configuration: configuration)
-      serverLogDebug("Opened conversation in Messages.app (background): \(conversationId)")
+      serverLogDebug("Opened conversation in Messages.app: \(conversationId)")
     } catch {
       serverLogWarning("Failed to open conversation in Messages.app: \(error)")
+    }
+  }
+
+  /// Restarts the imagent daemon so Messages.app re-reads chat.db read state.
+  /// imagent is automatically relaunched by launchd within seconds.
+  /// Debounced to at most once every 5 seconds to avoid thrashing when marking
+  /// multiple conversations as read in quick succession.
+  private func restartImagent() async {
+    let now = Date()
+    guard now.timeIntervalSince(lastImagentRestart) > 5 else {
+      serverLogDebug("Skipping imagent restart (debounced)")
+      return
+    }
+    lastImagentRestart = now
+
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      DispatchQueue.global(qos: .utility).async {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        process.arguments = ["imagent"]
+
+        do {
+          try process.run()
+          process.waitUntilExit()
+          serverLogDebug("Restarted imagent to sync read state")
+        } catch {
+          serverLogWarning("Failed to restart imagent: \(error)")
+        }
+
+        continuation.resume()
+      }
     }
   }
 
