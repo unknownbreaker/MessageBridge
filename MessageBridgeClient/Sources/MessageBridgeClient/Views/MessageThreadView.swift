@@ -8,6 +8,9 @@ struct MessageThreadView: View {
   @State private var showContactDetails = false
   @State private var showingTapbackPicker = false
   @State private var tapbackTargetMessage: Message?
+  @State private var scrollAnchorMessageId: Int64?
+  @State private var isRepositioning = false
+  @State private var knownMessageIds: Set<Int64> = []
 
   var messages: [Message] {
     viewModel.messages[conversation.id] ?? []
@@ -48,6 +51,10 @@ struct MessageThreadView: View {
                 Color.clear
                   .frame(height: 1)
                   .onAppear {
+                    let reversedMsgs = Array(messages.reversed())
+                    scrollAnchorMessageId = reversedMsgs.first?.id
+                    knownMessageIds = Set(messages.map(\.id))
+                    isRepositioning = true
                     Task {
                       await viewModel.loadMoreMessages(for: conversation.id)
                     }
@@ -63,6 +70,7 @@ struct MessageThreadView: View {
               let isLastMessage = index == reversedMessages.count - 1
               let isLastSentMessage =
                 message.isFromMe && !reversedMessages.dropFirst(index + 1).contains { $0.isFromMe }
+              let isNewlyLoaded = isRepositioning && !knownMessageIds.contains(message.id)
               MessageBubble(
                 message: message,
                 isGroupConversation: conversation.isGroup,
@@ -72,11 +80,22 @@ struct MessageThreadView: View {
                 isLastMessage: isLastMessage
               )
               .id(message.id)
+              .opacity(isNewlyLoaded ? 0 : 1)
             }
           }
           .padding()
         }
         .defaultScrollAnchor(.bottom)
+        .onChange(of: messages.count) {
+          if let anchorId = scrollAnchorMessageId, isRepositioning {
+            proxy.scrollTo(anchorId, anchor: .top)
+            DispatchQueue.main.async {
+              isRepositioning = false
+              scrollAnchorMessageId = nil
+              knownMessageIds = []
+            }
+          }
+        }
       }
 
       Divider()
@@ -87,7 +106,10 @@ struct MessageThreadView: View {
       }
     }
     .task(id: conversation.id) {
-      // Re-run when conversation changes
+      // Reset scroll anchor state when conversation changes
+      scrollAnchorMessageId = nil
+      isRepositioning = false
+      knownMessageIds = []
       await viewModel.loadMessages(for: conversation.id)
     }
     .onReceive(NotificationCenter.default.publisher(for: .showTapbackPicker)) { notification in
