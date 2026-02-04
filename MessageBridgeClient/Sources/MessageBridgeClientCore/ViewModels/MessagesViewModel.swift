@@ -149,6 +149,16 @@ public class MessagesViewModel: ObservableObject {
           Task { @MainActor [weak self] in
             self?.handleTapbackEvent(event)
           }
+        },
+        onSyncWarning: { [weak self] event in
+          Task { @MainActor [weak self] in
+            self?.handleSyncWarning(conversationId: event.conversationId, message: event.message)
+          }
+        },
+        onSyncWarningCleared: { [weak self] event in
+          Task { @MainActor [weak self] in
+            self?.handleSyncWarningCleared(conversationId: event.conversationId)
+          }
         }
       )
       logInfo("WebSocket connection started")

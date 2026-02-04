@@ -6,6 +6,12 @@ public typealias NewMessageHandler = @Sendable (Message, String) -> Void
 /// Callback for receiving tapback events via WebSocket
 public typealias TapbackEventHandler = @Sendable (TapbackEvent) -> Void
 
+/// Callback for receiving sync warning events via WebSocket
+public typealias SyncWarningHandler = @Sendable (SyncWarningEvent) -> Void
+
+/// Callback for receiving sync warning cleared events via WebSocket
+public typealias SyncWarningClearedHandler = @Sendable (SyncWarningClearedEvent) -> Void
+
 /// Action type for tapback operations
 public enum TapbackActionType: String, Sendable {
   case add
@@ -47,7 +53,9 @@ public protocol BridgeServiceProtocol: Sendable {
   func sendMessage(text: String, to recipient: String) async throws
   func startWebSocket(
     onNewMessage: @escaping NewMessageHandler,
-    onTapbackEvent: @escaping TapbackEventHandler
+    onTapbackEvent: @escaping TapbackEventHandler,
+    onSyncWarning: @escaping SyncWarningHandler,
+    onSyncWarningCleared: @escaping SyncWarningClearedHandler
   ) async throws
   func stopWebSocket() async
   func fetchAttachment(id: Int64) async throws -> Data
@@ -150,6 +158,18 @@ struct TapbackEventPayload: Codable {
   let conversationId: String
 }
 
+/// WebSocket message for sync warning events
+struct SyncWarningWebSocketMessage: Codable {
+  let type: String
+  let data: SyncWarningEvent
+}
+
+/// WebSocket message for sync warning cleared events
+struct SyncWarningClearedWebSocketMessage: Codable {
+  let type: String
+  let data: SyncWarningClearedEvent
+}
+
 /// Handles communication with the MessageBridge server
 public actor BridgeConnection: BridgeServiceProtocol {
   private var serverURL: URL?
@@ -158,6 +178,8 @@ public actor BridgeConnection: BridgeServiceProtocol {
   private var webSocketTask: URLSessionWebSocketTask?
   private var newMessageHandler: NewMessageHandler?
   private var tapbackEventHandler: TapbackEventHandler?
+  private var syncWarningHandler: SyncWarningHandler?
+  private var syncWarningClearedHandler: SyncWarningClearedHandler?
   private var e2eEnabled: Bool = false
   private var encryption: E2EEncryption?
 
@@ -426,7 +448,9 @@ public actor BridgeConnection: BridgeServiceProtocol {
 
   public func startWebSocket(
     onNewMessage: @escaping NewMessageHandler,
-    onTapbackEvent: @escaping TapbackEventHandler
+    onTapbackEvent: @escaping TapbackEventHandler,
+    onSyncWarning: @escaping SyncWarningHandler,
+    onSyncWarningCleared: @escaping SyncWarningClearedHandler
   ) async throws {
     guard let serverURL, let apiKey else {
       throw BridgeError.notConnected
@@ -434,6 +458,8 @@ public actor BridgeConnection: BridgeServiceProtocol {
 
     self.newMessageHandler = onNewMessage
     self.tapbackEventHandler = onTapbackEvent
+    self.syncWarningHandler = onSyncWarning
+    self.syncWarningClearedHandler = onSyncWarningCleared
 
     // Convert HTTP URL to WebSocket URL
     var wsComponents = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)!
@@ -462,6 +488,8 @@ public actor BridgeConnection: BridgeServiceProtocol {
     webSocketTask = nil
     newMessageHandler = nil
     tapbackEventHandler = nil
+    syncWarningHandler = nil
+    syncWarningClearedHandler = nil
   }
 
   private func receiveWebSocketMessage() {
@@ -555,6 +583,21 @@ public actor BridgeConnection: BridgeServiceProtocol {
         )
 
         tapbackEventHandler?(event)
+
+      case "sync_warning":
+        let wsMessage = try decoder.decode(SyncWarningWebSocketMessage.self, from: messageData)
+        logInfo(
+          "WebSocket: sync_warning received for conversation \(wsMessage.data.conversationId): \(wsMessage.data.message)"
+        )
+        syncWarningHandler?(wsMessage.data)
+
+      case "sync_warning_cleared":
+        let wsMessage = try decoder.decode(
+          SyncWarningClearedWebSocketMessage.self, from: messageData)
+        logInfo(
+          "WebSocket: sync_warning_cleared received for conversation \(wsMessage.data.conversationId)"
+        )
+        syncWarningClearedHandler?(wsMessage.data)
 
       default:
         logDebug("WebSocket received \(envelope.type) message")

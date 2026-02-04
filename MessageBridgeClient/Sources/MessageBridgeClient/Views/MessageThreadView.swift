@@ -35,6 +35,16 @@ struct MessageThreadView: View {
 
       Divider()
 
+      // Sync warning banner (if applicable)
+      if let warning = viewModel.syncWarnings[conversation.id] {
+        SyncWarningBanner(
+          message: warning,
+          onDismiss: {
+            viewModel.dismissSyncWarning(for: conversation.id)
+          }
+        )
+      }
+
       // Messages
       ScrollViewReader { proxy in
         ScrollView {

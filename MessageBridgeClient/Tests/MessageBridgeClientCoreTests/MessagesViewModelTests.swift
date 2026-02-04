@@ -19,6 +19,8 @@ actor MockBridgeService: BridgeServiceProtocol {
   var lastMessageText: String?
   var newMessageHandler: NewMessageHandler?
   var tapbackEventHandler: TapbackEventHandler?
+  var syncWarningHandler: SyncWarningHandler?
+  var syncWarningClearedHandler: SyncWarningClearedHandler?
 
   func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws {
     connectCalled = true
@@ -58,17 +60,23 @@ actor MockBridgeService: BridgeServiceProtocol {
 
   func startWebSocket(
     onNewMessage: @escaping NewMessageHandler,
-    onTapbackEvent: @escaping TapbackEventHandler
+    onTapbackEvent: @escaping TapbackEventHandler,
+    onSyncWarning: @escaping SyncWarningHandler,
+    onSyncWarningCleared: @escaping SyncWarningClearedHandler
   ) async throws {
     startWebSocketCalled = true
     newMessageHandler = onNewMessage
     tapbackEventHandler = onTapbackEvent
+    syncWarningHandler = onSyncWarning
+    syncWarningClearedHandler = onSyncWarningCleared
   }
 
   func stopWebSocket() async {
     stopWebSocketCalled = true
     newMessageHandler = nil
     tapbackEventHandler = nil
+    syncWarningHandler = nil
+    syncWarningClearedHandler = nil
   }
 
   var attachmentDataToReturn: Data = Data()
@@ -118,6 +126,16 @@ actor MockBridgeService: BridgeServiceProtocol {
   // Helper to simulate receiving a tapback event
   func simulateTapbackEvent(_ event: TapbackEvent) {
     tapbackEventHandler?(event)
+  }
+
+  // Helper to simulate receiving a sync warning event
+  func simulateSyncWarning(_ event: SyncWarningEvent) {
+    syncWarningHandler?(event)
+  }
+
+  // Helper to simulate receiving a sync warning cleared event
+  func simulateSyncWarningCleared(_ event: SyncWarningClearedEvent) {
+    syncWarningClearedHandler?(event)
   }
 }
 
@@ -703,6 +721,45 @@ final class MessagesViewModelTests: XCTestCase {
 
     // Sync warnings should be cleared
     XCTAssertTrue(viewModel.syncWarnings.isEmpty)
+  }
+
+  func testSyncWarning_viaWebSocket_updatesViewModel() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    // Connect to set up WebSocket
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+    XCTAssertTrue(viewModel.syncWarnings.isEmpty)
+
+    // Simulate receiving a sync warning via WebSocket
+    let warningEvent = SyncWarningEvent(conversationId: "chat456", message: "Read sync failed")
+    await mockService.simulateSyncWarning(warningEvent)
+
+    // Give the async handler time to process
+    try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+
+    XCTAssertEqual(viewModel.syncWarnings["chat456"], "Read sync failed")
+  }
+
+  func testSyncWarningCleared_viaWebSocket_removesWarning() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    // Connect to set up WebSocket
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+    // Add a sync warning first
+    viewModel.handleSyncWarning(conversationId: "chat789", message: "Test warning")
+    XCTAssertEqual(viewModel.syncWarnings["chat789"], "Test warning")
+
+    // Simulate receiving a sync warning cleared via WebSocket
+    let clearedEvent = SyncWarningClearedEvent(conversationId: "chat789")
+    await mockService.simulateSyncWarningCleared(clearedEvent)
+
+    // Give the async handler time to process
+    try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+
+    XCTAssertNil(viewModel.syncWarnings["chat789"])
   }
 }
 
