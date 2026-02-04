@@ -8,6 +8,19 @@ public enum SyncResult: Sendable, Equatable {
   case failed(reason: String)
 }
 
+/// Information about a group chat for UI search operations
+public struct GroupChatInfo: Sendable {
+  public let conversationId: String
+  public let displayName: String?
+  public let handles: [String]
+
+  public init(conversationId: String, displayName: String?, handles: [String]) {
+    self.conversationId = conversationId
+    self.displayName = displayName
+    self.handles = handles
+  }
+}
+
 /// Provides read-only access to the macOS Messages database (chat.db)
 public actor ChatDatabase: ChatDatabaseProtocol {
   private nonisolated let dbPool: DatabasePool
@@ -686,6 +699,58 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         continuation.resume()
       }
     }
+  }
+
+  /// Opens a group chat using UI search with retry and fallback (requires Accessibility permission)
+  /// - Returns: SyncResult indicating success or failure with reason
+  private func openGroupChatViaUISearch(chatInfo: GroupChatInfo) async -> SyncResult {
+    guard let searchString = chatInfo.displayName, !searchString.isEmpty else {
+      serverLogWarning("Cannot use UI search: no display name for chat \(chatInfo.conversationId)")
+      // Fall back to addresses even though duplicates exist - better than nothing
+      return await fallbackToURLScheme(chatInfo: chatInfo)
+    }
+
+    serverLog("openGroupChatViaUISearch: searching for '\(searchString)'")
+
+    // Attempt 1
+    let result1 = await executeSearchScript(searchString: searchString)
+    if result1 == "success" {
+      serverLog("openGroupChatViaUISearch: success on first attempt")
+      return .success
+    }
+
+    serverLog("openGroupChatViaUISearch: first attempt returned '\(result1)', retrying...")
+
+    // Clear and retry once
+    await clearSearchField()
+    try? await Task.sleep(for: .milliseconds(300))
+
+    let result2 = await executeSearchScript(searchString: searchString)
+    if result2 == "success" {
+      serverLog("openGroupChatViaUISearch: success on retry")
+      return .success
+    }
+
+    serverLog("openGroupChatViaUISearch: retry returned '\(result2)', falling back to URL scheme")
+
+    // Fallback to URL scheme
+    return await fallbackToURLScheme(chatInfo: chatInfo)
+  }
+
+  /// Falls back to opening via URL scheme when UI search fails
+  private func fallbackToURLScheme(chatInfo: GroupChatInfo) async -> SyncResult {
+    let addressList = chatInfo.handles.joined(separator: ",")
+    guard let url = URL(string: "messages://open?addresses=\(addressList)") else {
+      return .failed(reason: "Could not build fallback URL")
+    }
+
+    serverLog("openGroupChatViaUISearch: opening fallback URL = \(url)")
+
+    await MainActor.run {
+      NSWorkspace.shared.open(url)
+    }
+
+    return .failed(reason: "Read status could not be synced to Messages.app")
   }
 
   // MARK: - Handles
