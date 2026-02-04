@@ -642,6 +642,52 @@ public actor ChatDatabase: ChatDatabaseProtocol {
       """
   }
 
+  /// Executes the search AppleScript and returns the result
+  /// - Parameter searchString: The chat name to search for
+  /// - Returns: "success" if search worked, "no_results" if timed out, "error" if script failed
+  private func executeSearchScript(searchString: String) async -> String {
+    let script = ChatDatabase.buildSearchScript(searchString: searchString)
+
+    return await withCheckedContinuation { continuation in
+      DispatchQueue.global(qos: .userInitiated).async {
+        var error: NSDictionary?
+        let appleScript = NSAppleScript(source: script)
+        let result = appleScript?.executeAndReturnError(&error)
+
+        if let error = error {
+          let errorMessage = error[NSAppleScript.errorMessage] as? String ?? "Unknown error"
+          serverLogWarning("Search script error: \(errorMessage)")
+          continuation.resume(returning: "error")
+        } else if let resultString = result?.stringValue {
+          continuation.resume(returning: resultString)
+        } else {
+          continuation.resume(returning: "error")
+        }
+      }
+    }
+  }
+
+  /// Clears the search field by pressing Escape
+  private func clearSearchField() async {
+    let script = """
+      tell application "System Events"
+          tell process "Messages"
+              key code 53
+              delay 0.2
+          end tell
+      end tell
+      """
+
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        var error: NSDictionary?
+        let appleScript = NSAppleScript(source: script)
+        appleScript?.executeAndReturnError(&error)
+        continuation.resume()
+      }
+    }
+  }
+
   // MARK: - Handles
 
   public func fetchAllHandles() async throws -> [Handle] {
