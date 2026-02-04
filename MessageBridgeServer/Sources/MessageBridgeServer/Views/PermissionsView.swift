@@ -73,7 +73,7 @@ struct PermissionsView: View {
       }
       .padding()
     }
-    .frame(width: 450, height: 500)
+    .frame(width: 450, height: 580)
     .task {
       await checkPermissions(showLoading: true)
       // Poll for permission changes every 2 seconds while window is open

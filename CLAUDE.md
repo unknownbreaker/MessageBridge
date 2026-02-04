@@ -226,7 +226,7 @@ Follow this order to minimize breakage:
 | M5.1 2FA Code Detection    | ✅                 | ✅          | ✅       | ✅       |
 | M5.2 Multi-line Composer   | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M5.3 Text Selection        | ⬜                 | ⬜         | ⬜       | ⬜       |
-| M5.4 Link Previews         | ⬜                 | ⬜         | ⬜       | ⬜       |
+| M5.4 Link Previews         | ✅                 | ✅         | ✅       | ✅       |
 | M5.5 Search                | ⬜                 | ⬜         | ⬜       | ⬜       |
 | **Phase 6: Polish**        |
 | M6.1 Contact Names         | ⬜                 | ⬜         | ⬜       | ⬜       |

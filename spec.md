@@ -385,7 +385,7 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 ---
 
-### M5.4: Link Previews 🔴
+### M5.4: Link Previews 🟢
 
 **User Stories:**
 
@@ -394,11 +394,11 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 **Acceptance Criteria:**
 
-- [ ] Detect URLs in message text
-- [ ] Fetch metadata (title, description, image)
-- [ ] Display card below message text
-- [ ] Tap card opens URL in browser
-- [ ] Cache previews to avoid re-fetching
+- [x] Detect URLs in message text
+- [x] Fetch metadata (title, description, image)
+- [x] Display card below message text
+- [x] Tap card opens URL in browser
+- [x] Cache previews to avoid re-fetching
 
 **Extension Point:** `MessageProcessor` for detection, `MessageRenderer` for display
 

@@ -38,6 +38,8 @@ public actor PermissionsManager {
     string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts")
   private let automationURL = URL(
     string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
+  private let accessibilityURL = URL(
+    string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
 
   // MARK: - Public API
 
@@ -68,15 +70,28 @@ public actor PermissionsManager {
         settingsURL: contactsURL
       ))
 
-    // Automation - required to send messages via AppleScript
-    let automationAccess = await checkAutomationAccess()
+    // Automation (Messages.app) - required to send messages via AppleScript
+    let messagesAutomationAccess = await checkMessagesAutomationAccess()
     permissions.append(
       PermissionStatus(
-        id: "automation",
+        id: "automationMessages",
         name: "Automation (Messages.app)",
         description: "Required to send messages through the Messages app",
-        isGranted: automationAccess,
+        isGranted: messagesAutomationAccess,
         settingsURL: automationURL
+      ))
+
+    // Accessibility - optional, only needed if duplicate group chats with same participants exist
+    let accessibilityAccess = checkAccessibilityAccess()
+    permissions.append(
+      PermissionStatus(
+        id: "accessibility",
+        name: "Accessibility (Optional)",
+        description:
+          "Only needed for rare edge case: multiple group chats with identical participants",
+        isGranted: accessibilityAccess,
+        settingsURL: accessibilityURL,
+        requiresManualSetup: true
       ))
 
     return permissions
@@ -135,13 +150,11 @@ public actor PermissionsManager {
   }
 
   /// Check if Automation access for Messages.app is granted
-  /// This is checked by attempting a simple AppleScript command
-  private func checkAutomationAccess() async -> Bool {
-    // Try to run a simple AppleScript that checks if Messages is running
-    // This will trigger the automation permission prompt if not already granted
+  /// This triggers the permission prompt by attempting to communicate with Messages
+  private func checkMessagesAutomationAccess() async -> Bool {
     let script = """
-      tell application "System Events"
-          return exists application process "Messages"
+      tell application "Messages"
+          return name
       end tell
       """
 
@@ -149,22 +162,26 @@ public actor PermissionsManager {
     if let appleScript = NSAppleScript(source: script) {
       _ = appleScript.executeAndReturnError(&error)
       if error == nil {
-        // Script executed successfully, automation is allowed
         return true
       }
 
-      // Check if the error is specifically about automation permission
       if let errorInfo = error,
         let errorNumber = errorInfo[NSAppleScript.errorNumber] as? Int
       {
         // -1743 is "not authorized" for automation
-        // -600 is "application isn't running" which is OK
+        // -600 is "application isn't running" which is OK (permission granted)
         if errorNumber == -600 {
-          return true  // Permission is granted, app just isn't running
+          return true
         }
       }
     }
 
     return false
+  }
+
+  /// Check if Accessibility access is granted (required to send keystrokes via System Events)
+  private nonisolated func checkAccessibilityAccess() -> Bool {
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): false] as CFDictionary
+    return AXIsProcessTrustedWithOptions(options)
   }
 }
