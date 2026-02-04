@@ -202,31 +202,43 @@ struct MessageBubble: View {
             .padding(.leading, 4)
         }
 
-        // Display attachments first (like Apple Messages)
-        if message.hasAttachments {
-          AttachmentRendererRegistry.shared.renderer(for: message.attachments)
-            .render(message.attachments)
-        }
-
-        // Display text if present - delegated to RendererRegistry
-        if message.hasText || message.linkPreview != nil {
-          let renderer = RendererRegistry.shared.renderer(for: message)
-          let isLinkPreview = message.linkPreview != nil
-
-          renderer.render(message)
-            .padding(.horizontal, isLinkPreview ? 0 : 12)
-            .padding(.vertical, isLinkPreview ? 0 : 8)
-            .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
-            .foregroundStyle(message.isFromMe ? .white : .primary)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-
-        // Decorators (timestamp, read receipts, etc.)
         let decoratorContext = DecoratorContext(
           isLastSentMessage: isLastSentMessage,
           isLastMessage: isLastMessage,
           conversationId: message.conversationId
         )
+
+        // Wrap content in ZStack so topTrailing decorators (tapback pills) overlay the bubble
+        ZStack(alignment: .topTrailing) {
+          VStack(alignment: message.isFromMe ? .trailing : .leading, spacing: 2) {
+            // Display attachments first (like Apple Messages)
+            if message.hasAttachments {
+              AttachmentRendererRegistry.shared.renderer(for: message.attachments)
+                .render(message.attachments)
+            }
+
+            // Display text if present - delegated to RendererRegistry
+            if message.hasText || message.linkPreview != nil {
+              let renderer = RendererRegistry.shared.renderer(for: message)
+              let isLinkPreview = message.linkPreview != nil
+
+              renderer.render(message)
+                .padding(.horizontal, isLinkPreview ? 0 : 12)
+                .padding(.vertical, isLinkPreview ? 0 : 8)
+                .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
+                .foregroundStyle(message.isFromMe ? .white : .primary)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+          }
+
+          // Top trailing decorators (tapback pills)
+          ForEach(
+            DecoratorRegistry.shared.decorators(
+              for: message, at: .topTrailing, context: decoratorContext), id: \.id
+          ) { decorator in
+            decorator.decorate(message, context: decoratorContext)
+          }
+        }
         ForEach(
           DecoratorRegistry.shared.decorators(for: message, at: .below, context: decoratorContext),
           id: \.id
