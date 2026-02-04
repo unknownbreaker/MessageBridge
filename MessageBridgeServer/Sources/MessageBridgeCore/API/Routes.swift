@@ -55,7 +55,19 @@ public func configureRoutes(
     }
 
     do {
-      try await database.markConversationAsRead(conversationId: conversationId)
+      let syncResult = try await database.markConversationAsRead(conversationId: conversationId)
+
+      // Broadcast sync warning if applicable
+      if case .failed(let reason) = syncResult {
+        await webSocketManager?.broadcastSyncWarning(
+          conversationId: conversationId,
+          message: reason
+        )
+      } else {
+        // Clear any previous sync warning for this conversation
+        await webSocketManager?.broadcastSyncWarningCleared(conversationId: conversationId)
+      }
+
       return .ok
     } catch {
       throw Abort(.internalServerError, reason: "Failed to mark conversation as read")

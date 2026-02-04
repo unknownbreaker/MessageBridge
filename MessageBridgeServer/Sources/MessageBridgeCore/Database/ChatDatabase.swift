@@ -479,7 +479,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
   /// Mark all unread messages in a conversation as read
   /// This writes to Apple's chat.db to sync read status with Messages.app
-  public func markConversationAsRead(conversationId: String) async throws {
+  /// - Returns: SyncResult indicating if Messages.app sync was successful
+  public func markConversationAsRead(conversationId: String) async throws -> SyncResult {
     let (messagesMarked, chatUpdated) = try await Task.detached { [dbPool] in
       try dbPool.write { db -> (Int, Bool) in
         let now = Int64(Date().timeIntervalSinceReferenceDate * 1_000_000_000)
@@ -515,13 +516,16 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         return (messagesCount, chatUpdated)
       }
     }.value
+
     // Open the conversation in Messages.app (in background) to trigger native read-marking
     // This is more reliable than database updates since Messages.app syncs via iCloud
-    await syncReadStateWithMessagesApp(conversationId: conversationId)
+    let syncResult = await syncReadStateWithMessagesApp(conversationId: conversationId)
 
     serverLog(
       "Marked \(messagesMarked) message(s) as read, chat updated: \(chatUpdated) for: \(conversationId)"
     )
+
+    return syncResult
   }
 
   /// Nudges Messages.app to pick up the read-state changes written to chat.db.
@@ -529,17 +533,147 @@ public actor ChatDatabase: ChatDatabaseProtocol {
   /// For 1:1 chats the messages:// URL scheme reliably navigates Messages.app to the
   /// conversation (without activating the window), which triggers its internal read-marking.
   ///
-  /// For group chats (especially pinned ones) the URL scheme doesn't work — Messages.app
-  /// opens a blank compose window instead. Restarting the `imagent` daemon forces
-  /// Messages.app to re-read the database, picking up our is_read / last_read_message_timestamp
-  /// changes for all conversations at once.
-  private func syncReadStateWithMessagesApp(conversationId: String) async {
+  /// For group chats, we use UI search automation to open the specific chat. If the chat
+  /// has duplicate participants with another chat, we use the display name search which
+  /// requires Accessibility permissions.
+  ///
+  /// - Returns: SyncResult indicating if the sync was successful
+  private func syncReadStateWithMessagesApp(conversationId: String) async -> SyncResult {
     let isGroupChat = conversationId.lowercased().hasPrefix("chat")
+    serverLog("syncReadStateWithMessagesApp: \(conversationId), isGroupChat: \(isGroupChat)")
 
     if isGroupChat {
-      await restartImagent()
+      return await openGroupChatViaSearch(conversationId: conversationId)
     } else {
       await openConversationViaURLScheme(conversationId: conversationId)
+      return .success
+    }
+  }
+
+  /// Opens a group chat by searching for it, using the appropriate strategy based on
+  /// whether there are duplicate chats with the same participants.
+  /// - Returns: SyncResult indicating if the operation was successful
+  private func openGroupChatViaSearch(conversationId: String) async -> SyncResult {
+    // Get participant handles and chat info for this group chat
+    guard let chatInfo = getGroupChatInfo(conversationId: conversationId),
+      !chatInfo.handles.isEmpty
+    else {
+      serverLogWarning("Could not get info for group chat: \(conversationId)")
+      return .failed(reason: "Could not get chat info")
+    }
+
+    // Check if there are other chats with the exact same participants
+    let hasDuplicates = hasChatsWithSameParticipants(
+      conversationId: conversationId, handles: chatInfo.handles)
+
+    if hasDuplicates {
+      // Fall back to UI search by chat name (requires Accessibility)
+      serverLog("openGroupChatViaSearch: duplicate participants detected, using UI search")
+      return await openGroupChatViaUISearch(chatInfo: chatInfo)
+    } else {
+      // Use URL scheme with addresses (no special permissions needed)
+      let addressList = chatInfo.handles.joined(separator: ",")
+      guard let url = URL(string: "messages://open?addresses=\(addressList)") else {
+        serverLogWarning("Could not build URL for group chat: \(conversationId)")
+        return .failed(reason: "Could not build URL")
+      }
+
+      serverLog("openGroupChatViaSearch: opening URL = \(url)")
+      _ = await MainActor.run {
+        NSWorkspace.shared.open(url)
+      }
+      return .success
+    }
+  }
+
+  /// Gets display name and handles for a group chat
+  private nonisolated func getGroupChatInfo(conversationId: String) -> GroupChatInfo? {
+    do {
+      return try dbPool.read { [self] db -> GroupChatInfo? in
+        // Get the chat's ROWID and display_name
+        let chatRow = try Row.fetchOne(
+          db,
+          sql: """
+            SELECT ROWID, display_name
+            FROM chat
+            WHERE chat_identifier = ?
+            """,
+          arguments: [conversationId]
+        )
+
+        guard let chatRow = chatRow,
+          let chatId: Int64 = chatRow["ROWID"]
+        else {
+          return nil
+        }
+
+        let displayName: String? = chatRow["display_name"]
+
+        // Get the handles for this chat
+        let handles = try self.fetchHandlesForChat(db: db, chatId: chatId)
+        let handleAddresses = handles.map { $0.address }
+
+        return GroupChatInfo(
+          conversationId: conversationId,
+          displayName: displayName,
+          handles: handleAddresses
+        )
+      }
+    } catch {
+      serverLogWarning("Failed to get group chat info: \(error)")
+      return nil
+    }
+  }
+
+  /// Checks if there are other chats with the exact same set of participants
+  private nonisolated func hasChatsWithSameParticipants(conversationId: String, handles: [String])
+    -> Bool
+  {
+    guard !handles.isEmpty else { return false }
+
+    do {
+      return try dbPool.read { [self] db -> Bool in
+        // Find all chats that have ALL of the same handles (same participant count, all matching)
+        // This is done by:
+        // 1. Finding chats with the exact same number of participants
+        // 2. Checking that all handles are shared
+
+        let sortedHandles = handles.sorted()
+        let handleCount = handles.count
+
+        // Get all group chats with the same participant count
+        let candidateChats = try Row.fetchAll(
+          db,
+          sql: """
+            SELECT c.ROWID, c.chat_identifier, COUNT(chj.handle_id) as handle_count
+            FROM chat c
+            JOIN chat_handle_join chj ON c.ROWID = chj.chat_id
+            WHERE c.chat_identifier != ?
+            AND c.chat_identifier LIKE 'chat%'
+            GROUP BY c.ROWID
+            HAVING handle_count = ?
+            """,
+          arguments: [conversationId, handleCount]
+        )
+
+        for candidateRow in candidateChats {
+          guard let candidateChatId: Int64 = candidateRow["ROWID"] else { continue }
+
+          // Get the handles for this candidate chat
+          let candidateHandles = try self.fetchHandlesForChat(db: db, chatId: candidateChatId)
+          let candidateAddresses = candidateHandles.map { $0.address }.sorted()
+
+          // If all addresses match, we have a duplicate
+          if candidateAddresses == sortedHandles {
+            return true
+          }
+        }
+
+        return false
+      }
+    } catch {
+      serverLogWarning("Failed to check for duplicate chats: \(error)")
+      return false
     }
   }
 
@@ -746,7 +880,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
     serverLog("openGroupChatViaUISearch: opening fallback URL = \(url)")
 
-    await MainActor.run {
+    _ = await MainActor.run {
       NSWorkspace.shared.open(url)
     }
 
