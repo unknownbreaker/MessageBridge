@@ -16,6 +16,7 @@ public class MessagesViewModel: ObservableObject {
   @Published public var connectionStatus: ConnectionStatus = .disconnected
   @Published public var lastError: Error?
   @Published public var selectedConversationId: String?
+  @Published public var syncWarnings: [String: String] = [:]  // conversationId -> warning message
 
   public struct PaginationState {
     public var offset: Int = 0
@@ -100,6 +101,7 @@ public class MessagesViewModel: ObservableObject {
     messages = [:]
     paginationState = [:]
     selectedConversationId = nil
+    syncWarnings = [:]  // Clear sync warnings on disconnect
     updateDockBadge()  // Clear badge on disconnect
     logInfo("Disconnected from server")
   }
@@ -116,6 +118,23 @@ public class MessagesViewModel: ObservableObject {
     }
 
     await connect(to: config.serverURL, apiKey: config.apiKey, e2eEnabled: config.e2eEnabled)
+  }
+
+  // MARK: - Sync Warning Handling
+
+  /// Handle sync warning event from WebSocket
+  public func handleSyncWarning(conversationId: String, message: String) {
+    syncWarnings[conversationId] = message
+  }
+
+  /// Handle sync warning cleared event from WebSocket
+  public func handleSyncWarningCleared(conversationId: String) {
+    syncWarnings.removeValue(forKey: conversationId)
+  }
+
+  /// Dismiss sync warning for a conversation (user action)
+  public func dismissSyncWarning(for conversationId: String) {
+    syncWarnings.removeValue(forKey: conversationId)
   }
 
   private func startWebSocket() async {

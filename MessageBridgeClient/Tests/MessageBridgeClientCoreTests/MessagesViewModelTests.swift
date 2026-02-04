@@ -651,6 +651,59 @@ final class MessagesViewModelTests: XCTestCase {
 
     XCTAssertEqual(viewModel.paginationState["chat-1"]?.hasMore, false)
   }
+
+  // MARK: - Sync Warning Tests
+
+  func testSyncWarnings_initiallyEmpty() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+    XCTAssertTrue(viewModel.syncWarnings.isEmpty)
+  }
+
+  func testHandleSyncWarning_addsWarning() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+
+    XCTAssertEqual(viewModel.syncWarnings["chat123"], "Test warning")
+  }
+
+  func testHandleSyncWarningCleared_removesWarning() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+
+    viewModel.handleSyncWarningCleared(conversationId: "chat123")
+
+    XCTAssertNil(viewModel.syncWarnings["chat123"])
+  }
+
+  func testDismissSyncWarning_removesWarning() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+
+    viewModel.dismissSyncWarning(for: "chat123")
+
+    XCTAssertNil(viewModel.syncWarnings["chat123"])
+  }
+
+  func testDisconnect_clearsSyncWarnings() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    // Connect and add a sync warning
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+    XCTAssertFalse(viewModel.syncWarnings.isEmpty)
+
+    // Disconnect
+    await viewModel.disconnect()
+
+    // Sync warnings should be cleared
+    XCTAssertTrue(viewModel.syncWarnings.isEmpty)
+  }
 }
 
 // MARK: - MockBridgeService Helpers

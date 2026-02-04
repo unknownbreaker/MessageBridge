@@ -389,3 +389,25 @@ extension Conversation: Hashable {
     hasher.combine(lastMessage?.id)
   }
 }
+
+// MARK: - Sync Warning Events
+
+/// Event received when sync warning occurs (read status could not be synced to Messages.app)
+public struct SyncWarningEvent: Codable, Sendable {
+  public let conversationId: String
+  public let message: String
+
+  public init(conversationId: String, message: String) {
+    self.conversationId = conversationId
+    self.message = message
+  }
+}
+
+/// Event received when sync warning is cleared (sync succeeded)
+public struct SyncWarningClearedEvent: Codable, Sendable {
+  public let conversationId: String
+
+  public init(conversationId: String) {
+    self.conversationId = conversationId
+  }
+}
