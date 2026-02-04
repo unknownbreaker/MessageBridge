@@ -94,6 +94,30 @@ public actor WebSocketManager {
     await broadcast(wsMessage)
   }
 
+  /// Broadcast a sync warning to all connected clients
+  public func broadcastSyncWarning(conversationId: String, message: String) async {
+    os_log(
+      "Broadcasting sync warning for %{public}@ to %d client(s)", log: logger, type: .info,
+      conversationId, connections.count)
+
+    let event = SyncWarningEvent(conversationId: conversationId, message: message)
+    let wsMessage = WebSocketMessage(type: .syncWarning, data: event)
+
+    await broadcast(wsMessage)
+  }
+
+  /// Broadcast sync warning cleared to all connected clients
+  public func broadcastSyncWarningCleared(conversationId: String) async {
+    os_log(
+      "Broadcasting sync warning cleared for %{public}@ to %d client(s)", log: logger, type: .info,
+      conversationId, connections.count)
+
+    let event = SyncWarningClearedEvent(conversationId: conversationId)
+    let wsMessage = WebSocketMessage(type: .syncWarningCleared, data: event)
+
+    await broadcast(wsMessage)
+  }
+
   /// Send a connected confirmation to a specific client
   public func sendConnected(to id: UUID) async {
     guard let connInfo = connections[id] else { return }

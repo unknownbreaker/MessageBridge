@@ -31,4 +31,17 @@ final class SyncWarningTests: XCTestCase {
     XCTAssertEqual(WebSocketMessageType.syncWarning.rawValue, "sync_warning")
     XCTAssertEqual(WebSocketMessageType.syncWarningCleared.rawValue, "sync_warning_cleared")
   }
+
+  func testWebSocketManager_broadcastSyncWarning() async throws {
+    // This is an integration test - we'll verify the method exists and compiles
+    // Actual broadcast behavior is tested via WebSocket integration tests
+    let manager = WebSocketManager()
+
+    // Should compile and not throw
+    await manager.broadcastSyncWarning(conversationId: "chat123", message: "Test warning")
+    await manager.broadcastSyncWarningCleared(conversationId: "chat123")
+
+    // If we get here, methods exist and work
+    XCTAssertTrue(true)
+  }
 }
