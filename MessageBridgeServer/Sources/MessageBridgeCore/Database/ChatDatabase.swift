@@ -2,6 +2,12 @@ import AppKit
 import Foundation
 import GRDB
 
+/// Result of attempting to sync read state with Messages.app
+public enum SyncResult: Sendable, Equatable {
+  case success
+  case failed(reason: String)
+}
+
 /// Provides read-only access to the macOS Messages database (chat.db)
 public actor ChatDatabase: ChatDatabaseProtocol {
   private nonisolated let dbPool: DatabasePool

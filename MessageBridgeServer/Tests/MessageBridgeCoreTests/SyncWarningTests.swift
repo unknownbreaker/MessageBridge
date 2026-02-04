@@ -44,4 +44,23 @@ final class SyncWarningTests: XCTestCase {
     // If we get here, methods exist and work
     XCTAssertTrue(true)
   }
+
+  func testSyncResult_hasCorrectCases() {
+    let success = SyncResult.success
+    let failed = SyncResult.failed(reason: "Test reason")
+
+    switch success {
+    case .success:
+      XCTAssertTrue(true)
+    case .failed:
+      XCTFail("Expected success")
+    }
+
+    switch failed {
+    case .success:
+      XCTFail("Expected failed")
+    case .failed(let reason):
+      XCTAssertEqual(reason, "Test reason")
+    }
+  }
 }
