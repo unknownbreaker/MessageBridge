@@ -63,4 +63,14 @@ final class SyncWarningTests: XCTestCase {
       XCTAssertEqual(reason, "Test reason")
     }
   }
+
+  func testBuildSearchScript_containsPollLogic() {
+    // Test that the script contains the polling pattern
+    let script = ChatDatabase.buildSearchScript(searchString: "Test Chat")
+
+    XCTAssertTrue(script.contains("repeat"), "Script should contain polling loop")
+    XCTAssertTrue(script.contains("entire contents"), "Script should use entire contents")
+    XCTAssertTrue(script.contains("Conversations"), "Script should look for Conversations header")
+    XCTAssertTrue(script.contains("Test Chat"), "Script should contain search string")
+  }
 }

@@ -584,6 +584,64 @@ public actor ChatDatabase: ChatDatabaseProtocol {
     }
   }
 
+  // MARK: - AppleScript Builders
+
+  /// Builds the AppleScript for searching Messages.app with poll-until-ready logic
+  /// - Parameter searchString: The chat name to search for
+  /// - Returns: AppleScript source code
+  public static func buildSearchScript(searchString: String) -> String {
+    let escapedSearch =
+      searchString
+      .replacingOccurrences(of: "\\", with: "\\\\")
+      .replacingOccurrences(of: "\"", with: "\\\"")
+
+    return """
+      tell application "Messages" to activate
+      delay 0.3
+
+      tell application "System Events"
+          tell process "Messages"
+              -- Open search
+              keystroke "f" using command down
+              delay 0.2
+
+              -- Type search string
+              keystroke "\(escapedSearch)"
+
+              -- Poll for results (up to 3 seconds)
+              set resultsFound to false
+              repeat 20 times
+                  delay 0.15
+                  try
+                      set allElements to entire contents of front window
+                      repeat with elem in allElements
+                          if class of elem is static text then
+                              if description of elem is "Conversations" then
+                                  set resultsFound to true
+                                  exit repeat
+                              end if
+                          end if
+                      end repeat
+                  end try
+                  if resultsFound then exit repeat
+              end repeat
+
+              if resultsFound then
+                  -- Select first result
+                  key code 125
+                  delay 0.1
+                  key code 36
+                  delay 0.2
+                  key code 53
+                  return "success"
+              else
+                  return "no_results"
+              end if
+          end tell
+      end tell
+      """
+  }
+
   // MARK: - Handles
 
   public func fetchAllHandles() async throws -> [Handle] {
