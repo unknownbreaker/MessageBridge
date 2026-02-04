@@ -64,13 +64,34 @@ final class SyncWarningTests: XCTestCase {
     }
   }
 
-  func testBuildSearchScript_containsPollLogic() {
-    // Test that the script contains the polling pattern
+  func testBuildSearchScript_containsSafetyChecks() {
     let script = ChatDatabase.buildSearchScript(searchString: "Test Chat")
 
-    XCTAssertTrue(script.contains("repeat"), "Script should contain polling loop")
-    XCTAssertTrue(script.contains("entire contents"), "Script should use entire contents")
-    XCTAssertTrue(script.contains("Conversations"), "Script should look for Conversations header")
+    // Should find search field via accessibility role, not Cmd+F
+    XCTAssertTrue(script.contains("AXSearchField"), "Script should find search field by role")
+    XCTAssertTrue(script.contains("click searchField"), "Script should click to focus search field")
+    XCTAssertFalse(
+      script.contains("keystroke \"f\" using command down"),
+      "Script should NOT use Cmd+F (unreliable, can type into compose field)")
+
+    // Should verify text reached the search field before proceeding
+    XCTAssertTrue(
+      script.contains("textConfirmed"), "Script should verify text went to search field")
+    XCTAssertTrue(script.contains("wrong_field"), "Script should detect wrong field")
+
+    // Should return no_search_field if search field not found
+    XCTAssertTrue(
+      script.contains("no_search_field"), "Script should handle missing search field")
+
     XCTAssertTrue(script.contains("Test Chat"), "Script should contain search string")
+    XCTAssertTrue(script.contains("Conversations"), "Script should check for results")
+  }
+
+  func testBuildSearchScript_escapesSpecialCharacters() {
+    let script = ChatDatabase.buildSearchScript(searchString: "Chat \"With\" Quotes\\Slash")
+
+    XCTAssertTrue(
+      script.contains("Chat \\\"With\\\" Quotes\\\\Slash"),
+      "Script should escape quotes and backslashes")
   }
 }

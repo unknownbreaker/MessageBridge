@@ -733,7 +733,10 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
   // MARK: - AppleScript Builders
 
-  /// Builds the AppleScript for searching Messages.app with poll-until-ready logic
+  /// Builds the AppleScript for searching Messages.app by directly targeting the search field.
+  /// SAFETY: This script finds the search field via accessibility role (AXSearchField) and clicks it
+  /// to focus, rather than relying on Cmd+F which can fail and cause keystrokes to go into the
+  /// message compose field — accidentally sending the search term as a message.
   /// - Parameter searchString: The chat name to search for
   /// - Returns: AppleScript source code
   public static func buildSearchScript(searchString: String) -> String {
@@ -748,30 +751,74 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
       tell application "System Events"
           tell process "Messages"
-              -- Open search
-              keystroke "f" using command down
+              -- Find the search field by accessibility role (AXSearchField).
+              -- This is safer than Cmd+F which may fail to focus the search field,
+              -- causing keystrokes to go into the message compose field.
+              set searchField to missing value
+              try
+                  set allElements to entire contents of front window
+                  repeat with elem in allElements
+                      try
+                          if class of elem is text field and subrole of elem is "AXSearchField" then
+                              set searchField to elem
+                              exit repeat
+                          end if
+                      end try
+                  end repeat
+              end try
+
+              if searchField is missing value then
+                  return "no_search_field"
+              end if
+
+              -- Click the search field to ensure it has focus
+              click searchField
               delay 0.2
 
-              -- Type search string
-              keystroke "\(escapedSearch)"
+              -- Clear any existing text
+              keystroke "a" using command down
+              delay 0.05
+              key code 51 -- Backspace
+              delay 0.1
 
-              -- Poll for results (up to 3 seconds)
-              set resultsFound to false
-              repeat 20 times
-                  delay 0.15
+              -- Type the search string
+              keystroke "\(escapedSearch)"
+              delay 0.3
+
+              -- Verify text was entered in the SEARCH field, not the compose field.
+              -- If verification fails, abort without pressing Return to avoid sending a message.
+              set textConfirmed to false
+              repeat 10 times
                   try
-                      set allElements to entire contents of front window
-                      repeat with elem in allElements
-                          if class of elem is static text then
-                              if description of elem is "Conversations" then
-                                  set resultsFound to true
-                                  exit repeat
-                              end if
-                          end if
-                      end repeat
+                      set fieldVal to value of searchField
+                      if fieldVal contains "\(escapedSearch)" then
+                          set textConfirmed to true
+                          exit repeat
+                      end if
                   end try
-                  if resultsFound then exit repeat
+                  delay 0.15
               end repeat
+
+              if not textConfirmed then
+                  -- Text didn't reach the search field. Press Escape and abort.
+                  key code 53
+                  return "wrong_field"
+              end if
+
+              -- Wait for search results to populate, then check once
+              delay 1.0
+              set resultsFound to false
+              try
+                  set allElements to entire contents of front window
+                  repeat with elem in allElements
+                      try
+                          if class of elem is static text and value of elem is "Conversations" then
+                              set resultsFound to true
+                              exit repeat
+                          end if
+                      end try
+                  end repeat
+              end try
 
               if resultsFound then
                   -- Select first result
@@ -782,6 +829,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                   key code 53
                   return "success"
               else
+                  key code 53
                   return "no_results"
               end if
           end tell
@@ -851,6 +899,12 @@ public actor ChatDatabase: ChatDatabaseProtocol {
     if result1 == "success" {
       serverLog("openGroupChatViaUISearch: success on first attempt")
       return .success
+    }
+
+    // If the search field wasn't found, no point retrying — go straight to fallback
+    if result1 == "no_search_field" {
+      serverLog("openGroupChatViaUISearch: search field not found, falling back to URL scheme")
+      return await fallbackToURLScheme(chatInfo: chatInfo)
     }
 
     serverLog("openGroupChatViaUISearch: first attempt returned '\(result1)', retrying...")
