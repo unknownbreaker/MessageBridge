@@ -7,6 +7,8 @@ public enum WebSocketMessageType: String, Codable, Sendable {
   case error = "error"
   case tapbackAdded = "tapback_added"
   case tapbackRemoved = "tapback_removed"
+  case syncWarning = "sync_warning"
+  case syncWarningCleared = "sync_warning_cleared"
 }
 
 /// Base WebSocket message envelope
@@ -94,6 +96,26 @@ public struct TapbackEvent: Codable, Sendable {
     self.tapbackType = tapbackType
     self.sender = sender
     self.isFromMe = isFromMe
+    self.conversationId = conversationId
+  }
+}
+
+/// Data payload for sync warning events
+public struct SyncWarningEvent: Codable, Sendable {
+  public let conversationId: String
+  public let message: String
+
+  public init(conversationId: String, message: String) {
+    self.conversationId = conversationId
+    self.message = message
+  }
+}
+
+/// Data payload for sync warning cleared events
+public struct SyncWarningClearedEvent: Codable, Sendable {
+  public let conversationId: String
+
+  public init(conversationId: String) {
     self.conversationId = conversationId
   }
 }
