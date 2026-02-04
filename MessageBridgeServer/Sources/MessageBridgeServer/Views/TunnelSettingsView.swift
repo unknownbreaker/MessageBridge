@@ -9,7 +9,15 @@ struct TunnelSettingsView: View {
   @State private var errorMessage: String?
   @State private var ngrokAuthToken = ""
   @State private var isSavingToken = false
-  @State private var showTokenField = false
+  @State private var showTokenField: Bool
+
+  /// If true, auto-show the auth token input field on appear
+  let autoShowTokenField: Bool
+
+  init(autoShowTokenField: Bool = false) {
+    self.autoShowTokenField = autoShowTokenField
+    _showTokenField = State(initialValue: autoShowTokenField)
+  }
 
   var body: some View {
     Form {
