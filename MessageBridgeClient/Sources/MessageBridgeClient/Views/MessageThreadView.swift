@@ -210,8 +210,9 @@ struct MessageBubble: View {
           conversationId: message.conversationId
         )
 
-        // Wrap content in ZStack so topTrailing decorators (tapback pills) overlay the bubble
-        ZStack(alignment: .topTrailing) {
+        // Wrap content in ZStack so top decorators (tapback pills) overlay the bubble
+        // isFromMe → top-leading (inner side), others → top-trailing (inner side)
+        ZStack(alignment: message.isFromMe ? .topLeading : .topTrailing) {
           VStack(alignment: message.isFromMe ? .trailing : .leading, spacing: 2) {
             // Display attachments first (like Apple Messages)
             if message.hasAttachments {
@@ -233,7 +234,7 @@ struct MessageBubble: View {
             }
           }
 
-          // Top trailing decorators (tapback pills)
+          // Top decorators (tapback pills) — position matches ZStack alignment above
           ForEach(
             DecoratorRegistry.shared.decorators(
               for: message, at: .topTrailing, context: decoratorContext), id: \.id
@@ -319,6 +320,32 @@ struct AvatarView: View {
         .frame(width: size, height: size)
       }
     }
+  }
+}
+
+/// Banner displayed when read status sync fails for a conversation
+struct SyncWarningBanner: View {
+  let message: String
+  let onDismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.yellow)
+      Text(message)
+        .foregroundStyle(.yellow)
+        .font(.caption)
+      Spacer()
+      Button(action: onDismiss) {
+        Image(systemName: "xmark")
+          .foregroundStyle(.secondary)
+          .font(.caption)
+      }
+      .buttonStyle(.plain)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .background(Color.yellow.opacity(0.1))
   }
 }
 
