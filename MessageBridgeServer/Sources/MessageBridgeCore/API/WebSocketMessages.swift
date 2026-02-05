@@ -58,8 +58,8 @@ public struct TapbackEvent: Codable, Sendable {
   /// The GUID of the message this tapback is attached to.
   public let messageGUID: String
 
-  /// The tapback type as a string (e.g., "love", "like", "dislike", "laugh", "emphasis", "question").
-  public let tapbackType: String
+  /// The tapback type raw value (2000-2006).
+  public let tapbackType: Int
 
   /// The handle ID of the sender (e.g., "+15551234567" or "email@example.com").
   public let sender: String
@@ -70,34 +70,25 @@ public struct TapbackEvent: Codable, Sendable {
   /// The conversation ID for the client to find the message.
   public let conversationId: String
 
+  /// The custom emoji for `.customEmoji` type tapbacks (iOS 17+). Nil for classic types.
+  public let emoji: String?
+
   public init(
     messageGUID: String,
     tapbackType: TapbackType,
     sender: String,
     isFromMe: Bool,
-    conversationId: String
+    conversationId: String,
+    emoji: String? = nil
   ) {
     self.messageGUID = messageGUID
-    self.tapbackType = String(describing: tapbackType)
+    self.tapbackType = tapbackType.rawValue
     self.sender = sender
     self.isFromMe = isFromMe
     self.conversationId = conversationId
+    self.emoji = emoji
   }
 
-  /// Alternative initializer accepting tapbackType as a raw string.
-  public init(
-    messageGUID: String,
-    tapbackType: String,
-    sender: String,
-    isFromMe: Bool,
-    conversationId: String
-  ) {
-    self.messageGUID = messageGUID
-    self.tapbackType = tapbackType
-    self.sender = sender
-    self.isFromMe = isFromMe
-    self.conversationId = conversationId
-  }
 }
 
 /// Data payload for sync warning events

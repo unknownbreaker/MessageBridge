@@ -46,7 +46,10 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
   case laugh = 2003
   case emphasis = 2004
   case question = 2005
+  case customEmoji = 2006
 
+  /// The default emoji for classic tapback types.
+  /// For `.customEmoji`, use the `emoji` field on the `Tapback` struct instead.
   public var emoji: String {
     switch self {
     case .love: return "❤️"
@@ -55,6 +58,7 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
     case .laugh: return "😂"
     case .emphasis: return "‼️"
     case .question: return "❓"
+    case .customEmoji: return "😀"
     }
   }
 }
@@ -63,19 +67,35 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
 
 /// Represents a tapback reaction on a message
 public struct Tapback: Codable, Sendable, Equatable, Hashable, Identifiable {
-  public var id: String { "\(messageGUID)-\(sender)-\(type.rawValue)" }
+  public var id: String { "\(messageGUID)-\(sender)-\(type.rawValue)-\(emoji ?? "")" }
   public let type: TapbackType
   public let sender: String
   public let isFromMe: Bool
   public let date: Date
   public let messageGUID: String
+  /// The custom emoji for `.customEmoji` type tapbacks (iOS 17+).
+  /// Nil for classic tapback types.
+  public let emoji: String?
 
-  public init(type: TapbackType, sender: String, isFromMe: Bool, date: Date, messageGUID: String) {
+  public init(
+    type: TapbackType, sender: String, isFromMe: Bool, date: Date, messageGUID: String,
+    emoji: String? = nil
+  ) {
     self.type = type
     self.sender = sender
     self.isFromMe = isFromMe
     self.date = date
     self.messageGUID = messageGUID
+    self.emoji = emoji
+  }
+
+  /// The emoji to display for this tapback.
+  /// Uses the custom emoji for `.customEmoji` type, otherwise the classic type's emoji.
+  public var displayEmoji: String {
+    if type == .customEmoji, let emoji = emoji {
+      return emoji
+    }
+    return type.emoji
   }
 }
 

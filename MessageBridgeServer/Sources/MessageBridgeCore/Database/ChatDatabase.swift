@@ -206,6 +206,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
         WHERE c.chat_identifier = ?
+          AND (m.associated_message_type IS NULL OR m.associated_message_type = 0)
         ORDER BY m.date DESC
         LIMIT ? OFFSET ?
         """
@@ -295,6 +296,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         JOIN chat c ON cmj.chat_id = c.ROWID
         LEFT JOIN handle h ON m.handle_id = h.ROWID
         WHERE m.ROWID > ?
+          AND (m.associated_message_type IS NULL OR m.associated_message_type = 0)
         ORDER BY m.ROWID ASC
         LIMIT ?
         """
@@ -343,30 +345,43 @@ public actor ChatDatabase: ChatDatabaseProtocol {
   // MARK: - Tapback Detection (Fast Path)
 
   /// Fetch tapback rows newer than a given ROWID - optimized for real-time detection
-  /// This queries for messages with associated_message_type between 2000-3005 (tapbacks)
+  /// This queries for messages with associated_message_type between 2000-3006 (tapbacks)
   public nonisolated func fetchTapbacksNewerThan(id: Int64, limit: Int = 20) throws -> [(
     rowId: Int64, tapback: Tapback, conversationId: String, isRemoval: Bool
   )] {
     try dbPool.read { db in
-      // Query for tapback messages (associated_message_type 2000-3005)
+      // Query for tapback messages (associated_message_type 2000-3006)
       // Join to get the target message's conversation
+      // Strip the p:N/ or bp: prefix from associated_message_guid to get the raw target GUID.
+      // Apple stores tapback references as "p:0/MESSAGE_GUID" (part index),
+      // "bp:MESSAGE_GUID" (balloon provider / link preview), or bare "MESSAGE_GUID".
+      let stripPrefix = """
+        CASE WHEN m.associated_message_guid LIKE 'p:%/%'
+             THEN SUBSTR(m.associated_message_guid, INSTR(m.associated_message_guid, '/') + 1)
+             WHEN m.associated_message_guid LIKE 'bp:%'
+             THEN SUBSTR(m.associated_message_guid, 4)
+             ELSE m.associated_message_guid
+        END
+        """
+
       let sql = """
         SELECT
             m.ROWID as id,
             m.guid,
-            m.associated_message_guid,
+            (\(stripPrefix)) as target_guid,
             m.associated_message_type,
+            m.associated_message_emoji,
             m.is_from_me,
             m.date,
             COALESCE(h.id, '') as sender,
             c.chat_identifier as conversation_id
         FROM message m
         LEFT JOIN handle h ON m.handle_id = h.ROWID
-        JOIN message target_msg ON target_msg.guid = m.associated_message_guid
+        JOIN message target_msg ON target_msg.guid = (\(stripPrefix))
         JOIN chat_message_join cmj ON target_msg.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
         WHERE m.ROWID > ?
-          AND m.associated_message_type BETWEEN 2000 AND 3005
+          AND m.associated_message_type BETWEEN 2000 AND 3006
         ORDER BY m.ROWID ASC
         LIMIT ?
         """
@@ -376,7 +391,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
       return rows.compactMap { row -> (Int64, Tapback, String, Bool)? in
         guard
           let rowId: Int64 = row["id"],
-          let associatedGUID: String = row["associated_message_guid"],
+          let targetGUID: String = row["target_guid"],
           let associatedType: Int = row["associated_message_type"],
           let conversationId: String = row["conversation_id"],
           let parsed = TapbackType.from(associatedType: associatedType)
@@ -387,13 +402,15 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         let isFromMe: Int = row["is_from_me"] ?? 0
         let sender: String = row["sender"] ?? ""
         let dateValue: Int64 = row["date"] ?? 0
+        let customEmoji: String? = row["associated_message_emoji"]
 
         let tapback = Tapback(
           type: parsed.type,
           sender: sender,
           isFromMe: isFromMe == 1,
           date: Message.dateFromAppleTimestamp(dateValue),
-          messageGUID: associatedGUID
+          messageGUID: targetGUID,
+          emoji: customEmoji
         )
 
         return (rowId, tapback, conversationId, parsed.isRemoval)
@@ -438,6 +455,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
         WHERE m.text LIKE '%' || ? || '%'
+          AND (m.associated_message_type IS NULL OR m.associated_message_type = 0)
         ORDER BY m.date DESC
         LIMIT ?
         """

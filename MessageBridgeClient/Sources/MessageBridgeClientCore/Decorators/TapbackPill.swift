@@ -26,22 +26,23 @@ public struct TapbackPill: View {
     .background(Capsule().fill(.regularMaterial))
   }
 
-  /// Groups tapbacks by type, returning unique reaction types with counts.
+  /// Groups tapbacks by their display emoji, returning unique emojis with counts.
+  /// Classic tapbacks group by type; custom emoji tapbacks group by their emoji string.
   private var groupedTapbacks: [TapbackGroup] {
-    var groups: [TapbackType: Int] = [:]
+    var groups: [String: Int] = [:]
     for tapback in tapbacks {
-      groups[tapback.type, default: 0] += 1
+      let displayEmoji = tapback.displayEmoji
+      groups[displayEmoji, default: 0] += 1
     }
-    return groups.map { TapbackGroup(type: $0.key, count: $0.value) }
-      .sorted { $0.type.rawValue < $1.type.rawValue }
+    return groups.map { TapbackGroup(emoji: $0.key, count: $0.value) }
+      .sorted { $0.emoji < $1.emoji }
   }
 }
 
-/// A group of tapbacks of the same type with a count.
+/// A group of tapbacks with the same emoji and a count.
 struct TapbackGroup: Identifiable {
-  let type: TapbackType
+  let emoji: String
   let count: Int
 
-  var id: Int { type.rawValue }
-  var emoji: String { type.emoji }
+  var id: String { emoji }
 }

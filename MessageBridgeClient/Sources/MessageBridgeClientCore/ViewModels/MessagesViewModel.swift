@@ -284,7 +284,8 @@ public class MessagesViewModel: ObservableObject {
         sender: event.sender,
         isFromMe: event.isFromMe,
         date: Date(),
-        messageGUID: event.messageGUID
+        messageGUID: event.messageGUID,
+        emoji: event.emoji
       )
 
       // Remove any existing tapback from this sender (user can only have one tapback per message)

@@ -69,7 +69,8 @@ public actor WebSocketManager {
       tapbackType: tapback.type,
       sender: tapback.sender,
       isFromMe: tapback.isFromMe,
-      conversationId: conversationId
+      conversationId: conversationId,
+      emoji: tapback.emoji
     )
     let wsMessage = WebSocketMessage(type: .tapbackAdded, data: event)
 
@@ -87,7 +88,8 @@ public actor WebSocketManager {
       tapbackType: tapback.type,
       sender: tapback.sender,
       isFromMe: tapback.isFromMe,
-      conversationId: conversationId
+      conversationId: conversationId,
+      emoji: tapback.emoji
     )
     let wsMessage = WebSocketMessage(type: .tapbackRemoved, data: event)
 

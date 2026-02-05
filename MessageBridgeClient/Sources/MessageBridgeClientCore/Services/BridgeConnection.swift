@@ -26,6 +26,7 @@ public struct TapbackEvent: Codable, Sendable {
   public let isFromMe: Bool
   public let conversationId: String
   public let isRemoval: Bool
+  public let emoji: String?
 
   public init(
     messageGUID: String,
@@ -33,7 +34,8 @@ public struct TapbackEvent: Codable, Sendable {
     sender: String,
     isFromMe: Bool,
     conversationId: String,
-    isRemoval: Bool
+    isRemoval: Bool,
+    emoji: String? = nil
   ) {
     self.messageGUID = messageGUID
     self.tapbackType = tapbackType
@@ -41,6 +43,7 @@ public struct TapbackEvent: Codable, Sendable {
     self.isFromMe = isFromMe
     self.conversationId = conversationId
     self.isRemoval = isRemoval
+    self.emoji = emoji
   }
 }
 
@@ -77,6 +80,7 @@ struct ProcessedMessageDTO: Codable {
   let highlights: [TextHighlight]?
   let mentions: [Mention]?
   let isEmojiOnly: Bool?
+  let tapbacks: [Tapback]?
 
   /// Flattened raw message fields from the server's Message type
   struct RawMessageDTO: Codable {
@@ -106,6 +110,7 @@ struct ProcessedMessageDTO: Codable {
       detectedCodes: detectedCodes,
       highlights: highlights,
       mentions: mentions,
+      tapbacks: tapbacks,
       dateDelivered: message.dateDelivered,
       dateRead: message.dateRead,
       linkPreview: message.linkPreview
@@ -156,6 +161,7 @@ struct TapbackEventPayload: Codable {
   let sender: String
   let isFromMe: Bool
   let conversationId: String
+  let emoji: String?
 }
 
 /// WebSocket message for sync warning events
@@ -575,7 +581,8 @@ public actor BridgeConnection: BridgeServiceProtocol {
           sender: payload.sender,
           isFromMe: payload.isFromMe,
           conversationId: payload.conversationId,
-          isRemoval: envelope.type == "tapback_removed"
+          isRemoval: envelope.type == "tapback_removed",
+          emoji: payload.emoji
         )
 
         logInfo(
