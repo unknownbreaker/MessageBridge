@@ -107,9 +107,18 @@ public struct TapbackRequest: Content {
 public struct TapbackResponse: Content {
   public let success: Bool
   public let error: String?
+  public let messageGUID: String?
+  public let tapbackType: String?
+  public let action: String?
 
-  public init(success: Bool, error: String? = nil) {
+  public init(
+    success: Bool, error: String? = nil, messageGUID: String? = nil, tapbackType: String? = nil,
+    action: String? = nil
+  ) {
     self.success = success
     self.error = error
+    self.messageGUID = messageGUID
+    self.tapbackType = tapbackType
+    self.action = action
   }
 }

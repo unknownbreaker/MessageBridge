@@ -213,8 +213,13 @@ public func configureRoutes(
 
     // TODO: Implement IMCore bridge to actually send tapback via AppleScript
     // For now, return success (tapback will appear when chat.db is updated by Messages.app)
-    _ = messageId  // Silence unused variable warning
-    return TapbackResponse(success: true, error: nil)
+    return TapbackResponse(
+      success: true,
+      error: nil,
+      messageGUID: messageId,
+      tapbackType: tapbackRequest.type,
+      action: tapbackRequest.action
+    )
   }
 
   // POST /send - Send a message
