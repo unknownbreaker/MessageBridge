@@ -131,11 +131,13 @@ struct MessageThreadView: View {
     .popover(isPresented: $showingTapbackPicker) {
       if let message = tapbackTargetMessage {
         TapbackPicker(message: message) { type, isRemoval in
+          showingTapbackPicker = false
           Task {
             await viewModel.sendTapback(
               type: type,
               messageGUID: message.guid,
-              action: isRemoval ? .remove : .add
+              action: isRemoval ? .remove : .add,
+              conversationId: message.conversationId
             )
           }
         }
