@@ -37,6 +37,7 @@ public class MessagesViewModel: ObservableObject {
   private let bridgeService: any BridgeServiceProtocol
   private let notificationManager: NotificationManager
   private var cancellables = Set<AnyCancellable>()
+  private var markAsReadTask: Task<Void, Never>?
 
   /// Total unread message count across all conversations
   public var totalUnreadCount: Int {
@@ -353,11 +354,16 @@ public class MessagesViewModel: ObservableObject {
         updateDockBadge()
       }
 
-      // Always call server to mark as read in database (syncs with Messages.app)
-      Task {
+      // Cancel any in-flight mark-as-read (stops previous UI search AppleScript)
+      markAsReadTask?.cancel()
+
+      // Mark as read in database (syncs with Messages.app)
+      markAsReadTask = Task {
         do {
           try await bridgeService.markConversationAsRead(id)
           logDebug("Marked conversation \(id) as read on server")
+        } catch is CancellationError {
+          logDebug("Mark-as-read cancelled for \(id)")
         } catch {
           logWarning("Failed to mark conversation as read: \(error.localizedDescription)")
         }

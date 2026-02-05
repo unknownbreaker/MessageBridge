@@ -789,15 +789,18 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                   return "no_search_field"
               end if
 
+              -- Clear any existing search first (dismisses stale popover)
+              try
+                  set fieldVal to value of searchField
+                  if fieldVal is not missing value and fieldVal is not "" then
+                      click (first button of searchField whose description is "Clear text")
+                      delay 0.2
+                  end if
+              end try
+
               -- Click the search field to ensure it has focus
               click searchField
               delay 0.2
-
-              -- Clear any existing text
-              keystroke "a" using command down
-              delay 0.05
-              key code 51 -- Backspace
-              delay 0.1
 
               -- Type the search string
               keystroke "\(escapedSearch)"
@@ -823,29 +826,48 @@ public actor ChatDatabase: ChatDatabaseProtocol {
                   return "wrong_field"
               end if
 
-              -- Wait for search results to populate, then check once
+              -- Wait for search results to populate, then click the matching button
               delay 1.0
-              set resultsFound to false
+              set conversationsFound to false
+              set resultClicked to false
               try
                   set allElements to entire contents of front window
                   repeat with elem in allElements
                       try
-                          if class of elem is static text and value of elem is "Conversations" then
-                              set resultsFound to true
-                              exit repeat
+                          if class of elem is static text and description of elem is "Conversations" then
+                              set conversationsFound to true
+                          end if
+
+                          -- After the Conversations header, click the first button matching the search
+                          if conversationsFound and class of elem is button then
+                              if description of elem is "\(escapedSearch)" then
+                                  click elem
+                                  set resultClicked to true
+                                  exit repeat
+                              end if
                           end if
                       end try
                   end repeat
               end try
 
-              if resultsFound then
-                  -- Select first result
-                  key code 125
-                  delay 0.1
-                  key code 36
-                  delay 0.2
-                  key code 53
+              if resultClicked then
+                  delay 0.3
+                  -- Re-find the search field (original reference may be stale after click)
+                  try
+                      set allElements to entire contents of front window
+                      repeat with elem in allElements
+                          try
+                              if class of elem is text field and subrole of elem is "AXSearchField" then
+                                  click (first button of elem whose description is "Clear text")
+                                  exit repeat
+                              end if
+                          end try
+                      end repeat
+                  end try
                   return "success"
+              else if conversationsFound then
+                  key code 53
+                  return "no_matching_button"
               else
                   key code 53
                   return "no_results"
