@@ -528,6 +528,46 @@ final class MessagesViewModelTests: XCTestCase {
     XCTAssertNil(viewModel.messages["chat-2"])
   }
 
+  // MARK: - Conversation Reorder Tests
+
+  func testNewMessage_movesConversationToTop() async {
+    let mockService = MockBridgeService()
+
+    let conversationA = Conversation(
+      id: "chat-a", guid: "guid-a", displayName: "Alice",
+      participants: [Handle(id: 1, address: "+15551111111", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    let conversationB = Conversation(
+      id: "chat-b", guid: "guid-b", displayName: "Bob",
+      participants: [Handle(id: 2, address: "+15552222222", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    let conversationC = Conversation(
+      id: "chat-c", guid: "guid-c", displayName: "Carol",
+      participants: [Handle(id: 3, address: "+15553333333", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    await mockService.setConversationsToReturn([conversationA, conversationB, conversationC])
+
+    let viewModel = createViewModel(mockService: mockService)
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+    XCTAssertEqual(viewModel.conversations.map(\.id), ["chat-a", "chat-b", "chat-c"])
+
+    // Simulate a new message for conversation C
+    let incomingMessage = Message(
+      id: 300, guid: "msg-300", text: "Hello from Carol!",
+      date: Date(), isFromMe: false, handleId: 3, conversationId: "chat-c"
+    )
+    await mockService.simulateNewMessage(incomingMessage, sender: "Carol")
+    try? await Task.sleep(nanoseconds: 100_000_000)
+
+    // Conversation C should now be at the top
+    XCTAssertEqual(viewModel.conversations.map(\.id), ["chat-c", "chat-a", "chat-b"])
+    XCTAssertEqual(viewModel.conversations[0].lastMessage?.text, "Hello from Carol!")
+  }
+
   // MARK: - Pagination Tests
 
   func testLoadMessages_setsPaginationState() async {

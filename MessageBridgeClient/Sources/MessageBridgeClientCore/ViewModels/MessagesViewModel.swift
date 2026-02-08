@@ -224,9 +224,10 @@ public class MessagesViewModel: ObservableObject {
         groupPhotoBase64: existingConversation.groupPhotoBase64,
         unreadCount: newUnreadCount
       )
-      // Force SwiftUI to detect change by creating a new array
+      // Move conversation to top of list (matches Messages.app behavior)
       var newConversations = conversations
-      newConversations[index] = updatedConversation
+      newConversations.remove(at: index)
+      newConversations.insert(updatedConversation, at: 0)
       conversations = newConversations
       logDebug("handleNewMessage: updated conversation lastMessage to: \(message.text ?? "nil")")
 
