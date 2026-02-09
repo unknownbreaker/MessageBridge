@@ -65,13 +65,15 @@ final class MockChatDatabase: ChatDatabaseProtocol, @unchecked Sendable {
 
   var markAsReadCalled = false
   var lastMarkedConversationId: String?
+  var syncResultToReturn: SyncResult = .success
 
-  func markConversationAsRead(conversationId: String) async throws {
+  func markConversationAsRead(conversationId: String) async throws -> SyncResult {
     markAsReadCalled = true
     lastMarkedConversationId = conversationId
     if shouldThrowError {
       throw DatabaseError.queryFailed
     }
+    return syncResultToReturn
   }
 
   var newMessagesToReturn: [(message: Message, conversationId: String, senderAddress: String?)] = []

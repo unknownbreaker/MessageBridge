@@ -1,13 +1,28 @@
 import MessageBridgeCore
 import SwiftUI
 
+enum SettingsTab: Hashable {
+  case general
+  case security
+  case tunnel
+}
+
 struct SettingsView: View {
   @EnvironmentObject var appState: AppState
   @State private var portText: String = ""
   @State private var showRegenerateConfirmation = false
+  @State private var selectedTab: SettingsTab
+
+  /// If true, auto-show the auth token input field when tunnel tab appears
+  let showAuthTokenField: Bool
+
+  init(initialTab: SettingsTab = .general, showAuthTokenField: Bool = false) {
+    _selectedTab = State(initialValue: initialTab)
+    self.showAuthTokenField = showAuthTokenField
+  }
 
   var body: some View {
-    TabView {
+    TabView(selection: $selectedTab) {
       GeneralSettingsView(
         portText: $portText, showRegenerateConfirmation: $showRegenerateConfirmation
       )
@@ -15,18 +30,21 @@ struct SettingsView: View {
       .tabItem {
         Label("General", systemImage: "gear")
       }
+      .tag(SettingsTab.general)
 
       SecuritySettingsView(showRegenerateConfirmation: $showRegenerateConfirmation)
         .environmentObject(appState)
         .tabItem {
           Label("Security", systemImage: "lock")
         }
+        .tag(SettingsTab.security)
 
-      TunnelSettingsView()
+      TunnelSettingsView(autoShowTokenField: showAuthTokenField)
         .environmentObject(appState)
         .tabItem {
           Label("Tunnel", systemImage: "network")
         }
+        .tag(SettingsTab.tunnel)
     }
     .frame(width: 450, height: 350)
     .onAppear {
@@ -221,6 +239,6 @@ struct AboutView: View {
 }
 
 #Preview {
-  SettingsView()
+  SettingsView(initialTab: .general)
     .environmentObject(AppState())
 }

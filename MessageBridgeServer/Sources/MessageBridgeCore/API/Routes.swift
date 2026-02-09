@@ -3,7 +3,8 @@ import Vapor
 /// Configures all API routes for the application
 public func configureRoutes(
   _ app: Application, database: ChatDatabaseProtocol, messageSender: MessageSenderProtocol,
-  apiKey: String, webSocketManager: WebSocketManager? = nil
+  apiKey: String, webSocketManager: WebSocketManager? = nil,
+  pinnedWatcher: PinnedConversationWatcher? = nil
 ) throws {
   // Health check - no authentication required
   app.get("health") { _ in
@@ -20,7 +21,13 @@ public func configureRoutes(
     let offset = req.query[Int.self, at: "offset"] ?? 0
 
     do {
-      let conversations = try await database.fetchRecentConversations(limit: limit, offset: offset)
+      var conversations = try await database.fetchRecentConversations(limit: limit, offset: offset)
+
+      // Overlay pinned conversation data from the watcher's cache
+      if let watcher = pinnedWatcher {
+        conversations = await watcher.overlayPins(onto: conversations)
+      }
+
       let nextCursor = conversations.count == limit ? String(offset + limit) : nil
       return ConversationsResponse(conversations: conversations, nextCursor: nextCursor)
     } catch {
@@ -55,7 +62,19 @@ public func configureRoutes(
     }
 
     do {
-      try await database.markConversationAsRead(conversationId: conversationId)
+      let syncResult = try await database.markConversationAsRead(conversationId: conversationId)
+
+      // Broadcast sync warning if applicable
+      if case .failed(let reason) = syncResult {
+        await webSocketManager?.broadcastSyncWarning(
+          conversationId: conversationId,
+          message: reason
+        )
+      } else {
+        // Clear any previous sync warning for this conversation
+        await webSocketManager?.broadcastSyncWarningCleared(conversationId: conversationId)
+      }
+
       return .ok
     } catch {
       throw Abort(.internalServerError, reason: "Failed to mark conversation as read")
@@ -201,8 +220,13 @@ public func configureRoutes(
 
     // TODO: Implement IMCore bridge to actually send tapback via AppleScript
     // For now, return success (tapback will appear when chat.db is updated by Messages.app)
-    _ = messageId  // Silence unused variable warning
-    return TapbackResponse(success: true, error: nil)
+    return TapbackResponse(
+      success: true,
+      error: nil,
+      messageGUID: messageId,
+      tapbackType: tapbackRequest.type,
+      action: tapbackRequest.action
+    )
   }
 
   // POST /send - Send a message

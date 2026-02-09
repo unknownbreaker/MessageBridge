@@ -139,13 +139,22 @@ struct ConnectionSettingsView: View {
 
           Spacer()
 
-          Button("Connect") {
-            Task {
-              await viewModel.reconnect()
+          if isConnected {
+            Button("Disconnect") {
+              Task {
+                await viewModel.disconnect()
+              }
             }
+            .help("Disconnect from server")
+          } else {
+            Button("Connect") {
+              Task {
+                await viewModel.reconnect()
+              }
+            }
+            .disabled(isConnecting || serverURLString.isEmpty || apiKey.isEmpty)
+            .help("Connect to server")
           }
-          .disabled(isConnected || isConnecting || serverURLString.isEmpty || apiKey.isEmpty)
-          .help(isConnected ? "Already connected" : "Connect to server")
 
           Button("Save") {
             saveSettings()

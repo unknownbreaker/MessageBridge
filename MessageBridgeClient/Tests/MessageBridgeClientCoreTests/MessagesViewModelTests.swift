@@ -19,6 +19,9 @@ actor MockBridgeService: BridgeServiceProtocol {
   var lastMessageText: String?
   var newMessageHandler: NewMessageHandler?
   var tapbackEventHandler: TapbackEventHandler?
+  var syncWarningHandler: SyncWarningHandler?
+  var syncWarningClearedHandler: SyncWarningClearedHandler?
+  var pinnedConversationsChangedHandler: PinnedConversationsChangedHandler?
 
   func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws {
     connectCalled = true
@@ -58,17 +61,26 @@ actor MockBridgeService: BridgeServiceProtocol {
 
   func startWebSocket(
     onNewMessage: @escaping NewMessageHandler,
-    onTapbackEvent: @escaping TapbackEventHandler
+    onTapbackEvent: @escaping TapbackEventHandler,
+    onSyncWarning: @escaping SyncWarningHandler,
+    onSyncWarningCleared: @escaping SyncWarningClearedHandler,
+    onPinnedConversationsChanged: @escaping PinnedConversationsChangedHandler
   ) async throws {
     startWebSocketCalled = true
     newMessageHandler = onNewMessage
     tapbackEventHandler = onTapbackEvent
+    syncWarningHandler = onSyncWarning
+    syncWarningClearedHandler = onSyncWarningCleared
+    pinnedConversationsChangedHandler = onPinnedConversationsChanged
   }
 
   func stopWebSocket() async {
     stopWebSocketCalled = true
     newMessageHandler = nil
     tapbackEventHandler = nil
+    syncWarningHandler = nil
+    syncWarningClearedHandler = nil
+    pinnedConversationsChangedHandler = nil
   }
 
   var attachmentDataToReturn: Data = Data()
@@ -118,6 +130,21 @@ actor MockBridgeService: BridgeServiceProtocol {
   // Helper to simulate receiving a tapback event
   func simulateTapbackEvent(_ event: TapbackEvent) {
     tapbackEventHandler?(event)
+  }
+
+  // Helper to simulate receiving a sync warning event
+  func simulateSyncWarning(_ event: SyncWarningEvent) {
+    syncWarningHandler?(event)
+  }
+
+  // Helper to simulate receiving a sync warning cleared event
+  func simulateSyncWarningCleared(_ event: SyncWarningClearedEvent) {
+    syncWarningClearedHandler?(event)
+  }
+
+  // Helper to simulate receiving a pinned conversations changed event
+  func simulatePinnedConversationsChanged(_ event: PinnedConversationsChangedEvent) {
+    pinnedConversationsChangedHandler?(event)
   }
 }
 
@@ -510,6 +537,163 @@ final class MessagesViewModelTests: XCTestCase {
     XCTAssertNil(viewModel.messages["chat-2"])
   }
 
+  // MARK: - Conversation Reorder Tests
+
+  func testNewMessage_movesConversationToTop() async {
+    let mockService = MockBridgeService()
+
+    let conversationA = Conversation(
+      id: "chat-a", guid: "guid-a", displayName: "Alice",
+      participants: [Handle(id: 1, address: "+15551111111", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    let conversationB = Conversation(
+      id: "chat-b", guid: "guid-b", displayName: "Bob",
+      participants: [Handle(id: 2, address: "+15552222222", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    let conversationC = Conversation(
+      id: "chat-c", guid: "guid-c", displayName: "Carol",
+      participants: [Handle(id: 3, address: "+15553333333", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    await mockService.setConversationsToReturn([conversationA, conversationB, conversationC])
+
+    let viewModel = createViewModel(mockService: mockService)
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+    XCTAssertEqual(viewModel.conversations.map(\.id), ["chat-a", "chat-b", "chat-c"])
+
+    // Simulate a new message for conversation C
+    let incomingMessage = Message(
+      id: 300, guid: "msg-300", text: "Hello from Carol!",
+      date: Date(), isFromMe: false, handleId: 3, conversationId: "chat-c"
+    )
+    await mockService.simulateNewMessage(incomingMessage, sender: "Carol")
+    try? await Task.sleep(nanoseconds: 100_000_000)
+
+    // Conversation C should now be at the top
+    XCTAssertEqual(viewModel.conversations.map(\.id), ["chat-c", "chat-a", "chat-b"])
+    XCTAssertEqual(viewModel.conversations[0].lastMessage?.text, "Hello from Carol!")
+  }
+
+  // MARK: - Pinned Conversation Tests
+
+  func testNewMessage_doesNotReorderPinnedConversation() async {
+    let mockService = MockBridgeService()
+
+    let pinnedConversation = Conversation(
+      id: "chat-pinned", guid: "guid-pinned", displayName: "Pinned Chat",
+      participants: [Handle(id: 1, address: "+15551111111", service: "iMessage")],
+      lastMessage: nil, isGroup: false, pinnedIndex: 0
+    )
+    let conversationB = Conversation(
+      id: "chat-b", guid: "guid-b", displayName: "Bob",
+      participants: [Handle(id: 2, address: "+15552222222", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    let conversationC = Conversation(
+      id: "chat-c", guid: "guid-c", displayName: "Carol",
+      participants: [Handle(id: 3, address: "+15553333333", service: "iMessage")],
+      lastMessage: nil, isGroup: false
+    )
+    await mockService.setConversationsToReturn([pinnedConversation, conversationB, conversationC])
+
+    let viewModel = createViewModel(mockService: mockService)
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+    XCTAssertEqual(viewModel.conversations.map(\.id), ["chat-pinned", "chat-b", "chat-c"])
+
+    // Simulate a new message for the pinned conversation
+    let incomingMessage = Message(
+      id: 400, guid: "msg-400", text: "New message in pinned",
+      date: Date(), isFromMe: false, handleId: 1, conversationId: "chat-pinned"
+    )
+    await mockService.simulateNewMessage(incomingMessage, sender: "Pinned Chat")
+    try? await Task.sleep(nanoseconds: 100_000_000)
+
+    // Pinned conversation should stay at index 0, NOT move
+    XCTAssertEqual(viewModel.conversations.map(\.id), ["chat-pinned", "chat-b", "chat-c"])
+    XCTAssertEqual(viewModel.conversations[0].lastMessage?.text, "New message in pinned")
+    XCTAssertEqual(viewModel.conversations[0].pinnedIndex, 0)
+  }
+
+  func testPinnedConversationsChangedEvent_updatesPinnedIndex() async {
+    let mockService = MockBridgeService()
+
+    let conversationA = Conversation(
+      id: "chat-a", guid: "guid-a", displayName: "Alice",
+      participants: [], lastMessage: nil, isGroup: false
+    )
+    let conversationB = Conversation(
+      id: "chat-b", guid: "guid-b", displayName: "Bob",
+      participants: [], lastMessage: nil, isGroup: false
+    )
+    let conversationC = Conversation(
+      id: "chat-c", guid: "guid-c", displayName: "Carol",
+      participants: [], lastMessage: nil, isGroup: false
+    )
+    await mockService.setConversationsToReturn([conversationA, conversationB, conversationC])
+
+    let viewModel = createViewModel(mockService: mockService)
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+    // Initially no conversations are pinned
+    XCTAssertTrue(viewModel.conversations.allSatisfy { $0.pinnedIndex == nil })
+
+    // Simulate a pinned conversations changed event: pin A at 0 and C at 1
+    let event = PinnedConversationsChangedEvent(
+      pinned: [
+        PinnedConversationEntry(conversationId: "chat-a", index: 0),
+        PinnedConversationEntry(conversationId: "chat-c", index: 1),
+      ]
+    )
+    await mockService.simulatePinnedConversationsChanged(event)
+    try? await Task.sleep(nanoseconds: 100_000_000)
+
+    // A and C should have pinnedIndex, B should not
+    let pinA = viewModel.conversations.first { $0.id == "chat-a" }
+    let pinB = viewModel.conversations.first { $0.id == "chat-b" }
+    let pinC = viewModel.conversations.first { $0.id == "chat-c" }
+
+    XCTAssertEqual(pinA?.pinnedIndex, 0)
+    XCTAssertNil(pinB?.pinnedIndex)
+    XCTAssertEqual(pinC?.pinnedIndex, 1)
+  }
+
+  func testPinnedConversationsChangedEvent_clearsPreviousPins() async {
+    let mockService = MockBridgeService()
+
+    // Start with a pinned conversation
+    let conversationA = Conversation(
+      id: "chat-a", guid: "guid-a", displayName: "Alice",
+      participants: [], lastMessage: nil, isGroup: false, pinnedIndex: 0
+    )
+    let conversationB = Conversation(
+      id: "chat-b", guid: "guid-b", displayName: "Bob",
+      participants: [], lastMessage: nil, isGroup: false
+    )
+    await mockService.setConversationsToReturn([conversationA, conversationB])
+
+    let viewModel = createViewModel(mockService: mockService)
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+    XCTAssertEqual(viewModel.conversations.first { $0.id == "chat-a" }?.pinnedIndex, 0)
+
+    // Simulate event that pins B instead of A
+    let event = PinnedConversationsChangedEvent(
+      pinned: [
+        PinnedConversationEntry(conversationId: "chat-b", index: 0)
+      ]
+    )
+    await mockService.simulatePinnedConversationsChanged(event)
+    try? await Task.sleep(nanoseconds: 100_000_000)
+
+    // A should no longer be pinned, B should be pinned
+    XCTAssertNil(viewModel.conversations.first { $0.id == "chat-a" }?.pinnedIndex)
+    XCTAssertEqual(viewModel.conversations.first { $0.id == "chat-b" }?.pinnedIndex, 0)
+  }
+
   // MARK: - Pagination Tests
 
   func testLoadMessages_setsPaginationState() async {
@@ -650,6 +834,98 @@ final class MessagesViewModelTests: XCTestCase {
     await viewModel.loadMessages(for: "chat-1")
 
     XCTAssertEqual(viewModel.paginationState["chat-1"]?.hasMore, false)
+  }
+
+  // MARK: - Sync Warning Tests
+
+  func testSyncWarnings_initiallyEmpty() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+    XCTAssertTrue(viewModel.syncWarnings.isEmpty)
+  }
+
+  func testHandleSyncWarning_addsWarning() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+
+    XCTAssertEqual(viewModel.syncWarnings["chat123"], "Test warning")
+  }
+
+  func testHandleSyncWarningCleared_removesWarning() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+
+    viewModel.handleSyncWarningCleared(conversationId: "chat123")
+
+    XCTAssertNil(viewModel.syncWarnings["chat123"])
+  }
+
+  func testDismissSyncWarning_removesWarning() {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+
+    viewModel.dismissSyncWarning(for: "chat123")
+
+    XCTAssertNil(viewModel.syncWarnings["chat123"])
+  }
+
+  func testDisconnect_clearsSyncWarnings() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    // Connect and add a sync warning
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+    viewModel.handleSyncWarning(conversationId: "chat123", message: "Test warning")
+    XCTAssertFalse(viewModel.syncWarnings.isEmpty)
+
+    // Disconnect
+    await viewModel.disconnect()
+
+    // Sync warnings should be cleared
+    XCTAssertTrue(viewModel.syncWarnings.isEmpty)
+  }
+
+  func testSyncWarning_viaWebSocket_updatesViewModel() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    // Connect to set up WebSocket
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+    XCTAssertTrue(viewModel.syncWarnings.isEmpty)
+
+    // Simulate receiving a sync warning via WebSocket
+    let warningEvent = SyncWarningEvent(conversationId: "chat456", message: "Read sync failed")
+    await mockService.simulateSyncWarning(warningEvent)
+
+    // Give the async handler time to process
+    try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+
+    XCTAssertEqual(viewModel.syncWarnings["chat456"], "Read sync failed")
+  }
+
+  func testSyncWarningCleared_viaWebSocket_removesWarning() async {
+    let mockService = MockBridgeService()
+    let viewModel = createViewModel(mockService: mockService)
+
+    // Connect to set up WebSocket
+    await viewModel.connect(to: URL(string: "http://localhost:8080")!, apiKey: "test-key")
+
+    // Add a sync warning first
+    viewModel.handleSyncWarning(conversationId: "chat789", message: "Test warning")
+    XCTAssertEqual(viewModel.syncWarnings["chat789"], "Test warning")
+
+    // Simulate receiving a sync warning cleared via WebSocket
+    let clearedEvent = SyncWarningClearedEvent(conversationId: "chat789")
+    await mockService.simulateSyncWarningCleared(clearedEvent)
+
+    // Give the async handler time to process
+    try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+
+    XCTAssertNil(viewModel.syncWarnings["chat789"])
   }
 }
 

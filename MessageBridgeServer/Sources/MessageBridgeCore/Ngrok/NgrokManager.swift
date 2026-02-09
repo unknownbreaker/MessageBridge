@@ -515,7 +515,12 @@ public actor NgrokManager: TunnelProvider {
       if case .error = _status {
         // Already have an error status with more details, keep it
       } else {
-        updateStatus(.error("Tunnel exited with code \(exitCode)"))
+        // Include any output buffer content in the error for debugging
+        let errorDetail =
+          outputBuffer.isEmpty
+          ? "Tunnel exited with code \(exitCode)"
+          : "Tunnel exited with code \(exitCode). Output: \(outputBuffer.prefix(500))"
+        updateStatus(.error(errorDetail))
       }
     } else if !_status.isRunning {
       updateStatus(.stopped)

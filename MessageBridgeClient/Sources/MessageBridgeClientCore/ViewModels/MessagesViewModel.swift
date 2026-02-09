@@ -16,6 +16,7 @@ public class MessagesViewModel: ObservableObject {
   @Published public var connectionStatus: ConnectionStatus = .disconnected
   @Published public var lastError: Error?
   @Published public var selectedConversationId: String?
+  @Published public var syncWarnings: [String: String] = [:]  // conversationId -> warning message
 
   public struct PaginationState {
     public var offset: Int = 0
@@ -36,6 +37,7 @@ public class MessagesViewModel: ObservableObject {
   private let bridgeService: any BridgeServiceProtocol
   private let notificationManager: NotificationManager
   private var cancellables = Set<AnyCancellable>()
+  private var markAsReadTask: Task<Void, Never>?
 
   /// Total unread message count across all conversations
   public var totalUnreadCount: Int {
@@ -100,6 +102,7 @@ public class MessagesViewModel: ObservableObject {
     messages = [:]
     paginationState = [:]
     selectedConversationId = nil
+    syncWarnings = [:]  // Clear sync warnings on disconnect
     updateDockBadge()  // Clear badge on disconnect
     logInfo("Disconnected from server")
   }
@@ -118,6 +121,51 @@ public class MessagesViewModel: ObservableObject {
     await connect(to: config.serverURL, apiKey: config.apiKey, e2eEnabled: config.e2eEnabled)
   }
 
+  // MARK: - Sync Warning Handling
+
+  /// Handle sync warning event from WebSocket
+  public func handleSyncWarning(conversationId: String, message: String) {
+    syncWarnings[conversationId] = message
+  }
+
+  /// Handle sync warning cleared event from WebSocket
+  public func handleSyncWarningCleared(conversationId: String) {
+    syncWarnings.removeValue(forKey: conversationId)
+  }
+
+  /// Dismiss sync warning for a conversation (user action)
+  public func dismissSyncWarning(for conversationId: String) {
+    syncWarnings.removeValue(forKey: conversationId)
+  }
+
+  // MARK: - Pinned Conversations Handling
+
+  /// Handle pinned conversations changed event from WebSocket
+  public func handlePinnedConversationsChanged(_ event: PinnedConversationsChangedEvent) {
+    // Build a map of conversationId -> pinnedIndex
+    let pinMap = Dictionary(
+      uniqueKeysWithValues: event.pinned.map { ($0.conversationId, $0.index) })
+
+    // Update all conversations with new pin state
+    conversations = conversations.map { conversation in
+      let newPinnedIndex = pinMap[conversation.id]
+      if newPinnedIndex != conversation.pinnedIndex {
+        return Conversation(
+          id: conversation.id,
+          guid: conversation.guid,
+          displayName: conversation.rawDisplayName,
+          participants: conversation.participants,
+          lastMessage: conversation.lastMessage,
+          isGroup: conversation.isGroup,
+          groupPhotoBase64: conversation.groupPhotoBase64,
+          unreadCount: conversation.unreadCount,
+          pinnedIndex: newPinnedIndex
+        )
+      }
+      return conversation
+    }
+  }
+
   private func startWebSocket() async {
     do {
       try await bridgeService.startWebSocket(
@@ -129,6 +177,21 @@ public class MessagesViewModel: ObservableObject {
         onTapbackEvent: { [weak self] event in
           Task { @MainActor [weak self] in
             self?.handleTapbackEvent(event)
+          }
+        },
+        onSyncWarning: { [weak self] event in
+          Task { @MainActor [weak self] in
+            self?.handleSyncWarning(conversationId: event.conversationId, message: event.message)
+          }
+        },
+        onSyncWarningCleared: { [weak self] event in
+          Task { @MainActor [weak self] in
+            self?.handleSyncWarningCleared(conversationId: event.conversationId)
+          }
+        },
+        onPinnedConversationsChanged: { [weak self] event in
+          Task { @MainActor [weak self] in
+            self?.handlePinnedConversationsChanged(event)
           }
         }
       )
@@ -192,11 +255,18 @@ public class MessagesViewModel: ObservableObject {
         lastMessage: message,
         isGroup: existingConversation.isGroup,
         groupPhotoBase64: existingConversation.groupPhotoBase64,
-        unreadCount: newUnreadCount
+        unreadCount: newUnreadCount,
+        pinnedIndex: existingConversation.pinnedIndex
       )
-      // Force SwiftUI to detect change by creating a new array
+      // Move conversation to top of list — but only if it's not pinned
       var newConversations = conversations
-      newConversations[index] = updatedConversation
+      newConversations.remove(at: index)
+      if existingConversation.pinnedIndex != nil {
+        // Pinned conversations stay in their original position
+        newConversations.insert(updatedConversation, at: index)
+      } else {
+        newConversations.insert(updatedConversation, at: 0)
+      }
       conversations = newConversations
       logDebug("handleNewMessage: updated conversation lastMessage to: \(message.text ?? "nil")")
 
@@ -255,7 +325,8 @@ public class MessagesViewModel: ObservableObject {
         sender: event.sender,
         isFromMe: event.isFromMe,
         date: Date(),
-        messageGUID: event.messageGUID
+        messageGUID: event.messageGUID,
+        emoji: event.emoji
       )
 
       // Remove any existing tapback from this sender (user can only have one tapback per message)
@@ -312,7 +383,8 @@ public class MessagesViewModel: ObservableObject {
           lastMessage: existingConversation.lastMessage,
           isGroup: existingConversation.isGroup,
           groupPhotoBase64: existingConversation.groupPhotoBase64,
-          unreadCount: 0
+          unreadCount: 0,
+          pinnedIndex: existingConversation.pinnedIndex
         )
         // Force SwiftUI to detect change by creating a new array
         var newConversations = conversations
@@ -323,11 +395,16 @@ public class MessagesViewModel: ObservableObject {
         updateDockBadge()
       }
 
-      // Always call server to mark as read in database (syncs with Messages.app)
-      Task {
+      // Cancel any in-flight mark-as-read (stops previous UI search AppleScript)
+      markAsReadTask?.cancel()
+
+      // Mark as read in database (syncs with Messages.app)
+      markAsReadTask = Task {
         do {
           try await bridgeService.markConversationAsRead(id)
           logDebug("Marked conversation \(id) as read on server")
+        } catch is CancellationError {
+          logDebug("Mark-as-read cancelled for \(id)")
         } catch {
           logWarning("Failed to mark conversation as read: \(error.localizedDescription)")
         }
@@ -443,18 +520,101 @@ public class MessagesViewModel: ObservableObject {
     }
   }
 
-  /// Send a tapback reaction to a message
+  /// Send a tapback reaction to a message with optimistic local update
   /// - Parameters:
   ///   - type: The type of tapback (love, like, dislike, laugh, emphasis, question)
   ///   - messageGUID: The GUID of the message to react to
   ///   - action: Whether to add or remove the tapback
-  public func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType) async {
+  ///   - conversationId: The conversation containing the message
+  public func sendTapback(
+    type: TapbackType, messageGUID: String, action: TapbackActionType, conversationId: String
+  ) async {
+    // Find the message in local cache
+    guard var conversationMessages = messages[conversationId],
+      let messageIndex = conversationMessages.firstIndex(where: { $0.guid == messageGUID })
+    else {
+      // Message not in cache, fall through to server-only request
+      do {
+        try await bridgeService.sendTapback(type: type, messageGUID: messageGUID, action: action)
+        logDebug("Tapback \(action.rawValue) sent successfully for message \(messageGUID)")
+      } catch {
+        logError("Failed to send tapback", error: error)
+        lastError = error
+      }
+      return
+    }
+
+    let message = conversationMessages[messageIndex]
+    let previousTapbacks = message.tapbacks
+
+    // Optimistically update tapbacks
+    var tapbacks = message.tapbacks ?? []
+    switch action {
+    case .remove:
+      tapbacks.removeAll { $0.isFromMe && $0.type == type }
+    case .add:
+      // Remove any existing tapback from me (one per user per message)
+      tapbacks.removeAll { $0.isFromMe }
+      tapbacks.append(
+        Tapback(
+          type: type, sender: "me", isFromMe: true, date: Date(), messageGUID: messageGUID))
+    }
+
+    // Create updated message with new tapbacks
+    let updatedMessage = Message(
+      id: message.id,
+      guid: message.guid,
+      text: message.text,
+      date: message.date,
+      isFromMe: message.isFromMe,
+      handleId: message.handleId,
+      conversationId: message.conversationId,
+      attachments: message.attachments,
+      detectedCodes: message.detectedCodes,
+      highlights: message.highlights,
+      mentions: message.mentions,
+      tapbacks: tapbacks.isEmpty ? nil : tapbacks,
+      dateDelivered: message.dateDelivered,
+      dateRead: message.dateRead,
+      linkPreview: message.linkPreview
+    )
+
+    conversationMessages[messageIndex] = updatedMessage
+    messages[conversationId] = conversationMessages
+
+    // Send request to server
     do {
       try await bridgeService.sendTapback(type: type, messageGUID: messageGUID, action: action)
       logDebug("Tapback \(action.rawValue) sent successfully for message \(messageGUID)")
     } catch {
-      logError("Failed to send tapback", error: error)
+      // Rollback to previous tapbacks on failure
+      logError("Failed to send tapback, rolling back", error: error)
       lastError = error
+
+      if var rollbackMessages = messages[conversationId],
+        let rollbackIndex = rollbackMessages.firstIndex(where: { $0.guid == messageGUID })
+      {
+        let rollbackTarget = rollbackMessages[rollbackIndex]
+        let rolledBackMessage = Message(
+          id: rollbackTarget.id,
+          guid: rollbackTarget.guid,
+          text: rollbackTarget.text,
+          date: rollbackTarget.date,
+          isFromMe: rollbackTarget.isFromMe,
+          handleId: rollbackTarget.handleId,
+          conversationId: rollbackTarget.conversationId,
+          attachments: rollbackTarget.attachments,
+          detectedCodes: rollbackTarget.detectedCodes,
+          highlights: rollbackTarget.highlights,
+          mentions: rollbackTarget.mentions,
+          tapbacks: previousTapbacks,
+          dateDelivered: rollbackTarget.dateDelivered,
+          dateRead: rollbackTarget.dateRead,
+          linkPreview: rollbackTarget.linkPreview
+        )
+        rollbackMessages[rollbackIndex] = rolledBackMessage
+        messages[conversationId] = rollbackMessages
+      }
     }
   }
 

@@ -8,6 +8,9 @@ struct MessageThreadView: View {
   @State private var showContactDetails = false
   @State private var showingTapbackPicker = false
   @State private var tapbackTargetMessage: Message?
+  @State private var scrollAnchorMessageId: Int64?
+  @State private var isRepositioning = false
+  @State private var knownMessageIds: Set<Int64> = []
 
   var messages: [Message] {
     viewModel.messages[conversation.id] ?? []
@@ -32,6 +35,16 @@ struct MessageThreadView: View {
 
       Divider()
 
+      // Sync warning banner (if applicable)
+      if let warning = viewModel.syncWarnings[conversation.id] {
+        SyncWarningBanner(
+          message: warning,
+          onDismiss: {
+            viewModel.dismissSyncWarning(for: conversation.id)
+          }
+        )
+      }
+
       // Messages
       ScrollViewReader { proxy in
         ScrollView {
@@ -48,6 +61,10 @@ struct MessageThreadView: View {
                 Color.clear
                   .frame(height: 1)
                   .onAppear {
+                    let reversedMsgs = Array(messages.reversed())
+                    scrollAnchorMessageId = reversedMsgs.first?.id
+                    knownMessageIds = Set(messages.map(\.id))
+                    isRepositioning = true
                     Task {
                       await viewModel.loadMoreMessages(for: conversation.id)
                     }
@@ -63,6 +80,7 @@ struct MessageThreadView: View {
               let isLastMessage = index == reversedMessages.count - 1
               let isLastSentMessage =
                 message.isFromMe && !reversedMessages.dropFirst(index + 1).contains { $0.isFromMe }
+              let isNewlyLoaded = isRepositioning && !knownMessageIds.contains(message.id)
               MessageBubble(
                 message: message,
                 isGroupConversation: conversation.isGroup,
@@ -72,11 +90,22 @@ struct MessageThreadView: View {
                 isLastMessage: isLastMessage
               )
               .id(message.id)
+              .opacity(isNewlyLoaded ? 0 : 1)
             }
           }
           .padding()
         }
         .defaultScrollAnchor(.bottom)
+        .onChange(of: messages.count) {
+          if let anchorId = scrollAnchorMessageId, isRepositioning {
+            proxy.scrollTo(anchorId, anchor: .top)
+            DispatchQueue.main.async {
+              isRepositioning = false
+              scrollAnchorMessageId = nil
+              knownMessageIds = []
+            }
+          }
+        }
       }
 
       Divider()
@@ -87,7 +116,10 @@ struct MessageThreadView: View {
       }
     }
     .task(id: conversation.id) {
-      // Re-run when conversation changes
+      // Reset scroll anchor state when conversation changes
+      scrollAnchorMessageId = nil
+      isRepositioning = false
+      knownMessageIds = []
       await viewModel.loadMessages(for: conversation.id)
     }
     .onReceive(NotificationCenter.default.publisher(for: .showTapbackPicker)) { notification in
@@ -99,11 +131,13 @@ struct MessageThreadView: View {
     .popover(isPresented: $showingTapbackPicker) {
       if let message = tapbackTargetMessage {
         TapbackPicker(message: message) { type, isRemoval in
+          showingTapbackPicker = false
           Task {
             await viewModel.sendTapback(
               type: type,
               messageGUID: message.guid,
-              action: isRemoval ? .remove : .add
+              action: isRemoval ? .remove : .add,
+              conversationId: message.conversationId
             )
           }
         }
@@ -170,31 +204,44 @@ struct MessageBubble: View {
             .padding(.leading, 4)
         }
 
-        // Display attachments first (like Apple Messages)
-        if message.hasAttachments {
-          AttachmentRendererRegistry.shared.renderer(for: message.attachments)
-            .render(message.attachments)
-        }
-
-        // Display text if present - delegated to RendererRegistry
-        if message.hasText || message.linkPreview != nil {
-          let renderer = RendererRegistry.shared.renderer(for: message)
-          let isLinkPreview = message.linkPreview != nil
-
-          renderer.render(message)
-            .padding(.horizontal, isLinkPreview ? 0 : 12)
-            .padding(.vertical, isLinkPreview ? 0 : 8)
-            .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
-            .foregroundStyle(message.isFromMe ? .white : .primary)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-
-        // Decorators (timestamp, read receipts, etc.)
         let decoratorContext = DecoratorContext(
           isLastSentMessage: isLastSentMessage,
           isLastMessage: isLastMessage,
           conversationId: message.conversationId
         )
+
+        // Wrap content in ZStack so top decorators (tapback pills) overlay the bubble
+        // isFromMe → top-leading (inner side), others → top-trailing (inner side)
+        ZStack(alignment: message.isFromMe ? .topLeading : .topTrailing) {
+          VStack(alignment: message.isFromMe ? .trailing : .leading, spacing: 2) {
+            // Display attachments first (like Apple Messages)
+            if message.hasAttachments {
+              AttachmentRendererRegistry.shared.renderer(for: message.attachments)
+                .render(message.attachments)
+            }
+
+            // Display text if present - delegated to RendererRegistry
+            if message.hasText || message.linkPreview != nil {
+              let renderer = RendererRegistry.shared.renderer(for: message)
+              let isLinkPreview = message.linkPreview != nil
+
+              renderer.render(message)
+                .padding(.horizontal, isLinkPreview ? 0 : 12)
+                .padding(.vertical, isLinkPreview ? 0 : 8)
+                .background(message.isFromMe ? Color.blue : Color(.systemGray).opacity(0.2))
+                .foregroundStyle(message.isFromMe ? .white : .primary)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+          }
+
+          // Top decorators (tapback pills) — position matches ZStack alignment above
+          ForEach(
+            DecoratorRegistry.shared.decorators(
+              for: message, at: .topTrailing, context: decoratorContext), id: \.id
+          ) { decorator in
+            decorator.decorate(message, context: decoratorContext)
+          }
+        }
         ForEach(
           DecoratorRegistry.shared.decorators(for: message, at: .below, context: decoratorContext),
           id: \.id
@@ -273,6 +320,32 @@ struct AvatarView: View {
         .frame(width: size, height: size)
       }
     }
+  }
+}
+
+/// Banner displayed when read status sync fails for a conversation
+struct SyncWarningBanner: View {
+  let message: String
+  let onDismiss: () -> Void
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.yellow)
+      Text(message)
+        .foregroundStyle(.yellow)
+        .font(.caption)
+      Spacer()
+      Button(action: onDismiss) {
+        Image(systemName: "xmark")
+          .foregroundStyle(.secondary)
+          .font(.caption)
+      }
+      .buttonStyle(.plain)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .background(Color.yellow.opacity(0.1))
   }
 }
 

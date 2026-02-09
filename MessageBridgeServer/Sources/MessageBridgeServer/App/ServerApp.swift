@@ -8,13 +8,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   weak var appState: AppState?
 
   func applicationWillTerminate(_ notification: Notification) {
-    // Clean up any running tunnels when app quits
+    // Clean up server and tunnels when app quits
     guard let appState = appState else { return }
 
     // Use a semaphore to wait for async cleanup to complete
     let semaphore = DispatchSemaphore(value: 0)
 
     Task {
+      // Stop the server first
+      if appState.serverStatus.isRunning {
+        await appState.stopServer()
+      }
+
       // Stop ngrok tunnel if running
       if appState.ngrokTunnelStatus.isRunning {
         await appState.stopNgrokTunnel()
@@ -28,8 +33,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
       semaphore.signal()
     }
 
-    // Wait up to 2 seconds for cleanup
-    _ = semaphore.wait(timeout: .now() + 2)
+    // Wait up to 3 seconds for cleanup to complete
+    _ = semaphore.wait(timeout: .now() + 3)
   }
 }
 
@@ -43,8 +48,14 @@ class WindowManager: ObservableObject {
   var permissionsWindow: NSWindow?
   weak var appState: AppState?
 
-  func openSettings() {
+  func openSettings(tab: SettingsTab = .general, showAuthTokenField: Bool = false) {
     NSApp.activate(ignoringOtherApps: true)
+
+    // If requesting a specific tab or auth token field, close existing window to open fresh
+    if tab != .general || showAuthTokenField {
+      settingsWindow?.close()
+      settingsWindow = nil
+    }
 
     if let window = settingsWindow, window.isVisible {
       window.makeKeyAndOrderFront(nil)
@@ -53,7 +64,8 @@ class WindowManager: ObservableObject {
 
     guard let appState = appState else { return }
 
-    let settingsView = SettingsView().environmentObject(appState)
+    let settingsView = SettingsView(initialTab: tab, showAuthTokenField: showAuthTokenField)
+      .environmentObject(appState)
     let hostingController = NSHostingController(rootView: settingsView)
 
     let window = NSWindow(contentViewController: hostingController)
@@ -201,6 +213,113 @@ struct MenuContentView: View {
         Task { await appState.startServer() }
       }
       .disabled(appState.apiKey.isEmpty)
+    }
+
+    // Tunnel controls - show for selected and configured tunnel
+    if appState.selectedTunnelProvider == .cloudflare && appState.cloudflaredInfo != nil {
+      Divider()
+
+      if appState.cloudfareTunnelStatus.isRunning {
+        Text("Cloudflare Tunnel: \(appState.cloudfareTunnelStatus.displayText)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+
+        Button("Stop Cloudflare Tunnel") {
+          debugLog("Stop Cloudflare Tunnel clicked")
+          Task { await appState.stopCloudfareTunnel() }
+        }
+      } else if appState.cloudfareTunnelStatus == .stopped {
+        Button("Start Cloudflare Tunnel") {
+          debugLog("Start Cloudflare Tunnel clicked")
+          Task {
+            do {
+              try await appState.startCloudfareTunnel()
+            } catch {
+              appState.addLog(level: .error, message: "Failed to start Cloudflare Tunnel: \(error)")
+            }
+          }
+        }
+        .disabled(!appState.serverStatus.isRunning)
+      }
+    }
+
+    if appState.selectedTunnelProvider == .ngrok && appState.ngrokInfo != nil {
+      Divider()
+
+      if !appState.ngrokAuthTokenConfigured {
+        // Auth token not configured - show disabled state with setup option
+        Button("Start ngrok Tunnel") {
+          // No-op, button is disabled
+        }
+        .disabled(true)
+
+        Text("Auth token required")
+          .font(.caption)
+          .foregroundStyle(.orange)
+
+        Button("Configure Auth Token...") {
+          debugLog("Configure ngrok auth token clicked")
+          WindowManager.shared.appState = appState
+          WindowManager.shared.openSettings(tab: .tunnel, showAuthTokenField: true)
+        }
+      } else if appState.ngrokTunnelStatus.isRunning {
+        Text("ngrok Tunnel: \(appState.ngrokTunnelStatus.displayText)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+
+        Button("Stop ngrok Tunnel") {
+          debugLog("Stop ngrok Tunnel clicked")
+          Task { await appState.stopNgrokTunnel() }
+        }
+      } else if appState.ngrokTunnelStatus == .starting {
+        Text("ngrok Tunnel: Starting...")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+
+        Button("Starting...") {
+          // No-op while starting
+        }
+        .disabled(true)
+      } else if case .error(let errorMessage) = appState.ngrokTunnelStatus {
+        Text("ngrok Tunnel: Error")
+          .font(.caption)
+          .foregroundStyle(.red)
+
+        Text(errorMessage)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+
+        Button("Retry") {
+          debugLog("Retry ngrok Tunnel clicked")
+          Task {
+            do {
+              try await appState.startNgrokTunnel()
+            } catch {
+              appState.addLog(level: .error, message: "Failed to start ngrok Tunnel: \(error)")
+            }
+          }
+        }
+        .disabled(!appState.serverStatus.isRunning)
+
+        Button("Configure Auth Token...") {
+          debugLog("Configure ngrok auth token clicked")
+          WindowManager.shared.appState = appState
+          WindowManager.shared.openSettings(tab: .tunnel, showAuthTokenField: true)
+        }
+      } else if appState.ngrokTunnelStatus == .stopped {
+        Button("Start ngrok Tunnel") {
+          debugLog("Start ngrok Tunnel clicked")
+          Task {
+            do {
+              try await appState.startNgrokTunnel()
+            } catch {
+              appState.addLog(level: .error, message: "Failed to start ngrok Tunnel: \(error)")
+            }
+          }
+        }
+        .disabled(!appState.serverStatus.isRunning)
+      }
     }
 
     Divider()
@@ -451,11 +570,13 @@ class AppState: ObservableObject {
     Task {
       await cloudflaredManager.onStatusChange { [weak self] status in
         Task { @MainActor in
+          self?.addLog(level: .debug, message: "Cloudflare status changed: \(status.displayText)")
           self?.cloudfareTunnelStatus = status
         }
       }
       await ngrokManager.onStatusChange { [weak self] status in
         Task { @MainActor in
+          self?.addLog(level: .debug, message: "ngrok status changed: \(status.displayText)")
           self?.ngrokTunnelStatus = status
         }
       }
@@ -467,12 +588,14 @@ class AppState: ObservableObject {
     let cloudflaredInstalled = await cloudflaredManager.isInstalled()
     if cloudflaredInstalled {
       cloudflaredInfo = await cloudflaredManager.getInfo()
-      // Check if there's an existing cloudflared process running
-      let externalProcessDetected = await cloudflaredManager.detectExistingTunnel()
-      if !externalProcessDetected {
-        cloudfareTunnelStatus = .stopped
+      // Only update status if not already running (don't override managed tunnel status)
+      if !cloudfareTunnelStatus.isRunning {
+        // Check if there's an existing cloudflared process running
+        let externalProcessDetected = await cloudflaredManager.detectExistingTunnel()
+        if !externalProcessDetected {
+          cloudfareTunnelStatus = .stopped
+        }
       }
-      // If external process detected, status is already set by detectExistingTunnel()
     } else {
       cloudfareTunnelStatus = .notInstalled
       cloudflaredInfo = nil
@@ -483,13 +606,21 @@ class AppState: ObservableObject {
     ngrokAuthTokenConfigured = await ngrokManager.hasAuthToken
     if ngrokInstalled {
       ngrokInfo = await ngrokManager.getInfo()
-      // Check if there's an existing ngrok process running and try to get its URL
-      if let url = await ngrokManager.detectExistingTunnel() {
-        addLog(level: .info, message: "Detected existing ngrok tunnel: \(url)")
+      // Only update status if not already running (don't override managed tunnel status)
+      debugLog(
+        "checkTunnelInstallations: ngrokTunnelStatus.isRunning = \(ngrokTunnelStatus.isRunning), current status = \(ngrokTunnelStatus.displayText)"
+      )
+      if !ngrokTunnelStatus.isRunning {
+        // Check if there's an existing ngrok process running and try to get its URL
+        if let url = await ngrokManager.detectExistingTunnel() {
+          addLog(level: .info, message: "Detected existing ngrok tunnel: \(url)")
+        } else {
+          debugLog("checkTunnelInstallations: setting ngrokTunnelStatus to .stopped")
+          ngrokTunnelStatus = .stopped
+        }
       } else {
-        ngrokTunnelStatus = .stopped
+        debugLog("checkTunnelInstallations: skipping status update, tunnel already running")
       }
-      // If external process detected, status is already set by detectExistingTunnel()
     } else {
       ngrokTunnelStatus = .notInstalled
       ngrokInfo = nil
@@ -550,7 +681,9 @@ class AppState: ObservableObject {
       throw TunnelError.connectionFailed("Server must be running first")
     }
     addLog(level: .info, message: "Starting ngrok tunnel...")
+    addLog(level: .debug, message: "ngrokTunnelStatus before: \(ngrokTunnelStatus.displayText)")
     let url = try await ngrokManager.startTunnel(port: port)
+    addLog(level: .debug, message: "ngrokTunnelStatus after: \(ngrokTunnelStatus.displayText)")
     addLog(level: .info, message: "ngrok tunnel started: \(url)")
   }
 

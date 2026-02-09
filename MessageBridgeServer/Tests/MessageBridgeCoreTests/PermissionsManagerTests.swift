@@ -49,17 +49,18 @@ final class PermissionsManagerTests: XCTestCase {
     XCTAssertEqual(permissions1.count, permissions2.count)
   }
 
-  func testPermissionsManager_checkAllPermissions_returnsThreePermissions() async {
+  func testPermissionsManager_checkAllPermissions_returnsFourPermissions() async {
     let manager = PermissionsManager.shared
     let permissions = await manager.checkAllPermissions()
 
-    XCTAssertEqual(permissions.count, 3)
+    XCTAssertEqual(permissions.count, 4)
 
     // Verify the permission IDs
     let ids = permissions.map { $0.id }
     XCTAssertTrue(ids.contains("fullDiskAccess"))
     XCTAssertTrue(ids.contains("contacts"))
-    XCTAssertTrue(ids.contains("automation"))
+    XCTAssertTrue(ids.contains("automationMessages"))
+    XCTAssertTrue(ids.contains("accessibility"))
   }
 
   func testPermissionsManager_checkAllPermissions_hasSettingsURLs() async {
@@ -114,13 +115,26 @@ final class PermissionsManagerTests: XCTestCase {
     let manager = PermissionsManager.shared
     let permissions = await manager.checkAllPermissions()
 
-    guard let automation = permissions.first(where: { $0.id == "automation" }) else {
+    guard let automation = permissions.first(where: { $0.id == "automationMessages" }) else {
       XCTFail("Automation permission not found")
       return
     }
 
     XCTAssertEqual(automation.name, "Automation (Messages.app)")
     XCTAssertTrue(automation.description.contains("send messages"))
+  }
+
+  func testPermissionsManager_accessibility_permission() async {
+    let manager = PermissionsManager.shared
+    let permissions = await manager.checkAllPermissions()
+
+    guard let accessibility = permissions.first(where: { $0.id == "accessibility" }) else {
+      XCTFail("Accessibility permission not found")
+      return
+    }
+
+    XCTAssertTrue(accessibility.name.contains("Accessibility"))
+    XCTAssertTrue(accessibility.requiresManualSetup)
   }
 
   func testPermissionsManager_allPermissionsGranted_returnsBool() async {
