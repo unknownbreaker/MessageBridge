@@ -120,6 +120,21 @@ public actor WebSocketManager {
     await broadcast(wsMessage)
   }
 
+  /// Broadcast pinned conversations changed to all connected clients
+  public func broadcastPinnedConversationsChanged(_ pins: [PinnedConversation]) async {
+    os_log(
+      "Broadcasting pinned conversations changed (%d pins) to %d client(s)", log: logger,
+      type: .info, pins.count, connections.count)
+
+    let entries = pins.map {
+      PinnedConversationEntry(conversationId: $0.conversationId, index: $0.index)
+    }
+    let event = PinnedConversationsChangedEvent(pinned: entries)
+    let wsMessage = WebSocketMessage(type: .pinnedConversationsChanged, data: event)
+
+    await broadcast(wsMessage)
+  }
+
   /// Send a connected confirmation to a specific client
   public func sendConnected(to id: UUID) async {
     guard let connInfo = connections[id] else { return }

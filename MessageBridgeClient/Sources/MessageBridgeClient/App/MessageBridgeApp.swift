@@ -5,6 +5,7 @@ import UserNotifications
 @main
 struct MessageBridgeApp: App {
   @StateObject private var viewModel = MessagesViewModel()
+  @StateObject private var clientPinStorage = ClientPinStorage()
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   @Environment(\.openWindow) private var openWindow
 
@@ -22,6 +23,7 @@ struct MessageBridgeApp: App {
     WindowGroup {
       ContentView()
         .environmentObject(viewModel)
+        .environmentObject(clientPinStorage)
         .onAppear {
           appDelegate.viewModel = viewModel
         }

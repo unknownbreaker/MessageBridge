@@ -3,7 +3,8 @@ import Vapor
 /// Configures all API routes for the application
 public func configureRoutes(
   _ app: Application, database: ChatDatabaseProtocol, messageSender: MessageSenderProtocol,
-  apiKey: String, webSocketManager: WebSocketManager? = nil
+  apiKey: String, webSocketManager: WebSocketManager? = nil,
+  pinnedWatcher: PinnedConversationWatcher? = nil
 ) throws {
   // Health check - no authentication required
   app.get("health") { _ in
@@ -20,7 +21,13 @@ public func configureRoutes(
     let offset = req.query[Int.self, at: "offset"] ?? 0
 
     do {
-      let conversations = try await database.fetchRecentConversations(limit: limit, offset: offset)
+      var conversations = try await database.fetchRecentConversations(limit: limit, offset: offset)
+
+      // Overlay pinned conversation data from the watcher's cache
+      if let watcher = pinnedWatcher {
+        conversations = await watcher.overlayPins(onto: conversations)
+      }
+
       let nextCursor = conversations.count == limit ? String(offset + limit) : nil
       return ConversationsResponse(conversations: conversations, nextCursor: nextCursor)
     } catch {

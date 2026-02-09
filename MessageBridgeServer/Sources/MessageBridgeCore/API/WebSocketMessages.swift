@@ -9,6 +9,7 @@ public enum WebSocketMessageType: String, Codable, Sendable {
   case tapbackRemoved = "tapback_removed"
   case syncWarning = "sync_warning"
   case syncWarningCleared = "sync_warning_cleared"
+  case pinnedConversationsChanged = "pinned_conversations_changed"
 }
 
 /// Base WebSocket message envelope
@@ -108,5 +109,25 @@ public struct SyncWarningClearedEvent: Codable, Sendable {
 
   public init(conversationId: String) {
     self.conversationId = conversationId
+  }
+}
+
+/// Entry in the pinned conversations changed event
+public struct PinnedConversationEntry: Codable, Sendable {
+  public let conversationId: String
+  public let index: Int
+
+  public init(conversationId: String, index: Int) {
+    self.conversationId = conversationId
+    self.index = index
+  }
+}
+
+/// Data payload for pinned conversations changed events
+public struct PinnedConversationsChangedEvent: Codable, Sendable {
+  public let pinned: [PinnedConversationEntry]
+
+  public init(pinned: [PinnedConversationEntry]) {
+    self.pinned = pinned
   }
 }

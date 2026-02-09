@@ -343,15 +343,16 @@ public struct Conversation: Codable, Identifiable, Sendable {
   public let isGroup: Bool
   public let groupPhotoBase64: String?  // Group photo as base64-encoded image (PNG)
   public let unreadCount: Int  // Number of unread messages
+  public let pinnedIndex: Int?  // Messages.app pin position (0-8), nil if unpinned
 
   enum CodingKeys: String, CodingKey {
-    case id, guid, participants, lastMessage, isGroup, groupPhotoBase64, unreadCount
+    case id, guid, participants, lastMessage, isGroup, groupPhotoBase64, unreadCount, pinnedIndex
     case _displayName = "displayName"
   }
 
   public init(
     id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?,
-    isGroup: Bool, groupPhotoBase64: String? = nil, unreadCount: Int = 0
+    isGroup: Bool, groupPhotoBase64: String? = nil, unreadCount: Int = 0, pinnedIndex: Int? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -361,6 +362,7 @@ public struct Conversation: Codable, Identifiable, Sendable {
     self.isGroup = isGroup
     self.groupPhotoBase64 = groupPhotoBase64
     self.unreadCount = unreadCount
+    self.pinnedIndex = pinnedIndex
   }
 
   /// Whether this conversation has unread messages
@@ -401,12 +403,14 @@ extension Conversation: Hashable {
   public static func == (lhs: Conversation, rhs: Conversation) -> Bool {
     lhs.id == rhs.id && lhs.unreadCount == rhs.unreadCount
       && lhs.lastMessage?.id == rhs.lastMessage?.id
+      && lhs.pinnedIndex == rhs.pinnedIndex
   }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(id)
     hasher.combine(unreadCount)
     hasher.combine(lastMessage?.id)
+    hasher.combine(pinnedIndex)
   }
 }
 

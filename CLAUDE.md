@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Important:** When making changes that affect how users interact with the app (UI, keyboard shortcuts, configuration, installation, etc.), update the User Guide section of this document accordingly.
 
+**Required:** At the start of every session, activate the `superpowers:using-superpowers` skill before doing any other work.
+
 ---
 
 ## Current Focus
@@ -12,19 +14,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Link Preview URL Stripping & Missing Thumbnails
-- Fixed URL not being stripped from message bubble: plist stores canonical/resolved URL (Instagram adds usernames, youtu.be → youtube.com, share links → different domains), so replaced naive string match with NSDataDetector-based first-URL stripping
-- Fixed missing preview thumbnails: Messages.app stores og:image as pluginPayloadAttachment files with NO mime_type/UTI set; removed MIME filter, now picks largest attachment (og:image over favicon)
-- Added plist image extraction fallback for embedded image data in payload_data
-- Removed `.help()` on styled Text views causing SwiftUI console warnings
-- All 500 server tests + 330 client tests pass (11 new)
+**Last Session:** Pinned Conversations
+- Added `pinnedIndex: Int?` to both server and client Conversation models
+- Created `PinnedConversationWatcher` actor on server: polls Messages.app sidebar via AppleScript accessibility every 60s, matches display names to conversation IDs
+- Wired watcher into ServerManager/Routes: `/conversations` response overlays pin data, WebSocket broadcasts `pinned_conversations_changed` events
+- Added client-only "Client Pins" tier stored in UserDefaults via `ClientPinStorage`
+- Sectioned sidebar: "Messages Pins" (tier 1) → "Client Pins" (tier 2) → unpinned; context menus for pin/unpin
+- Pinned conversations don't reorder on new messages
+- All 517 server tests + 353 client tests pass
 
 **Known Blockers:** None
 
 **Next Steps:**
 
-1. Start new phase milestones (M4.3 Typing Indicators, M5.2 Multi-line Composer, etc.)
-2. Consider adding startIndex/endIndex character offsets to client TextHighlight for precise highlighting
+1. M4.1 remaining: AppleScript bridge to actually send tapbacks through Messages.app (currently optimistic-only)
+2. Start new phase milestones (M4.3 Typing Indicators, M5.5 Search, etc.)
+3. Consider adding startIndex/endIndex character offsets to client TextHighlight for precise highlighting
 
 ---
 
@@ -224,7 +229,7 @@ Follow this order to minimize breakage:
 | M4.3 Typing Indicators     | ⬜                 | ⬜         | ⬜       | ⬜       |
 | **Phase 5: QoL**           |
 | M5.1 2FA Code Detection    | ✅                 | ✅          | ✅       | ✅       |
-| M5.2 Multi-line Composer   | ⬜                 | ⬜         | ⬜       | ⬜       |
+| M5.2 Multi-line Composer   | ✅                 | ✅         | ✅       | ✅       |
 | M5.3 Text Selection        | ⬜                 | ⬜         | ⬜       | ⬜       |
 | M5.4 Link Previews         | ✅                 | ✅         | ✅       | ✅       |
 | M5.5 Search                | ⬜                 | ⬜         | ⬜       | ⬜       |

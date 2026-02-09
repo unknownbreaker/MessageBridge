@@ -138,6 +138,34 @@ public class MessagesViewModel: ObservableObject {
     syncWarnings.removeValue(forKey: conversationId)
   }
 
+  // MARK: - Pinned Conversations Handling
+
+  /// Handle pinned conversations changed event from WebSocket
+  public func handlePinnedConversationsChanged(_ event: PinnedConversationsChangedEvent) {
+    // Build a map of conversationId -> pinnedIndex
+    let pinMap = Dictionary(
+      uniqueKeysWithValues: event.pinned.map { ($0.conversationId, $0.index) })
+
+    // Update all conversations with new pin state
+    conversations = conversations.map { conversation in
+      let newPinnedIndex = pinMap[conversation.id]
+      if newPinnedIndex != conversation.pinnedIndex {
+        return Conversation(
+          id: conversation.id,
+          guid: conversation.guid,
+          displayName: conversation.rawDisplayName,
+          participants: conversation.participants,
+          lastMessage: conversation.lastMessage,
+          isGroup: conversation.isGroup,
+          groupPhotoBase64: conversation.groupPhotoBase64,
+          unreadCount: conversation.unreadCount,
+          pinnedIndex: newPinnedIndex
+        )
+      }
+      return conversation
+    }
+  }
+
   private func startWebSocket() async {
     do {
       try await bridgeService.startWebSocket(
@@ -159,6 +187,11 @@ public class MessagesViewModel: ObservableObject {
         onSyncWarningCleared: { [weak self] event in
           Task { @MainActor [weak self] in
             self?.handleSyncWarningCleared(conversationId: event.conversationId)
+          }
+        },
+        onPinnedConversationsChanged: { [weak self] event in
+          Task { @MainActor [weak self] in
+            self?.handlePinnedConversationsChanged(event)
           }
         }
       )
@@ -222,12 +255,18 @@ public class MessagesViewModel: ObservableObject {
         lastMessage: message,
         isGroup: existingConversation.isGroup,
         groupPhotoBase64: existingConversation.groupPhotoBase64,
-        unreadCount: newUnreadCount
+        unreadCount: newUnreadCount,
+        pinnedIndex: existingConversation.pinnedIndex
       )
-      // Move conversation to top of list (matches Messages.app behavior)
+      // Move conversation to top of list — but only if it's not pinned
       var newConversations = conversations
       newConversations.remove(at: index)
-      newConversations.insert(updatedConversation, at: 0)
+      if existingConversation.pinnedIndex != nil {
+        // Pinned conversations stay in their original position
+        newConversations.insert(updatedConversation, at: index)
+      } else {
+        newConversations.insert(updatedConversation, at: 0)
+      }
       conversations = newConversations
       logDebug("handleNewMessage: updated conversation lastMessage to: \(message.text ?? "nil")")
 
@@ -344,7 +383,8 @@ public class MessagesViewModel: ObservableObject {
           lastMessage: existingConversation.lastMessage,
           isGroup: existingConversation.isGroup,
           groupPhotoBase64: existingConversation.groupPhotoBase64,
-          unreadCount: 0
+          unreadCount: 0,
+          pinnedIndex: existingConversation.pinnedIndex
         )
         // Force SwiftUI to detect change by creating a new array
         var newConversations = conversations

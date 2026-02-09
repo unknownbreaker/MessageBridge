@@ -12,6 +12,10 @@ public typealias SyncWarningHandler = @Sendable (SyncWarningEvent) -> Void
 /// Callback for receiving sync warning cleared events via WebSocket
 public typealias SyncWarningClearedHandler = @Sendable (SyncWarningClearedEvent) -> Void
 
+/// Callback for receiving pinned conversations changed events via WebSocket
+public typealias PinnedConversationsChangedHandler =
+  @Sendable (PinnedConversationsChangedEvent) -> Void
+
 /// Action type for tapback operations
 public enum TapbackActionType: String, Sendable {
   case add
@@ -47,6 +51,17 @@ public struct TapbackEvent: Codable, Sendable {
   }
 }
 
+/// Entry in the pinned conversations changed event
+public struct PinnedConversationEntry: Codable, Sendable {
+  public let conversationId: String
+  public let index: Int
+}
+
+/// Event received when Messages.app pin state changes
+public struct PinnedConversationsChangedEvent: Codable, Sendable {
+  public let pinned: [PinnedConversationEntry]
+}
+
 /// Protocol defining the bridge service interface for testability
 public protocol BridgeServiceProtocol: Sendable {
   func connect(to url: URL, apiKey: String, e2eEnabled: Bool) async throws
@@ -58,7 +73,8 @@ public protocol BridgeServiceProtocol: Sendable {
     onNewMessage: @escaping NewMessageHandler,
     onTapbackEvent: @escaping TapbackEventHandler,
     onSyncWarning: @escaping SyncWarningHandler,
-    onSyncWarningCleared: @escaping SyncWarningClearedHandler
+    onSyncWarningCleared: @escaping SyncWarningClearedHandler,
+    onPinnedConversationsChanged: @escaping PinnedConversationsChangedHandler
   ) async throws
   func stopWebSocket() async
   func fetchAttachment(id: Int64) async throws -> Data
@@ -176,6 +192,12 @@ struct SyncWarningClearedWebSocketMessage: Codable {
   let data: SyncWarningClearedEvent
 }
 
+/// WebSocket message for pinned conversations changed events
+struct PinnedConversationsWebSocketMessage: Codable {
+  let type: String
+  let data: PinnedConversationsChangedEvent
+}
+
 /// Handles communication with the MessageBridge server
 public actor BridgeConnection: BridgeServiceProtocol {
   private var serverURL: URL?
@@ -186,6 +208,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
   private var tapbackEventHandler: TapbackEventHandler?
   private var syncWarningHandler: SyncWarningHandler?
   private var syncWarningClearedHandler: SyncWarningClearedHandler?
+  private var pinnedConversationsChangedHandler: PinnedConversationsChangedHandler?
   private var e2eEnabled: Bool = false
   private var encryption: E2EEncryption?
 
@@ -456,7 +479,8 @@ public actor BridgeConnection: BridgeServiceProtocol {
     onNewMessage: @escaping NewMessageHandler,
     onTapbackEvent: @escaping TapbackEventHandler,
     onSyncWarning: @escaping SyncWarningHandler,
-    onSyncWarningCleared: @escaping SyncWarningClearedHandler
+    onSyncWarningCleared: @escaping SyncWarningClearedHandler,
+    onPinnedConversationsChanged: @escaping PinnedConversationsChangedHandler
   ) async throws {
     guard let serverURL, let apiKey else {
       throw BridgeError.notConnected
@@ -466,6 +490,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
     self.tapbackEventHandler = onTapbackEvent
     self.syncWarningHandler = onSyncWarning
     self.syncWarningClearedHandler = onSyncWarningCleared
+    self.pinnedConversationsChangedHandler = onPinnedConversationsChanged
 
     // Convert HTTP URL to WebSocket URL
     var wsComponents = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)!
@@ -496,6 +521,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
     tapbackEventHandler = nil
     syncWarningHandler = nil
     syncWarningClearedHandler = nil
+    pinnedConversationsChangedHandler = nil
   }
 
   private func receiveWebSocketMessage() {
@@ -605,6 +631,14 @@ public actor BridgeConnection: BridgeServiceProtocol {
           "WebSocket: sync_warning_cleared received for conversation \(wsMessage.data.conversationId)"
         )
         syncWarningClearedHandler?(wsMessage.data)
+
+      case "pinned_conversations_changed":
+        let wsMessage = try decoder.decode(
+          PinnedConversationsWebSocketMessage.self, from: messageData)
+        logInfo(
+          "WebSocket: pinned_conversations_changed received with \(wsMessage.data.pinned.count) pins"
+        )
+        pinnedConversationsChangedHandler?(wsMessage.data)
 
       default:
         logDebug("WebSocket received \(envelope.type) message")
