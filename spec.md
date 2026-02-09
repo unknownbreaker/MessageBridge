@@ -504,6 +504,325 @@ These are not planned but may be added later:
 
 ---
 
+## Milestone Audit Tracker
+
+> **Track progress auditing each milestone.**
+
+| Milestone                  | Spec Tests | Tests Pass | Migrated | Verified |
+| -------------------------- | ---------- | ---------- | -------- | -------- |
+| **Phase 1: Core**          |            |            |          |          |
+| M1.1 Basic Server          | done       | done       | done     |          |
+| M1.2 Basic Client          | done       | done       | done     |          |
+| M1.3 Send Messages         | done       | done       | done     |          |
+| M1.4 Real-time Updates     | done       | done       | done     |          |
+| **Phase 2: Connectivity**  |            |            |          |          |
+| M2.1 Tailscale             | done       | done       | done     |          |
+| M2.2 Cloudflare            | done       | done       | done     |          |
+| M2.3 ngrok                 |            |            |          |          |
+| M2.4 E2E Encryption        | done       | done       | done     |          |
+| **Phase 3: Rich Messages** |            |            |          |          |
+| M3.1 Attachments Display   | done       | done       | done     |          |
+| M3.2 Image Gallery         | done       | done       | done     | done     |
+| M3.3 Attachments Send      |            |            |          |          |
+| M3.4 Audio Messages        |            |            |          |          |
+| **Phase 4: Reactions**     |            |            |          |          |
+| M4.1 Tapbacks              | done       | done       | done     |          |
+| M4.2 Read Receipts         | done       | done       | done     |          |
+| M4.3 Typing Indicators     |            |            |          |          |
+| **Phase 5: QoL**           |            |            |          |          |
+| M5.1 2FA Code Detection    | done       | done       | done     | done     |
+| M5.2 Multi-line Composer   | done       | done       | done     | done     |
+| M5.3 Text Selection        |            |            |          |          |
+| M5.4 Link Previews         | done       | done       | done     | done     |
+| M5.5 Search                |            |            |          |          |
+| **Phase 6: Polish**        |            |            |          |          |
+| M6.1 Contact Names         |            |            |          |          |
+| M6.2 Notifications         |            |            |          |          |
+| M6.3 Dark Mode             |            |            |          |          |
+| M6.4 Keyboard Nav          |            |            |          |          |
+
+**Audit process:** Spec Tests Written -> Tests Pass -> Code Migrated to protocols/registries -> Final Verified
+
+---
+
+## Architecture Blueprints
+
+> **These are TARGET designs for unbuilt features.** They define how future features should be implemented when their milestones are started. Consult these when beginning work on a milestone.
+
+### PresenceProvider Protocol (for M4.3 Typing Indicators)
+
+```swift
+protocol PresenceProvider: Identifiable, Sendable {
+    var id: String { get }
+    func observe(conversationId: String) async
+    func stopObserving(conversationId: String) async
+    var presencePublisher: AnyPublisher<PresenceState, Never> { get }
+}
+
+struct PresenceState: Sendable {
+    let conversationId: String
+    let typingParticipants: [String]
+    let lastSeen: [String: Date]
+}
+```
+
+**Planned implementations:** `TypingIndicatorProvider`, `OnlineStatusProvider`
+
+**WebSocket messages:**
+```json
+// Server → Client
+{"type": "typing_started", "data": {"conversationId": "chat123", "participantId": "+15551234567"}}
+{"type": "typing_stopped", "data": {"conversationId": "chat123", "participantId": "+15551234567"}}
+// Client → Server
+{"type": "typing", "data": {"conversationId": "chat123"}}
+```
+
+---
+
+### EventBus Pattern (future)
+
+```swift
+EventBus.shared.emit(.newMessage(message))
+EventBus.shared.emit(.typingStarted(conversationId))
+EventBus.shared.emit(.messageRead(messageIds))
+```
+
+Planned for decoupling components. Not yet implemented — components currently communicate via direct references and WebSocket broadcasts.
+
+---
+
+### Cache Subsystem (future)
+
+Planned client-side caching:
+
+| Component | Purpose |
+|-----------|---------|
+| `ImageCache` | In-memory LRU cache for decoded images |
+| `ThumbnailCache` | Disk-backed thumbnail cache |
+| `DiskCache` | General-purpose disk cache with eviction policy |
+| `CachePolicy` | TTL, size limits, eviction rules |
+
+---
+
+### ComposerPlugin Implementations (for M3.3, M3.4)
+
+These plugins are defined by the `ComposerPlugin` protocol but not yet implemented:
+
+| Plugin | Icon | Shortcut | Milestone | Description |
+|--------|------|----------|-----------|-------------|
+| `AttachmentPickerPlugin` | `paperclip` | ⌘⇧A | M3.3 | File picker for any attachment |
+| `PhotoPickerPlugin` | `photo` | ⌘⇧P | M3.3 | Photos library picker |
+| `CameraPlugin` | `camera` | — | M3.3 | Take photo/video |
+| `GifPickerPlugin` | `gift` | ⌘⇧G | future | GIF search (Giphy/Tenor) |
+| `AudioRecorderPlugin` | `mic` | — | M3.4 | Record voice message |
+| `EmojiPickerPlugin` | `face.smiling` | ⌘⌃Space | future | Emoji picker |
+| `MentionPlugin` | `at` | @ key | future | Mention autocomplete |
+
+**Example implementation pattern:**
+```swift
+struct AttachmentPickerPlugin: ComposerPlugin {
+    let id = "attachment-picker"
+    let icon = "paperclip"
+    let keyboardShortcut: KeyEquivalent? = "a"
+    let modifiers: EventModifiers = [.command, .shift]
+
+    func showsToolbarButton(context: any ComposerContext) -> Bool { true }
+
+    @MainActor
+    func activate(context: any ComposerContext) async {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK {
+            for url in panel.urls {
+                let attachment = DraftAttachment(url: url)
+                context.addAttachment(attachment)
+            }
+        }
+    }
+}
+```
+
+---
+
+### Unbuilt Decorator Blueprints
+
+| Decorator | Position | Milestone | Description |
+|-----------|----------|-----------|-------------|
+| `DeliveryStatusDecorator` | `.bottomTrailing` | M4.2 | Sending... / Sent / Failed |
+| `ReplyPreviewDecorator` | `.topLeading` | future | Preview of replied-to message |
+| `CodeCopyDecorator` | `.overlay` | M5.1 | "Copy Code" button for 2FA codes |
+
+**Note:** `CopyCodeAction` exists as a `MessageAction` — a `CodeCopyDecorator` overlay is a potential UX enhancement.
+
+---
+
+### Unbuilt Processor Blueprints
+
+| Processor | Priority | Milestone | Description |
+|-----------|----------|-----------|-------------|
+| `LinkUnfurler` | 100 | future | Extract metadata from URLs, generate previews |
+| `EmailDetector` | 90 | future | Make email addresses tappable |
+
+---
+
+### Unbuilt Attachment Handlers (Server)
+
+| Handler | Supported Types | Description |
+|---------|----------------|-------------|
+| `AudioHandler` | audio/* | Duration, waveform generation |
+| `FileHandler` | application/* | File size, icon based on type |
+| `ContactHandler` | text/vcard | Parse vCard, extract contact info |
+| `LocationHandler` | — | Map coordinates, address |
+
+Supporting infrastructure (also unbuilt): `ThumbnailGenerator`, `ThumbnailCache`, `WaveformGenerator`, `BlurhashGenerator`
+
+---
+
+### Unbuilt Renderers (Client)
+
+| Renderer | Type | Description |
+|----------|------|-------------|
+| `CodeBlockRenderer` | Message | Syntax highlighting for code blocks |
+| `ContactRenderer` | Attachment | Contact card display |
+| `LocationRenderer` | Attachment | Map preview with tap-to-open |
+
+---
+
+### Settings System (future)
+
+```swift
+enum SettingsKey {
+    static let tunnelDefault = "tunnel.default"
+    static let e2eEnabled = "security.e2e.enabled"
+    static let showTypingIndicators = "ui.typing.enabled"
+    static let autoCopyCodes = "codes.autoCopy"
+    static let enterToSend = "composer.enterToSend"
+    static let composerMaxLines = "composer.maxLines"
+}
+```
+
+Currently settings are stored via `@AppStorage` and Keychain. A unified `Settings` system with migration support is planned.
+
+---
+
+### Full Target File Structure
+
+This shows the complete target state including unbuilt files. Files marked with `*` do not yet exist.
+
+```
+MessageBridge/
+├── CLAUDE.md
+├── spec.md
+│
+├── MessageBridgeServer/
+│   ├── Sources/
+│   │   ├── MessageBridgeCore/
+│   │   │   ├── Protocols/
+│   │   │   │   ├── TunnelProvider.swift
+│   │   │   │   ├── MessageProcessor.swift
+│   │   │   │   └── AttachmentHandler.swift
+│   │   │   ├── Registries/
+│   │   │   │   ├── TunnelRegistry.swift
+│   │   │   │   ├── ProcessorChain.swift
+│   │   │   │   └── AttachmentRegistry.swift
+│   │   │   ├── Models/ (Message, Conversation, Attachment, Tapback, etc.)
+│   │   │   ├── Database/ (ChatDatabase, ChatDatabaseProtocol, TapbackQueries)
+│   │   │   ├── API/ (Routes, Middleware, WebSocket)
+│   │   │   ├── Processors/ (CodeDetector, EmojiEnlarger, MentionExtractor, PhoneNumberDetector)
+│   │   │   ├── Attachments/ (ImageHandler, VideoHandler)
+│   │   │   ├── Attachments/ * (AudioHandler, FileHandler, ContactHandler, LocationHandler)
+│   │   │   ├── Processors/ * (LinkUnfurler, EmailDetector)
+│   │   │   ├── Events/ * (EventBus, AppEvent, Handlers/)
+│   │   │   ├── Settings/ * (SettingsKey, Settings, SettingsMigration)
+│   │   │   ├── Presence/ * (TypingTracker, PresenceBroadcaster)
+│   │   │   └── (Tailscale, Cloudflare, Ngrok, Security, Logging, etc.)
+│   │   └── MessageBridgeServer/ (App, Views)
+│   └── Tests/
+│
+├── MessageBridgeClient/
+│   ├── Sources/
+│   │   ├── MessageBridgeClientCore/
+│   │   │   ├── Protocols/
+│   │   │   │   ├── MessageRenderer.swift
+│   │   │   │   ├── AttachmentRenderer.swift
+│   │   │   │   ├── BubbleDecorator.swift
+│   │   │   │   ├── MessageAction.swift
+│   │   │   │   ├── ComposerPlugin.swift
+│   │   │   │   └── PresenceProvider.swift *
+│   │   │   ├── Registries/ (all 5 exist + PresenceRegistry *)
+│   │   │   ├── Renderers/Messages/ (PlainText, LinkPreview, HighlightedText, LargeEmoji)
+│   │   │   ├── Renderers/Messages/ * (CodeBlockRenderer)
+│   │   │   ├── Renderers/Attachments/ (SingleImage, ImageGallery, Video, Audio, Document)
+│   │   │   ├── Renderers/Attachments/ * (ContactRenderer, LocationRenderer)
+│   │   │   ├── Decorators/ (Tapback, ReadReceipt, Timestamp)
+│   │   │   ├── Decorators/ * (DeliveryStatus, ReplyPreview, CodeCopy)
+│   │   │   ├── Actions/ (all 9 exist)
+│   │   │   ├── Composer/ * (plugin implementations)
+│   │   │   ├── Presence/ * (TypingIndicatorProvider, OnlineStatusProvider)
+│   │   │   ├── Cache/ * (ImageCache, ThumbnailCache, DiskCache)
+│   │   │   ├── Settings/ * (SettingsKey, Settings)
+│   │   │   └── (Services, ViewModels, Security, Logging, etc.)
+│   │   └── MessageBridgeClient/ (App, Views)
+│   └── Tests/
+│
+└── Scripts/
+```
+
+---
+
+### Expanded Model Schemas (Target)
+
+These are the TARGET model definitions. Some fields exist, others are planned.
+
+**Message (expanded target):**
+```swift
+struct Message: Codable, Identifiable, Sendable {
+    // Existing
+    let id: Int64
+    let guid: String
+    let text: String?
+    let date: Date
+    let isFromMe: Bool
+    let handleId: Int64?
+    let conversationId: String
+    let attachments: [Attachment]
+    var tapbacks: [Tapback]?
+    let dateDelivered: Date?
+    let dateRead: Date?
+    let linkPreview: LinkPreview?
+    let detectedCodes: [DetectedCode]?
+    let highlights: [TextHighlight]?
+    let mentions: [Mention]?
+
+    // Planned
+    let attributedText: AttributedContent?  // Rich text
+    let replyToMessageId: Int64?            // Threading
+    let threadId: String?                   // Threading
+    let readBy: [ReadReceipt]?              // Group read receipts
+}
+```
+
+**API Endpoints (target):**
+
+| Method | Endpoint | Status | Description |
+|--------|----------|--------|-------------|
+| GET | `/health` | ✅ Exists | Server status |
+| GET | `/conversations` | ✅ Exists | List conversations (paginated) |
+| GET | `/conversations/:id/messages` | ✅ Exists | Messages for conversation |
+| POST | `/conversations/:id/read` | ✅ Exists | Mark conversation as read |
+| GET | `/search` | ✅ Exists | Search messages |
+| POST | `/send` | ✅ Exists | Send text message |
+| POST | `/messages/:id/tapback` | ✅ Exists | Add/remove tapback |
+| GET | `/attachments/:id` | ✅ Exists | Download attachment |
+| GET | `/attachments/:id/thumbnail` | ✅ Exists | Get attachment thumbnail |
+| WS | `/ws` | ✅ Exists | Real-time updates |
+| GET | `/messages/:id` | 🔴 Planned | Single message with full details |
+| POST | `/send-attachment` | 🔴 Planned | Send message with attachments |
+| DELETE | `/messages/:id` | 🔴 Planned | Delete message |
+
+---
+
 ## Changelog
 
 | Date       | Change                                        |
@@ -511,3 +830,4 @@ These are not planned but may be added later:
 | 2024-01-15 | Initial spec with Phase 1-2                   |
 | 2024-02-01 | Added Phase 3-6 milestones                    |
 | 2024-03-01 | Added 2FA code detection, multi-line composer |
+| 2026-02-09 | Added Architecture Blueprints section (moved from CLAUDE.md) |
