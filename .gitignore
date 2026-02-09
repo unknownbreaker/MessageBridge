@@ -5,6 +5,7 @@ Package.resolved
 
 # Xcode
 *.xcodeproj/xcuserdata/
+**/*.xcodeproj/xcshareddata/
 *.xcworkspace/xcuserdata/
 DerivedData/
 *.xccheckout
@@ -32,3 +33,6 @@ build/
 
 # Worktrees
 .worktrees/
+
+# Diagnostic scripts
+Scripts/

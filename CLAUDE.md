@@ -14,14 +14,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Pinned Conversations
-- Added `pinnedIndex: Int?` to both server and client Conversation models
-- Created `PinnedConversationWatcher` actor on server: polls Messages.app sidebar via AppleScript accessibility every 60s, matches display names to conversation IDs
-- Wired watcher into ServerManager/Routes: `/conversations` response overlays pin data, WebSocket broadcasts `pinned_conversations_changed` events
-- Added client-only "Client Pins" tier stored in UserDefaults via `ClientPinStorage`
-- Sectioned sidebar: "Messages Pins" (tier 1) → "Client Pins" (tier 2) → unpinned; context menus for pin/unpin
-- Pinned conversations don't reorder on new messages
-- All 517 server tests + 353 client tests pass
+**Last Session:** Pinned Conversations (Bug Fixes & Ship)
+- Fixed server crash: `Dictionary(uniqueKeysWithValues:)` trap on duplicate conversation IDs → switched to `uniquingKeysWith`
+- Fixed 1:1 pin matching: added first-name matching for short sidebar names (e.g. "Jamie" → "Jamie Rodriguez")
+- Fixed missing old pinned conversations: cache full `Conversation` objects during matching, inject into API response when outside top-50 fetch window
+- Fixed duplicate group detection: participant-set dedup handles protocol-variant chat IDs (SMS/RCS/iMessage for same group)
+- Fixed compact mode: temporarily widen Messages.app window to 1400px during sidebar scan when width < 1200px
+- Fixed stale unread indicator on injected conversations: force `unreadCount: 0`
+- Shipped as PR #1, squash-merged to main
+- All 528 server tests + 353 client tests pass
 
 **Known Blockers:** None
 
