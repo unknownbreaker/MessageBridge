@@ -19,7 +19,7 @@ public struct TapbackDecorator: BubbleDecorator {
   public func decorate(_ message: Message, context: DecoratorContext) -> AnyView {
     AnyView(
       TapbackPill(tapbacks: message.tapbacks ?? [])
-        .offset(x: 8, y: -8)
+        .offset(x: message.isFromMe ? -8 : 8, y: -8)
     )
   }
 }

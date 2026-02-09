@@ -69,7 +69,8 @@ public actor WebSocketManager {
       tapbackType: tapback.type,
       sender: tapback.sender,
       isFromMe: tapback.isFromMe,
-      conversationId: conversationId
+      conversationId: conversationId,
+      emoji: tapback.emoji
     )
     let wsMessage = WebSocketMessage(type: .tapbackAdded, data: event)
 
@@ -87,9 +88,49 @@ public actor WebSocketManager {
       tapbackType: tapback.type,
       sender: tapback.sender,
       isFromMe: tapback.isFromMe,
-      conversationId: conversationId
+      conversationId: conversationId,
+      emoji: tapback.emoji
     )
     let wsMessage = WebSocketMessage(type: .tapbackRemoved, data: event)
+
+    await broadcast(wsMessage)
+  }
+
+  /// Broadcast a sync warning to all connected clients
+  public func broadcastSyncWarning(conversationId: String, message: String) async {
+    os_log(
+      "Broadcasting sync warning for %{public}@ to %d client(s)", log: logger, type: .info,
+      conversationId, connections.count)
+
+    let event = SyncWarningEvent(conversationId: conversationId, message: message)
+    let wsMessage = WebSocketMessage(type: .syncWarning, data: event)
+
+    await broadcast(wsMessage)
+  }
+
+  /// Broadcast sync warning cleared to all connected clients
+  public func broadcastSyncWarningCleared(conversationId: String) async {
+    os_log(
+      "Broadcasting sync warning cleared for %{public}@ to %d client(s)", log: logger, type: .info,
+      conversationId, connections.count)
+
+    let event = SyncWarningClearedEvent(conversationId: conversationId)
+    let wsMessage = WebSocketMessage(type: .syncWarningCleared, data: event)
+
+    await broadcast(wsMessage)
+  }
+
+  /// Broadcast pinned conversations changed to all connected clients
+  public func broadcastPinnedConversationsChanged(_ pins: [PinnedConversation]) async {
+    os_log(
+      "Broadcasting pinned conversations changed (%d pins) to %d client(s)", log: logger,
+      type: .info, pins.count, connections.count)
+
+    let entries = pins.map {
+      PinnedConversationEntry(conversationId: $0.conversationId, index: $0.index)
+    }
+    let event = PinnedConversationsChangedEvent(pinned: entries)
+    let wsMessage = WebSocketMessage(type: .pinnedConversationsChanged, data: event)
 
     await broadcast(wsMessage)
   }

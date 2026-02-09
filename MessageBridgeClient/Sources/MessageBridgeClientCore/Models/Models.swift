@@ -46,7 +46,10 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
   case laugh = 2003
   case emphasis = 2004
   case question = 2005
+  case customEmoji = 2006
 
+  /// The default emoji for classic tapback types.
+  /// For `.customEmoji`, use the `emoji` field on the `Tapback` struct instead.
   public var emoji: String {
     switch self {
     case .love: return "❤️"
@@ -55,6 +58,7 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
     case .laugh: return "😂"
     case .emphasis: return "‼️"
     case .question: return "❓"
+    case .customEmoji: return "😀"
     }
   }
 }
@@ -63,19 +67,35 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
 
 /// Represents a tapback reaction on a message
 public struct Tapback: Codable, Sendable, Equatable, Hashable, Identifiable {
-  public var id: String { "\(messageGUID)-\(sender)-\(type.rawValue)" }
+  public var id: String { "\(messageGUID)-\(sender)-\(type.rawValue)-\(emoji ?? "")" }
   public let type: TapbackType
   public let sender: String
   public let isFromMe: Bool
   public let date: Date
   public let messageGUID: String
+  /// The custom emoji for `.customEmoji` type tapbacks (iOS 17+).
+  /// Nil for classic tapback types.
+  public let emoji: String?
 
-  public init(type: TapbackType, sender: String, isFromMe: Bool, date: Date, messageGUID: String) {
+  public init(
+    type: TapbackType, sender: String, isFromMe: Bool, date: Date, messageGUID: String,
+    emoji: String? = nil
+  ) {
     self.type = type
     self.sender = sender
     self.isFromMe = isFromMe
     self.date = date
     self.messageGUID = messageGUID
+    self.emoji = emoji
+  }
+
+  /// The emoji to display for this tapback.
+  /// Uses the custom emoji for `.customEmoji` type, otherwise the classic type's emoji.
+  public var displayEmoji: String {
+    if type == .customEmoji, let emoji = emoji {
+      return emoji
+    }
+    return type.emoji
   }
 }
 
@@ -323,15 +343,16 @@ public struct Conversation: Codable, Identifiable, Sendable {
   public let isGroup: Bool
   public let groupPhotoBase64: String?  // Group photo as base64-encoded image (PNG)
   public let unreadCount: Int  // Number of unread messages
+  public let pinnedIndex: Int?  // Messages.app pin position (0-8), nil if unpinned
 
   enum CodingKeys: String, CodingKey {
-    case id, guid, participants, lastMessage, isGroup, groupPhotoBase64, unreadCount
+    case id, guid, participants, lastMessage, isGroup, groupPhotoBase64, unreadCount, pinnedIndex
     case _displayName = "displayName"
   }
 
   public init(
     id: String, guid: String, displayName: String?, participants: [Handle], lastMessage: Message?,
-    isGroup: Bool, groupPhotoBase64: String? = nil, unreadCount: Int = 0
+    isGroup: Bool, groupPhotoBase64: String? = nil, unreadCount: Int = 0, pinnedIndex: Int? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -341,6 +362,7 @@ public struct Conversation: Codable, Identifiable, Sendable {
     self.isGroup = isGroup
     self.groupPhotoBase64 = groupPhotoBase64
     self.unreadCount = unreadCount
+    self.pinnedIndex = pinnedIndex
   }
 
   /// Whether this conversation has unread messages
@@ -381,11 +403,35 @@ extension Conversation: Hashable {
   public static func == (lhs: Conversation, rhs: Conversation) -> Bool {
     lhs.id == rhs.id && lhs.unreadCount == rhs.unreadCount
       && lhs.lastMessage?.id == rhs.lastMessage?.id
+      && lhs.pinnedIndex == rhs.pinnedIndex
   }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(id)
     hasher.combine(unreadCount)
     hasher.combine(lastMessage?.id)
+    hasher.combine(pinnedIndex)
+  }
+}
+
+// MARK: - Sync Warning Events
+
+/// Event received when sync warning occurs (read status could not be synced to Messages.app)
+public struct SyncWarningEvent: Codable, Sendable {
+  public let conversationId: String
+  public let message: String
+
+  public init(conversationId: String, message: String) {
+    self.conversationId = conversationId
+    self.message = message
+  }
+}
+
+/// Event received when sync warning is cleared (sync succeeded)
+public struct SyncWarningClearedEvent: Codable, Sendable {
+  public let conversationId: String
+
+  public init(conversationId: String) {
+    self.conversationId = conversationId
   }
 }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Tapback reaction types matching Apple's chat.db associated_message_type values.
-/// Add reactions use 2000-2005, remove reactions use 3000-3005.
+/// Add reactions use 2000-2005 (classic) or 2006 (custom emoji), removals use 3000-3006.
 public enum TapbackType: Int, Codable, Sendable, CaseIterable {
   case love = 2000
   case like = 2001
@@ -9,8 +9,10 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
   case laugh = 2003
   case emphasis = 2004
   case question = 2005
+  case customEmoji = 2006
 
-  /// The emoji representation of this tapback type.
+  /// The emoji representation of this tapback type (for classic types only).
+  /// For `.customEmoji`, use the `emoji` field on the `Tapback` struct instead.
   public var emoji: String {
     switch self {
     case .love: return "❤️"
@@ -19,6 +21,7 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
     case .laugh: return "😂"
     case .emphasis: return "‼️"
     case .question: return "❓"
+    case .customEmoji: return "😀"
     }
   }
 
@@ -29,15 +32,15 @@ public enum TapbackType: Int, Codable, Sendable, CaseIterable {
   }
 
   /// Parse an associated_message_type value from chat.db.
-  /// - Parameter associatedType: The associated_message_type value (2000-3005 range)
+  /// - Parameter associatedType: The associated_message_type value (2000-3006 or 3000-3006 range)
   /// - Returns: A tuple of (TapbackType, isRemoval) or nil if not a valid tapback type
   public static func from(associatedType: Int) -> (type: TapbackType, isRemoval: Bool)? {
-    // Check if it's an add reaction (2000-2005)
+    // Check if it's an add reaction (2000-2006)
     if let type = TapbackType(rawValue: associatedType) {
       return (type, false)
     }
 
-    // Check if it's a remove reaction (3000-3005)
+    // Check if it's a remove reaction (3000-3006)
     let addType = associatedType - 1000
     if let type = TapbackType(rawValue: addType) {
       return (type, true)
@@ -64,17 +67,23 @@ public struct Tapback: Codable, Sendable, Equatable {
   /// The GUID of the message this tapback is attached to.
   public let messageGUID: String
 
+  /// The custom emoji for `.customEmoji` type tapbacks (iOS 17+).
+  /// Nil for classic tapback types (love, like, dislike, laugh, emphasis, question).
+  public let emoji: String?
+
   public init(
     type: TapbackType,
     sender: String,
     isFromMe: Bool,
     date: Date,
-    messageGUID: String
+    messageGUID: String,
+    emoji: String? = nil
   ) {
     self.type = type
     self.sender = sender
     self.isFromMe = isFromMe
     self.date = date
     self.messageGUID = messageGUID
+    self.emoji = emoji
   }
 }

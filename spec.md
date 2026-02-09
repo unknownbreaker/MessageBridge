@@ -348,7 +348,7 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 ---
 
-### M5.2: Multi-line Composer 🔴
+### M5.2: Multi-line Composer ✅
 
 **User Stories:**
 
@@ -357,11 +357,11 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 **Acceptance Criteria:**
 
-- [ ] Text field grows up to 6 lines (configurable)
-- [ ] Scrolls internally after max lines
-- [ ] Shift+Enter or Option+Enter for newline
-- [ ] Enter behavior configurable (send vs newline)
-- [ ] Cmd+Enter always sends
+- [x] Text field grows up to 6 lines (configurable)
+- [x] Scrolls internally after max lines
+- [x] Shift+Enter or Option+Enter for newline
+- [x] Enter behavior configurable (send vs newline)
+- [x] Cmd+Enter always sends
 
 **Extension Point:** `Views/Composer/ExpandingTextEditor.swift`
 
@@ -385,7 +385,7 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 ---
 
-### M5.4: Link Previews 🔴
+### M5.4: Link Previews 🟢
 
 **User Stories:**
 
@@ -394,11 +394,11 @@ MessageBridge enables access to iMessages/SMS on a work Mac by relaying through 
 
 **Acceptance Criteria:**
 
-- [ ] Detect URLs in message text
-- [ ] Fetch metadata (title, description, image)
-- [ ] Display card below message text
-- [ ] Tap card opens URL in browser
-- [ ] Cache previews to avoid re-fetching
+- [x] Detect URLs in message text
+- [x] Fetch metadata (title, description, image)
+- [x] Display card below message text
+- [x] Tap card opens URL in browser
+- [x] Cache previews to avoid re-fetching
 
 **Extension Point:** `MessageProcessor` for detection, `MessageRenderer` for display
 

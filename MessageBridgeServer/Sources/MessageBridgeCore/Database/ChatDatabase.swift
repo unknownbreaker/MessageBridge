@@ -2,6 +2,25 @@ import AppKit
 import Foundation
 import GRDB
 
+/// Result of attempting to sync read state with Messages.app
+public enum SyncResult: Sendable, Equatable {
+  case success
+  case failed(reason: String)
+}
+
+/// Information about a group chat for UI search operations
+public struct GroupChatInfo: Sendable {
+  public let conversationId: String
+  public let displayName: String?
+  public let handles: [String]
+
+  public init(conversationId: String, displayName: String?, handles: [String]) {
+    self.conversationId = conversationId
+    self.displayName = displayName
+    self.handles = handles
+  }
+}
+
 /// Provides read-only access to the macOS Messages database (chat.db)
 public actor ChatDatabase: ChatDatabaseProtocol {
   private nonisolated let dbPool: DatabasePool
@@ -187,6 +206,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
         WHERE c.chat_identifier = ?
+          AND (m.associated_message_type IS NULL OR m.associated_message_type = 0)
         ORDER BY m.date DESC
         LIMIT ? OFFSET ?
         """
@@ -276,6 +296,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         JOIN chat c ON cmj.chat_id = c.ROWID
         LEFT JOIN handle h ON m.handle_id = h.ROWID
         WHERE m.ROWID > ?
+          AND (m.associated_message_type IS NULL OR m.associated_message_type = 0)
         ORDER BY m.ROWID ASC
         LIMIT ?
         """
@@ -324,30 +345,43 @@ public actor ChatDatabase: ChatDatabaseProtocol {
   // MARK: - Tapback Detection (Fast Path)
 
   /// Fetch tapback rows newer than a given ROWID - optimized for real-time detection
-  /// This queries for messages with associated_message_type between 2000-3005 (tapbacks)
+  /// This queries for messages with associated_message_type between 2000-3006 (tapbacks)
   public nonisolated func fetchTapbacksNewerThan(id: Int64, limit: Int = 20) throws -> [(
     rowId: Int64, tapback: Tapback, conversationId: String, isRemoval: Bool
   )] {
     try dbPool.read { db in
-      // Query for tapback messages (associated_message_type 2000-3005)
+      // Query for tapback messages (associated_message_type 2000-3006)
       // Join to get the target message's conversation
+      // Strip the p:N/ or bp: prefix from associated_message_guid to get the raw target GUID.
+      // Apple stores tapback references as "p:0/MESSAGE_GUID" (part index),
+      // "bp:MESSAGE_GUID" (balloon provider / link preview), or bare "MESSAGE_GUID".
+      let stripPrefix = """
+        CASE WHEN m.associated_message_guid LIKE 'p:%/%'
+             THEN SUBSTR(m.associated_message_guid, INSTR(m.associated_message_guid, '/') + 1)
+             WHEN m.associated_message_guid LIKE 'bp:%'
+             THEN SUBSTR(m.associated_message_guid, 4)
+             ELSE m.associated_message_guid
+        END
+        """
+
       let sql = """
         SELECT
             m.ROWID as id,
             m.guid,
-            m.associated_message_guid,
+            (\(stripPrefix)) as target_guid,
             m.associated_message_type,
+            m.associated_message_emoji,
             m.is_from_me,
             m.date,
             COALESCE(h.id, '') as sender,
             c.chat_identifier as conversation_id
         FROM message m
         LEFT JOIN handle h ON m.handle_id = h.ROWID
-        JOIN message target_msg ON target_msg.guid = m.associated_message_guid
+        JOIN message target_msg ON target_msg.guid = (\(stripPrefix))
         JOIN chat_message_join cmj ON target_msg.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
         WHERE m.ROWID > ?
-          AND m.associated_message_type BETWEEN 2000 AND 3005
+          AND m.associated_message_type BETWEEN 2000 AND 3006
         ORDER BY m.ROWID ASC
         LIMIT ?
         """
@@ -357,7 +391,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
       return rows.compactMap { row -> (Int64, Tapback, String, Bool)? in
         guard
           let rowId: Int64 = row["id"],
-          let associatedGUID: String = row["associated_message_guid"],
+          let targetGUID: String = row["target_guid"],
           let associatedType: Int = row["associated_message_type"],
           let conversationId: String = row["conversation_id"],
           let parsed = TapbackType.from(associatedType: associatedType)
@@ -368,13 +402,15 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         let isFromMe: Int = row["is_from_me"] ?? 0
         let sender: String = row["sender"] ?? ""
         let dateValue: Int64 = row["date"] ?? 0
+        let customEmoji: String? = row["associated_message_emoji"]
 
         let tapback = Tapback(
           type: parsed.type,
           sender: sender,
           isFromMe: isFromMe == 1,
           date: Message.dateFromAppleTimestamp(dateValue),
-          messageGUID: associatedGUID
+          messageGUID: targetGUID,
+          emoji: customEmoji
         )
 
         return (rowId, tapback, conversationId, parsed.isRemoval)
@@ -419,6 +455,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
         WHERE m.text LIKE '%' || ? || '%'
+          AND (m.associated_message_type IS NULL OR m.associated_message_type = 0)
         ORDER BY m.date DESC
         LIMIT ?
         """
@@ -460,7 +497,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
 
   /// Mark all unread messages in a conversation as read
   /// This writes to Apple's chat.db to sync read status with Messages.app
-  public func markConversationAsRead(conversationId: String) async throws {
+  /// - Returns: SyncResult indicating if Messages.app sync was successful
+  public func markConversationAsRead(conversationId: String) async throws -> SyncResult {
     let (messagesMarked, chatUpdated) = try await Task.detached { [dbPool] in
       try dbPool.write { db -> (Int, Bool) in
         let now = Int64(Date().timeIntervalSinceReferenceDate * 1_000_000_000)
@@ -496,13 +534,16 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         return (messagesCount, chatUpdated)
       }
     }.value
+
     // Open the conversation in Messages.app (in background) to trigger native read-marking
     // This is more reliable than database updates since Messages.app syncs via iCloud
-    await syncReadStateWithMessagesApp(conversationId: conversationId)
+    let syncResult = await syncReadStateWithMessagesApp(conversationId: conversationId)
 
     serverLog(
       "Marked \(messagesMarked) message(s) as read, chat updated: \(chatUpdated) for: \(conversationId)"
     )
+
+    return syncResult
   }
 
   /// Nudges Messages.app to pick up the read-state changes written to chat.db.
@@ -510,17 +551,147 @@ public actor ChatDatabase: ChatDatabaseProtocol {
   /// For 1:1 chats the messages:// URL scheme reliably navigates Messages.app to the
   /// conversation (without activating the window), which triggers its internal read-marking.
   ///
-  /// For group chats (especially pinned ones) the URL scheme doesn't work — Messages.app
-  /// opens a blank compose window instead. Restarting the `imagent` daemon forces
-  /// Messages.app to re-read the database, picking up our is_read / last_read_message_timestamp
-  /// changes for all conversations at once.
-  private func syncReadStateWithMessagesApp(conversationId: String) async {
+  /// For group chats, we use UI search automation to open the specific chat. If the chat
+  /// has duplicate participants with another chat, we use the display name search which
+  /// requires Accessibility permissions.
+  ///
+  /// - Returns: SyncResult indicating if the sync was successful
+  private func syncReadStateWithMessagesApp(conversationId: String) async -> SyncResult {
     let isGroupChat = conversationId.lowercased().hasPrefix("chat")
+    serverLog("syncReadStateWithMessagesApp: \(conversationId), isGroupChat: \(isGroupChat)")
 
     if isGroupChat {
-      await restartImagent()
+      return await openGroupChatViaSearch(conversationId: conversationId)
     } else {
       await openConversationViaURLScheme(conversationId: conversationId)
+      return .success
+    }
+  }
+
+  /// Opens a group chat by searching for it, using the appropriate strategy based on
+  /// whether there are duplicate chats with the same participants.
+  /// - Returns: SyncResult indicating if the operation was successful
+  private func openGroupChatViaSearch(conversationId: String) async -> SyncResult {
+    // Get participant handles and chat info for this group chat
+    guard let chatInfo = getGroupChatInfo(conversationId: conversationId),
+      !chatInfo.handles.isEmpty
+    else {
+      serverLogWarning("Could not get info for group chat: \(conversationId)")
+      return .failed(reason: "Could not get chat info")
+    }
+
+    // Check if there are other chats with the exact same participants
+    let hasDuplicates = hasChatsWithSameParticipants(
+      conversationId: conversationId, handles: chatInfo.handles)
+
+    if hasDuplicates {
+      // Fall back to UI search by chat name (requires Accessibility)
+      serverLog("openGroupChatViaSearch: duplicate participants detected, using UI search")
+      return await openGroupChatViaUISearch(chatInfo: chatInfo)
+    } else {
+      // Use URL scheme with addresses (no special permissions needed)
+      let addressList = chatInfo.handles.joined(separator: ",")
+      guard let url = URL(string: "messages://open?addresses=\(addressList)") else {
+        serverLogWarning("Could not build URL for group chat: \(conversationId)")
+        return .failed(reason: "Could not build URL")
+      }
+
+      serverLog("openGroupChatViaSearch: opening URL = \(url)")
+      _ = await MainActor.run {
+        NSWorkspace.shared.open(url)
+      }
+      return .success
+    }
+  }
+
+  /// Gets display name and handles for a group chat
+  private nonisolated func getGroupChatInfo(conversationId: String) -> GroupChatInfo? {
+    do {
+      return try dbPool.read { [self] db -> GroupChatInfo? in
+        // Get the chat's ROWID and display_name
+        let chatRow = try Row.fetchOne(
+          db,
+          sql: """
+            SELECT ROWID, display_name
+            FROM chat
+            WHERE chat_identifier = ?
+            """,
+          arguments: [conversationId]
+        )
+
+        guard let chatRow = chatRow,
+          let chatId: Int64 = chatRow["ROWID"]
+        else {
+          return nil
+        }
+
+        let displayName: String? = chatRow["display_name"]
+
+        // Get the handles for this chat
+        let handles = try self.fetchHandlesForChat(db: db, chatId: chatId)
+        let handleAddresses = handles.map { $0.address }
+
+        return GroupChatInfo(
+          conversationId: conversationId,
+          displayName: displayName,
+          handles: handleAddresses
+        )
+      }
+    } catch {
+      serverLogWarning("Failed to get group chat info: \(error)")
+      return nil
+    }
+  }
+
+  /// Checks if there are other chats with the exact same set of participants
+  private nonisolated func hasChatsWithSameParticipants(conversationId: String, handles: [String])
+    -> Bool
+  {
+    guard !handles.isEmpty else { return false }
+
+    do {
+      return try dbPool.read { [self] db -> Bool in
+        // Find all chats that have ALL of the same handles (same participant count, all matching)
+        // This is done by:
+        // 1. Finding chats with the exact same number of participants
+        // 2. Checking that all handles are shared
+
+        let sortedHandles = handles.sorted()
+        let handleCount = handles.count
+
+        // Get all group chats with the same participant count
+        let candidateChats = try Row.fetchAll(
+          db,
+          sql: """
+            SELECT c.ROWID, c.chat_identifier, COUNT(chj.handle_id) as handle_count
+            FROM chat c
+            JOIN chat_handle_join chj ON c.ROWID = chj.chat_id
+            WHERE c.chat_identifier != ?
+            AND c.chat_identifier LIKE 'chat%'
+            GROUP BY c.ROWID
+            HAVING handle_count = ?
+            """,
+          arguments: [conversationId, handleCount]
+        )
+
+        for candidateRow in candidateChats {
+          guard let candidateChatId: Int64 = candidateRow["ROWID"] else { continue }
+
+          // Get the handles for this candidate chat
+          let candidateHandles = try self.fetchHandlesForChat(db: db, chatId: candidateChatId)
+          let candidateAddresses = candidateHandles.map { $0.address }.sorted()
+
+          // If all addresses match, we have a duplicate
+          if candidateAddresses == sortedHandles {
+            return true
+          }
+        }
+
+        return false
+      }
+    } catch {
+      serverLogWarning("Failed to check for duplicate chats: \(error)")
+      return false
     }
   }
 
@@ -576,6 +747,238 @@ public actor ChatDatabase: ChatDatabaseProtocol {
         continuation.resume()
       }
     }
+  }
+
+  // MARK: - AppleScript Builders
+
+  /// Builds the AppleScript for searching Messages.app by directly targeting the search field.
+  /// SAFETY: This script finds the search field via accessibility role (AXSearchField) and clicks it
+  /// to focus, rather than relying on Cmd+F which can fail and cause keystrokes to go into the
+  /// message compose field — accidentally sending the search term as a message.
+  /// - Parameter searchString: The chat name to search for
+  /// - Returns: AppleScript source code
+  public static func buildSearchScript(searchString: String) -> String {
+    let escapedSearch =
+      searchString
+      .replacingOccurrences(of: "\\", with: "\\\\")
+      .replacingOccurrences(of: "\"", with: "\\\"")
+
+    return """
+      tell application "Messages" to activate
+      delay 0.3
+
+      tell application "System Events"
+          tell process "Messages"
+              -- Find the search field by accessibility role (AXSearchField).
+              -- This is safer than Cmd+F which may fail to focus the search field,
+              -- causing keystrokes to go into the message compose field.
+              set searchField to missing value
+              try
+                  set allElements to entire contents of front window
+                  repeat with elem in allElements
+                      try
+                          if class of elem is text field and subrole of elem is "AXSearchField" then
+                              set searchField to elem
+                              exit repeat
+                          end if
+                      end try
+                  end repeat
+              end try
+
+              if searchField is missing value then
+                  return "no_search_field"
+              end if
+
+              -- Clear any existing search first (dismisses stale popover)
+              try
+                  set fieldVal to value of searchField
+                  if fieldVal is not missing value and fieldVal is not "" then
+                      click (first button of searchField whose description is "Clear text")
+                      delay 0.2
+                  end if
+              end try
+
+              -- Click the search field to ensure it has focus
+              click searchField
+              delay 0.2
+
+              -- Type the search string
+              keystroke "\(escapedSearch)"
+              delay 0.3
+
+              -- Verify text was entered in the SEARCH field, not the compose field.
+              -- If verification fails, abort without pressing Return to avoid sending a message.
+              set textConfirmed to false
+              repeat 10 times
+                  try
+                      set fieldVal to value of searchField
+                      if fieldVal contains "\(escapedSearch)" then
+                          set textConfirmed to true
+                          exit repeat
+                      end if
+                  end try
+                  delay 0.15
+              end repeat
+
+              if not textConfirmed then
+                  -- Text didn't reach the search field. Press Escape and abort.
+                  key code 53
+                  return "wrong_field"
+              end if
+
+              -- Wait for search results to populate, then click the matching button
+              delay 1.0
+              set conversationsFound to false
+              set resultClicked to false
+              try
+                  set allElements to entire contents of front window
+                  repeat with elem in allElements
+                      try
+                          if class of elem is static text and description of elem is "Conversations" then
+                              set conversationsFound to true
+                          end if
+
+                          -- After the Conversations header, click the first button matching the search
+                          if conversationsFound and class of elem is button then
+                              if description of elem is "\(escapedSearch)" then
+                                  click elem
+                                  set resultClicked to true
+                                  exit repeat
+                              end if
+                          end if
+                      end try
+                  end repeat
+              end try
+
+              if resultClicked then
+                  delay 0.3
+                  -- Re-find the search field (original reference may be stale after click)
+                  try
+                      set allElements to entire contents of front window
+                      repeat with elem in allElements
+                          try
+                              if class of elem is text field and subrole of elem is "AXSearchField" then
+                                  click (first button of elem whose description is "Clear text")
+                                  exit repeat
+                              end if
+                          end try
+                      end repeat
+                  end try
+                  return "success"
+              else if conversationsFound then
+                  key code 53
+                  return "no_matching_button"
+              else
+                  key code 53
+                  return "no_results"
+              end if
+          end tell
+      end tell
+      """
+  }
+
+  /// Executes the search AppleScript and returns the result
+  /// - Parameter searchString: The chat name to search for
+  /// - Returns: "success" if search worked, "no_results" if timed out, "error" if script failed
+  private func executeSearchScript(searchString: String) async -> String {
+    let script = ChatDatabase.buildSearchScript(searchString: searchString)
+
+    return await withCheckedContinuation { continuation in
+      DispatchQueue.global(qos: .userInitiated).async {
+        var error: NSDictionary?
+        let appleScript = NSAppleScript(source: script)
+        let result = appleScript?.executeAndReturnError(&error)
+
+        if let error = error {
+          let errorMessage = error[NSAppleScript.errorMessage] as? String ?? "Unknown error"
+          serverLogWarning("Search script error: \(errorMessage)")
+          continuation.resume(returning: "error")
+        } else if let resultString = result?.stringValue {
+          continuation.resume(returning: resultString)
+        } else {
+          continuation.resume(returning: "error")
+        }
+      }
+    }
+  }
+
+  /// Clears the search field by pressing Escape
+  private func clearSearchField() async {
+    let script = """
+      tell application "System Events"
+          tell process "Messages"
+              key code 53
+              delay 0.2
+          end tell
+      end tell
+      """
+
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        var error: NSDictionary?
+        let appleScript = NSAppleScript(source: script)
+        appleScript?.executeAndReturnError(&error)
+        continuation.resume()
+      }
+    }
+  }
+
+  /// Opens a group chat using UI search with retry and fallback (requires Accessibility permission)
+  /// - Returns: SyncResult indicating success or failure with reason
+  private func openGroupChatViaUISearch(chatInfo: GroupChatInfo) async -> SyncResult {
+    guard let searchString = chatInfo.displayName, !searchString.isEmpty else {
+      serverLogWarning("Cannot use UI search: no display name for chat \(chatInfo.conversationId)")
+      // Fall back to addresses even though duplicates exist - better than nothing
+      return await fallbackToURLScheme(chatInfo: chatInfo)
+    }
+
+    serverLog("openGroupChatViaUISearch: searching for '\(searchString)'")
+
+    // Attempt 1
+    let result1 = await executeSearchScript(searchString: searchString)
+    if result1 == "success" {
+      serverLog("openGroupChatViaUISearch: success on first attempt")
+      return .success
+    }
+
+    // If the search field wasn't found, no point retrying — go straight to fallback
+    if result1 == "no_search_field" {
+      serverLog("openGroupChatViaUISearch: search field not found, falling back to URL scheme")
+      return await fallbackToURLScheme(chatInfo: chatInfo)
+    }
+
+    serverLog("openGroupChatViaUISearch: first attempt returned '\(result1)', retrying...")
+
+    // Clear and retry once
+    await clearSearchField()
+    try? await Task.sleep(for: .milliseconds(300))
+
+    let result2 = await executeSearchScript(searchString: searchString)
+    if result2 == "success" {
+      serverLog("openGroupChatViaUISearch: success on retry")
+      return .success
+    }
+
+    serverLog("openGroupChatViaUISearch: retry returned '\(result2)', falling back to URL scheme")
+
+    // Fallback to URL scheme
+    return await fallbackToURLScheme(chatInfo: chatInfo)
+  }
+
+  /// Falls back to opening via URL scheme when UI search fails
+  private func fallbackToURLScheme(chatInfo: GroupChatInfo) async -> SyncResult {
+    let addressList = chatInfo.handles.joined(separator: ",")
+    guard let url = URL(string: "messages://open?addresses=\(addressList)") else {
+      return .failed(reason: "Could not build fallback URL")
+    }
+
+    serverLog("openGroupChatViaUISearch: opening fallback URL = \(url)")
+
+    _ = await MainActor.run {
+      NSWorkspace.shared.open(url)
+    }
+
+    return .failed(reason: "Read status could not be synced to Messages.app")
   }
 
   // MARK: - Handles

@@ -33,6 +33,7 @@ public actor ServerManager {
   private var database: ChatDatabase?
   private var messageDetector: MessageChangeDetector?
   private var webSocketManager: WebSocketManager?
+  private var pinnedWatcher: PinnedConversationWatcher?
 
   private(set) public var status: ServerStatus = .stopped
   private(set) public var port: Int = 8080
@@ -71,6 +72,10 @@ public actor ServerManager {
       let messageDetector = MessageChangeDetector(database: database, fileWatcher: fileWatcher)
       self.messageDetector = messageDetector
 
+      // Set up pinned conversation watcher
+      let pinnedWatcher = PinnedConversationWatcher(database: database)
+      self.pinnedWatcher = pinnedWatcher
+
       // Create and configure Vapor application
       let app = try await Application.make(.production)
       app.http.server.configuration.port = port
@@ -82,7 +87,8 @@ public actor ServerManager {
         database: database,
         messageSender: messageSender,
         apiKey: apiKey,
-        webSocketManager: webSocketManager
+        webSocketManager: webSocketManager,
+        pinnedWatcher: pinnedWatcher
       )
 
       self.application = app
@@ -100,6 +106,11 @@ public actor ServerManager {
       // Start message detection
       try await messageDetector.startDetecting { [weak webSocketManager] message, sender in
         await webSocketManager?.broadcastNewMessage(message, sender: sender)
+      }
+
+      // Start pinned conversation detection
+      await pinnedWatcher.startWatching { [weak webSocketManager] pins in
+        await webSocketManager?.broadcastPinnedConversationsChanged(pins)
       }
 
       // Start server in background task
@@ -131,6 +142,10 @@ public actor ServerManager {
     // Stop message detection
     await messageDetector?.stopDetecting()
     messageDetector = nil
+
+    // Stop pinned conversation detection
+    await pinnedWatcher?.stopWatching()
+    pinnedWatcher = nil
 
     // Shutdown Vapor application
     if let app = application {
