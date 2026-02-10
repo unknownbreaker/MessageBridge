@@ -473,7 +473,9 @@ public class MessagesViewModel: ObservableObject {
     return try await bridgeService.fetchAttachment(id: id)
   }
 
-  public func sendMessage(_ text: String, toConversation conversation: Conversation) async {
+  public func sendMessage(
+    _ text: String, toConversation conversation: Conversation, replyToGuid: String? = nil
+  ) async {
     // Clear any previous error
     lastError = nil
 
@@ -503,12 +505,13 @@ public class MessagesViewModel: ObservableObject {
       date: Date(),
       isFromMe: true,
       handleId: nil,
-      conversationId: conversationId
+      conversationId: conversationId,
+      replyToGuid: replyToGuid
     )
     messages[conversationId, default: []].insert(optimisticMessage, at: 0)
 
     do {
-      try await bridgeService.sendMessage(text: text, to: recipient, replyToGuid: nil)
+      try await bridgeService.sendMessage(text: text, to: recipient, replyToGuid: replyToGuid)
       // Send succeeded - keep the optimistic message
       // The real message will arrive via WebSocket and replace it
       logDebug("Message sent successfully to \(recipient)")
