@@ -69,4 +69,10 @@ public struct ProcessedMessage: Codable, Sendable {
 
   /// Date message was read (forwards to underlying message)
   public var dateRead: Date? { message.dateRead }
+
+  /// Reply-to GUID (forwards to underlying message)
+  public var replyToGuid: String? { message.replyToGuid }
+
+  /// Thread originator GUID (forwards to underlying message)
+  public var threadOriginatorGuid: String? { message.threadOriginatorGuid }
 }
