@@ -11,6 +11,7 @@ struct MessageThreadView: View {
   @State private var scrollAnchorMessageId: Int64?
   @State private var isRepositioning = false
   @State private var knownMessageIds: Set<Int64> = []
+  @State private var replyingTo: Message?
 
   var messages: [Message] {
     viewModel.messages[conversation.id] ?? []
@@ -111,21 +112,25 @@ struct MessageThreadView: View {
       Divider()
 
       // Compose
-      ComposerView(text: $messageText) {
-        sendMessage()
-      }
+      ComposerView(text: $messageText, onSend: { sendMessage() }, replyingTo: $replyingTo)
     }
     .task(id: conversation.id) {
       // Reset scroll anchor state when conversation changes
       scrollAnchorMessageId = nil
       isRepositioning = false
       knownMessageIds = []
+      replyingTo = nil
       await viewModel.loadMessages(for: conversation.id)
     }
     .onReceive(NotificationCenter.default.publisher(for: .showTapbackPicker)) { notification in
       if let message = notification.userInfo?["message"] as? Message {
         tapbackTargetMessage = message
         showingTapbackPicker = true
+      }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .beginReply)) { notification in
+      if let message = notification.userInfo?["message"] as? Message {
+        replyingTo = message
       }
     }
     .popover(isPresented: $showingTapbackPicker) {
@@ -147,9 +152,11 @@ struct MessageThreadView: View {
 
   private func sendMessage() {
     guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    let replyGuid = replyingTo?.guid
     Task {
-      await viewModel.sendMessage(messageText, toConversation: conversation)
+      await viewModel.sendMessage(messageText, toConversation: conversation, replyToGuid: replyGuid)
       messageText = ""
+      replyingTo = nil
     }
   }
 
@@ -209,7 +216,6 @@ struct MessageBubble: View {
           isLastMessage: isLastMessage,
           conversationId: message.conversationId
         )
-
 
         // Top-leading decorators (reply preview bar)
         ForEach(
