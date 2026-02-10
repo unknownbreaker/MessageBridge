@@ -348,7 +348,9 @@ public actor BridgeConnection: BridgeServiceProtocol {
     return messagesResponse.messages.map { $0.toMessage() }
   }
 
-  public func sendMessage(text: String, to recipient: String, replyToGuid: String? = nil) async throws {
+  public func sendMessage(text: String, to recipient: String, replyToGuid: String? = nil)
+    async throws
+  {
     guard let serverURL, let apiKey else {
       throw BridgeError.notConnected
     }

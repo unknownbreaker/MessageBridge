@@ -308,6 +308,12 @@ Wraps `Message` with processor-added fields: `detectedCodes`, `highlights`, `men
 
 ## Common Mistakes
 
+### Xcode Project Registration
+- **New `.swift` files in `Client/Sources/MessageBridgeClient/`** MUST be added to `Client/MessageBridgeClient.xcodeproj/project.pbxproj` — `swift build` (SPM) finds files automatically, but the Xcode project maintains an explicit file list
+- Add to 4 sections: `PBXBuildFile`, `PBXFileReference`, the parent group's `children`, and `PBXSourcesBuildPhase > files`
+- Files in `Client/Sources/MessageBridgeClientCore/` and `Server/` are SPM-only and do NOT need Xcode project registration
+- Same applies for `Server/Sources/MessageBridgeServer/` files in `Server/MessageBridgeServer.xcodeproj/project.pbxproj`
+
 ### Attachments
 - Loading full images instead of thumbnails -> memory explosion
 - Blocking main thread on attachment processing -> UI freeze

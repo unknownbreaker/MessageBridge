@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import MessageBridgeClientCore
 
 final class MessageReplyClientTests: XCTestCase {
@@ -25,14 +26,14 @@ final class MessageReplyClientTests: XCTestCase {
 
   func testMessage_decodesReplyFieldsFromJSON() throws {
     let json = """
-    {
-      "id": 1, "guid": "msg-001", "text": "Reply text",
-      "date": 0, "isFromMe": false, "handleId": 1,
-      "conversationId": "chat1", "attachments": [],
-      "replyToGuid": "original-guid",
-      "threadOriginatorGuid": "thread-root-guid"
-    }
-    """.data(using: .utf8)!
+      {
+        "id": 1, "guid": "msg-001", "text": "Reply text",
+        "date": 0, "isFromMe": false, "handleId": 1,
+        "conversationId": "chat1", "attachments": [],
+        "replyToGuid": "original-guid",
+        "threadOriginatorGuid": "thread-root-guid"
+      }
+      """.data(using: .utf8)!
 
     let msg = try JSONDecoder().decode(Message.self, from: json)
     XCTAssertEqual(msg.replyToGuid, "original-guid")
@@ -41,12 +42,12 @@ final class MessageReplyClientTests: XCTestCase {
 
   func testMessage_decodesWithoutReplyFields() throws {
     let json = """
-    {
-      "id": 1, "guid": "msg-001", "text": "Plain text",
-      "date": 0, "isFromMe": false, "handleId": 1,
-      "conversationId": "chat1", "attachments": []
-    }
-    """.data(using: .utf8)!
+      {
+        "id": 1, "guid": "msg-001", "text": "Plain text",
+        "date": 0, "isFromMe": false, "handleId": 1,
+        "conversationId": "chat1", "attachments": []
+      }
+      """.data(using: .utf8)!
 
     let msg = try JSONDecoder().decode(Message.self, from: json)
     XCTAssertNil(msg.replyToGuid)

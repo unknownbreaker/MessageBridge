@@ -6,7 +6,9 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
 
   public init() {}
 
-  public func sendMessage(to recipient: String, text: String, service: String?, replyToGuid: String? = nil) async throws
+  public func sendMessage(
+    to recipient: String, text: String, service: String?, replyToGuid: String? = nil
+  ) async throws
     -> SendResult
   {
     guard !recipient.isEmpty else {
@@ -93,10 +95,12 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
   func buildReplyAppleScript(
     recipient: String, text: String, replyToText: String, service: String
   ) -> String {
-    let escapedText = text
+    let escapedText =
+      text
       .replacingOccurrences(of: "\\", with: "\\\\")
       .replacingOccurrences(of: "\"", with: "\\\"")
-    let escapedOriginal = replyToText
+    let escapedOriginal =
+      replyToText
       .replacingOccurrences(of: "\\", with: "\\\\")
       .replacingOccurrences(of: "\"", with: "\\\"")
 
