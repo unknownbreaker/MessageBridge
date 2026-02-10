@@ -715,7 +715,7 @@ MessageBridge/
 ├── CLAUDE.md
 ├── spec.md
 │
-├── MessageBridgeServer/
+├── Server/
 │   ├── Sources/
 │   │   ├── MessageBridgeCore/
 │   │   │   ├── Protocols/
@@ -740,7 +740,7 @@ MessageBridge/
 │   │   └── MessageBridgeServer/ (App, Views)
 │   └── Tests/
 │
-├── MessageBridgeClient/
+├── Client/
 │   ├── Sources/
 │   │   ├── MessageBridgeClientCore/
 │   │   │   ├── Protocols/

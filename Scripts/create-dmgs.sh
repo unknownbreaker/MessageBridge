@@ -60,17 +60,17 @@ echo ""
 
 # Function to create server DMG
 create_server_dmg() {
-    local version="${1:-$(cat "$PROJECT_DIR/MessageBridgeServer/VERSION" 2>/dev/null | tr -d '[:space:]')}"
+    local version="${1:-$(cat "$PROJECT_DIR/Server/VERSION" 2>/dev/null | tr -d '[:space:]')}"
     version="${version:-0.0.0}"
 
     echo -e "${YELLOW}Creating Server DMG (v${version})...${NC}"
 
-    if [[ ! -d "$BUILD_DIR/MessageBridge Server.app" ]]; then
+    if [[ ! -d "$BUILD_DIR/MessageBridgeServer.app" ]]; then
         echo -e "${RED}Error: Server app not found. Run build-release.sh server first.${NC}"
         return 1
     fi
 
-    SERVER_DMG_NAME="MessageBridge-Server-${version}.dmg"
+    SERVER_DMG_NAME="MessageBridgeServer-${version}.dmg"
     SERVER_DMG_PATH="$BUILD_DIR/$SERVER_DMG_NAME"
 
     # Create temporary directory for DMG contents
@@ -79,13 +79,13 @@ create_server_dmg() {
     mkdir -p "$SERVER_DMG_TEMP"
 
     # Copy app to temp directory
-    cp -R "$BUILD_DIR/MessageBridge Server.app" "$SERVER_DMG_TEMP/"
+    cp -R "$BUILD_DIR/MessageBridgeServer.app" "$SERVER_DMG_TEMP/"
 
     # Create symlink to Applications folder (traditional drag-drop install)
     ln -s /Applications "$SERVER_DMG_TEMP/Applications"
 
     # Create DMG
-    hdiutil create -volname "MessageBridge Server" \
+    hdiutil create -volname "MessageBridgeServer" \
         -srcfolder "$SERVER_DMG_TEMP" \
         -ov -format UDZO \
         "$SERVER_DMG_PATH"
@@ -101,17 +101,17 @@ create_server_dmg() {
 
 # Function to create client DMG
 create_client_dmg() {
-    local version="${1:-$(cat "$PROJECT_DIR/MessageBridgeClient/VERSION" 2>/dev/null | tr -d '[:space:]')}"
+    local version="${1:-$(cat "$PROJECT_DIR/Client/VERSION" 2>/dev/null | tr -d '[:space:]')}"
     version="${version:-0.0.0}"
 
     echo -e "${YELLOW}Creating Client DMG (v${version})...${NC}"
 
-    if [[ ! -d "$BUILD_DIR/MessageBridge.app" ]]; then
+    if [[ ! -d "$BUILD_DIR/MessageBridgeClient.app" ]]; then
         echo -e "${RED}Error: Client app not found. Run build-release.sh client first.${NC}"
         return 1
     fi
 
-    CLIENT_DMG_NAME="MessageBridge-${version}.dmg"
+    CLIENT_DMG_NAME="MessageBridgeClient-${version}.dmg"
     CLIENT_DMG_PATH="$BUILD_DIR/$CLIENT_DMG_NAME"
 
     # Create temporary directory for DMG contents
@@ -120,13 +120,13 @@ create_client_dmg() {
     mkdir -p "$CLIENT_DMG_TEMP"
 
     # Copy app to temp directory
-    cp -R "$BUILD_DIR/MessageBridge.app" "$CLIENT_DMG_TEMP/"
+    cp -R "$BUILD_DIR/MessageBridgeClient.app" "$CLIENT_DMG_TEMP/"
 
     # Create symlink to Applications folder (traditional drag-drop install)
     ln -s /Applications "$CLIENT_DMG_TEMP/Applications"
 
     # Create DMG
-    hdiutil create -volname "MessageBridge" \
+    hdiutil create -volname "MessageBridgeClient" \
         -srcfolder "$CLIENT_DMG_TEMP" \
         -ov -format UDZO \
         "$CLIENT_DMG_PATH"

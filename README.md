@@ -48,8 +48,8 @@ Work Mac                              Home Mac
 
 Download the latest release from [GitHub Releases](https://github.com/unknownbreaker/MessageBridge/releases):
 
-- `MessageBridge-Server-x.x.x.dmg` - For your home Mac
-- `MessageBridge-x.x.x.dmg` - For your work Mac
+- `MessageBridgeServer-x.x.x.dmg` - For your home Mac
+- `MessageBridgeClient-x.x.x.dmg` - For your work Mac
 
 ### Option 2: Build from Source
 
@@ -73,12 +73,12 @@ Best for: Work Macs where Tailscale is blocked by IT policies. Setup is done on 
 
 ### Step 2: Set Up the Server (Home Mac)
 
-1. **Download** `MessageBridge-Server-x.x.x.dmg` from [Releases](https://github.com/unknownbreaker/MessageBridge/releases)
-2. **Install** - Open the DMG and drag MessageBridge Server to Applications
+1. **Download** `MessageBridgeServer-x.x.x.dmg` from [Releases](https://github.com/unknownbreaker/MessageBridge/releases)
+2. **Install** - Open the DMG and drag MessageBridgeServer to Applications
 3. **Grant Permissions**:
-   - Launch MessageBridge Server from Applications
+   - Launch MessageBridgeServer from Applications
    - Grant **Full Disk Access** when prompted (required to read Messages database)
-   - System Settings > Privacy & Security > Full Disk Access > Enable MessageBridge Server
+   - System Settings > Privacy & Security > Full Disk Access > Enable MessageBridgeServer
 4. **Start the Server** - Click "Start Server" in the menu bar dropdown
 5. **Copy your API Key** - Click the copy button next to the API key (you'll need this for the client)
 6. **Set Up Cloudflare Tunnel** (if using Option B):
@@ -96,10 +96,10 @@ The server runs in your menu bar with a status indicator:
 
 ### Step 3: Set Up the Client (Work Mac)
 
-1. **Download** `MessageBridge-x.x.x.dmg` from [Releases](https://github.com/unknownbreaker/MessageBridge/releases)
-2. **Install** - Open the DMG and drag MessageBridge to Applications
+1. **Download** `MessageBridgeClient-x.x.x.dmg` from [Releases](https://github.com/unknownbreaker/MessageBridge/releases)
+2. **Install** - Open the DMG and drag MessageBridgeClient to Applications
 3. **Configure Connection**:
-   - Launch MessageBridge
+   - Launch MessageBridgeClient
    - Open Settings (`Cmd+,`)
    - Go to the **Connection** tab
    - Enter Server URL:
@@ -154,7 +154,7 @@ Logs include source code location (file, function, line) and are automatically c
 ### Server
 
 ```bash
-cd MessageBridgeServer
+cd Server
 swift build -c release
 swift test  # 72 tests
 ```
@@ -162,7 +162,7 @@ swift test  # 72 tests
 ### Client
 
 ```bash
-cd MessageBridgeClient
+cd Client
 swift build -c release
 swift test  # 37 tests
 ```
@@ -217,8 +217,8 @@ MessageBridge/
 ├── .github/workflows/
 │   ├── ci.yml               # Build & test on PRs
 │   └── release.yml          # Automated releases
-├── MessageBridgeServer/     # Menu bar server app (Swift Package)
-├── MessageBridgeClient/     # SwiftUI client app (Swift Package)
+├── Server/                  # Menu bar server app (Swift Package)
+├── Client/                  # SwiftUI client app (Swift Package)
 ├── Scripts/
 │   ├── build-release.sh     # Build both apps
 │   ├── create-dmgs.sh       # Create DMG installers

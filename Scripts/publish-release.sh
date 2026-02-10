@@ -193,11 +193,11 @@ find_latest_tag() {
 SERVER_TAG=$(find_latest_tag "server")
 CLIENT_TAG=$(find_latest_tag "client")
 
-SERVER_OLD=$(read_version "$PROJECT_DIR/MessageBridgeServer/VERSION")
-CLIENT_OLD=$(read_version "$PROJECT_DIR/MessageBridgeClient/VERSION")
+SERVER_OLD=$(read_version "$PROJECT_DIR/Server/VERSION")
+CLIENT_OLD=$(read_version "$PROJECT_DIR/Client/VERSION")
 
-SERVER_BUMP=$(detect_bump "$SERVER_TAG" "MessageBridgeServer")
-CLIENT_BUMP=$(detect_bump "$CLIENT_TAG" "MessageBridgeClient")
+SERVER_BUMP=$(detect_bump "$SERVER_TAG" "Server")
+CLIENT_BUMP=$(detect_bump "$CLIENT_TAG" "Client")
 
 SERVER_NEW="$SERVER_OLD"
 CLIENT_NEW="$CLIENT_OLD"
@@ -229,8 +229,8 @@ if [[ "$SERVER_NEW" != "$SERVER_OLD" ]]; then
         log_dry "Would update server Version.swift"
     else
         log_step "Bumping server to v$SERVER_NEW"
-        echo "$SERVER_NEW" > "$PROJECT_DIR/MessageBridgeServer/VERSION"
-        sync_version_swift "$PROJECT_DIR/MessageBridgeServer/Sources/MessageBridgeCore/Version/Version.swift" "$SERVER_NEW"
+        echo "$SERVER_NEW" > "$PROJECT_DIR/Server/VERSION"
+        sync_version_swift "$PROJECT_DIR/Server/Sources/MessageBridgeCore/Version/Version.swift" "$SERVER_NEW"
         log_ok "Server VERSION and Version.swift updated"
     fi
 fi
@@ -242,8 +242,8 @@ if [[ "$CLIENT_NEW" != "$CLIENT_OLD" ]]; then
         log_dry "Would update client Version.swift"
     else
         log_step "Bumping client to v$CLIENT_NEW"
-        echo "$CLIENT_NEW" > "$PROJECT_DIR/MessageBridgeClient/VERSION"
-        sync_version_swift "$PROJECT_DIR/MessageBridgeClient/Sources/MessageBridgeClientCore/Version/Version.swift" "$CLIENT_NEW"
+        echo "$CLIENT_NEW" > "$PROJECT_DIR/Client/VERSION"
+        sync_version_swift "$PROJECT_DIR/Client/Sources/MessageBridgeClientCore/Version/Version.swift" "$CLIENT_NEW"
         log_ok "Client VERSION and Version.swift updated"
     fi
 fi
@@ -261,10 +261,10 @@ if $DRY_RUN; then
 else
     log_step "Committing version bumps"
     git add \
-        "$PROJECT_DIR/MessageBridgeServer/VERSION" \
-        "$PROJECT_DIR/MessageBridgeClient/VERSION" \
-        "$PROJECT_DIR/MessageBridgeServer/Sources/MessageBridgeCore/Version/Version.swift" \
-        "$PROJECT_DIR/MessageBridgeClient/Sources/MessageBridgeClientCore/Version/Version.swift" \
+        "$PROJECT_DIR/Server/VERSION" \
+        "$PROJECT_DIR/Client/VERSION" \
+        "$PROJECT_DIR/Server/Sources/MessageBridgeCore/Version/Version.swift" \
+        "$PROJECT_DIR/Client/Sources/MessageBridgeClientCore/Version/Version.swift" \
         2>/dev/null || true
     git commit -m "$COMMIT_MSG"
     log_ok "Committed: $COMMIT_MSG"
@@ -353,11 +353,11 @@ fi
 
 log_step "Creating GitHub release"
 
-SERVER_VERSION=$(read_version "$PROJECT_DIR/MessageBridgeServer/VERSION")
-CLIENT_VERSION=$(read_version "$PROJECT_DIR/MessageBridgeClient/VERSION")
+SERVER_VERSION=$(read_version "$PROJECT_DIR/Server/VERSION")
+CLIENT_VERSION=$(read_version "$PROJECT_DIR/Client/VERSION")
 
-SERVER_DMG="$BUILD_DIR/MessageBridge-Server-${SERVER_VERSION}.dmg"
-CLIENT_DMG="$BUILD_DIR/MessageBridge-${CLIENT_VERSION}.dmg"
+SERVER_DMG="$BUILD_DIR/MessageBridgeServer-${SERVER_VERSION}.dmg"
+CLIENT_DMG="$BUILD_DIR/MessageBridgeClient-${CLIENT_VERSION}.dmg"
 
 if $DRY_RUN; then
     log_dry "Would create GitHub release '$RELEASE_TITLE' with tag $RELEASE_TAG"

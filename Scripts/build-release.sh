@@ -71,26 +71,26 @@ build_server() {
 
     # Get server version
     SERVER_VERSION=$(sync_version \
-        "$PROJECT_DIR/MessageBridgeServer/VERSION" \
-        "$PROJECT_DIR/MessageBridgeServer/Sources/MessageBridgeCore/Version/Version.swift" \
+        "$PROJECT_DIR/Server/VERSION" \
+        "$PROJECT_DIR/Server/Sources/MessageBridgeCore/Version/Version.swift" \
         "Server")
 
     echo -e "${YELLOW}Server version: ${SERVER_VERSION}${NC}"
 
-    cd "$PROJECT_DIR/MessageBridgeServer"
+    cd "$PROJECT_DIR/Server"
 
     # Build release binary
     swift build -c release
 
     # Create app bundle structure
-    APP_NAME="MessageBridge Server"
+    APP_NAME="MessageBridgeServer"
     SERVER_APP="$BUILD_DIR/$APP_NAME.app"
     rm -rf "$SERVER_APP"
     mkdir -p "$SERVER_APP/Contents/MacOS"
     mkdir -p "$SERVER_APP/Contents/Resources"
 
     # Copy binary
-    cp ".build/release/MessageBridgeServer" "$SERVER_APP/Contents/MacOS/MessageBridge Server"
+    cp ".build/release/MessageBridgeServer" "$SERVER_APP/Contents/MacOS/MessageBridgeServer"
 
     # Copy icon
     if [[ -f "$PROJECT_DIR/Assets/AppIcon-Server.icns" ]]; then
@@ -107,7 +107,7 @@ build_server() {
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>MessageBridge Server</string>
+    <string>MessageBridgeServer</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
@@ -115,7 +115,7 @@ build_server() {
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>MessageBridge Server</string>
+    <string>MessageBridgeServer</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -173,26 +173,26 @@ build_client() {
 
     # Get client version
     CLIENT_VERSION=$(sync_version \
-        "$PROJECT_DIR/MessageBridgeClient/VERSION" \
-        "$PROJECT_DIR/MessageBridgeClient/Sources/MessageBridgeClientCore/Version/Version.swift" \
+        "$PROJECT_DIR/Client/VERSION" \
+        "$PROJECT_DIR/Client/Sources/MessageBridgeClientCore/Version/Version.swift" \
         "Client")
 
     echo -e "${YELLOW}Client version: ${CLIENT_VERSION}${NC}"
 
-    cd "$PROJECT_DIR/MessageBridgeClient"
+    cd "$PROJECT_DIR/Client"
 
     # Build release binary
     swift build -c release
 
     # Create app bundle structure
-    APP_NAME="MessageBridge"
+    APP_NAME="MessageBridgeClient"
     CLIENT_APP="$BUILD_DIR/$APP_NAME.app"
     rm -rf "$CLIENT_APP"
     mkdir -p "$CLIENT_APP/Contents/MacOS"
     mkdir -p "$CLIENT_APP/Contents/Resources"
 
     # Copy binary
-    cp ".build/release/MessageBridgeClient" "$CLIENT_APP/Contents/MacOS/MessageBridge"
+    cp ".build/release/MessageBridgeClient" "$CLIENT_APP/Contents/MacOS/MessageBridgeClient"
 
     # Copy icon
     if [[ -f "$PROJECT_DIR/Assets/AppIcon-Client.icns" ]]; then
@@ -209,7 +209,7 @@ build_client() {
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>MessageBridge</string>
+    <string>MessageBridgeClient</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
@@ -217,7 +217,7 @@ build_client() {
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>MessageBridge</string>
+    <string>MessageBridgeClient</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

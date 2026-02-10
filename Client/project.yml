@@ -11,7 +11,7 @@ packages:
     path: .
 
 targets:
-  MessageBridge:
+  MessageBridgeClient:
     type: application
     platform: macOS
     sources:
@@ -26,9 +26,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.messagebridge.client
-        PRODUCT_NAME: MessageBridge
+        PRODUCT_NAME: MessageBridgeClient
         INFOPLIST_FILE: Info.plist
-        CODE_SIGN_ENTITLEMENTS: MessageBridge.entitlements
+        CODE_SIGN_ENTITLEMENTS: MessageBridgeClient.entitlements
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         SWIFT_VERSION: "5.9"
         CODE_SIGN_IDENTITY: "-"

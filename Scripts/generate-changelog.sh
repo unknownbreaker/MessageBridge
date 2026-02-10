@@ -207,8 +207,8 @@ generate_section() {
 }
 
 # Generate both sections
-generate_section "Server" "$SERVER_FROM" "MessageBridgeServer"
-generate_section "Client" "$CLIENT_FROM" "MessageBridgeClient"
+generate_section "Server" "$SERVER_FROM" "Server"
+generate_section "Client" "$CLIENT_FROM" "Client"
 
 echo "---"
 echo "Signed and notarized by Apple."

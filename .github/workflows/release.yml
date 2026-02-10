@@ -38,15 +38,15 @@ jobs:
             VERSION=${TAG#server-v}
             echo "type=server" >> $GITHUB_OUTPUT
             echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "app_name=MessageBridge Server" >> $GITHUB_OUTPUT
-            echo "app_path=build/MessageBridge Server.app" >> $GITHUB_OUTPUT
+            echo "app_name=MessageBridgeServer" >> $GITHUB_OUTPUT
+            echo "app_path=build/MessageBridgeServer.app" >> $GITHUB_OUTPUT
             echo "Building Server version: $VERSION"
           elif [[ "$TAG" == client-v* ]]; then
             VERSION=${TAG#client-v}
             echo "type=client" >> $GITHUB_OUTPUT
             echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "app_name=MessageBridge" >> $GITHUB_OUTPUT
-            echo "app_path=build/MessageBridge.app" >> $GITHUB_OUTPUT
+            echo "app_name=MessageBridgeClient" >> $GITHUB_OUTPUT
+            echo "app_path=build/MessageBridgeClient.app" >> $GITHUB_OUTPUT
             echo "Building Client version: $VERSION"
           else
             echo "Unknown tag format: $TAG"
@@ -59,9 +59,9 @@ jobs:
           VERSION=${{ steps.release-info.outputs.version }}
 
           if [[ "$TYPE" == "server" ]]; then
-            echo "$VERSION" > MessageBridgeServer/VERSION
+            echo "$VERSION" > Server/VERSION
           elif [[ "$TYPE" == "client" ]]; then
-            echo "$VERSION" > MessageBridgeClient/VERSION
+            echo "$VERSION" > Client/VERSION
           fi
 
       - name: Build Release App
@@ -139,7 +139,7 @@ jobs:
           if [[ -n "$LAST_TAG" ]]; then
             echo "## What's Changed" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
-            git log --pretty=format:"* %s (%h)" ${LAST_TAG}..HEAD -- $(if [[ "$TYPE" == "server" ]]; then echo "MessageBridgeServer/"; else echo "MessageBridgeClient/"; fi) >> RELEASE_NOTES.md
+            git log --pretty=format:"* %s (%h)" ${LAST_TAG}..HEAD -- $(if [[ "$TYPE" == "server" ]]; then echo "Server/"; else echo "Client/"; fi) >> RELEASE_NOTES.md
           else
             echo "## Initial Release" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md

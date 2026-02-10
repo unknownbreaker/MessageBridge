@@ -7,46 +7,46 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		05EBF7E9EB5CBF0B522F5405 /* AttachmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BAECDDD5E4DF7E9E7EFC59 /* AttachmentView.swift */; };
-		196DAE2631700C90C1FB777C /* ComposerToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96B345581BD36BE289F568E /* ComposerToolbar.swift */; };
-		23B81DFB52C465D2F9AA1429 /* MessageBridgeClientCore in Frameworks */ = {isa = PBXBuildFile; productRef = D1FD14E3F5D24716D8F3193A /* MessageBridgeClientCore */; };
-		2589A533DFECD3A7BC3DA67A /* ExpandingTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE3777583A04593187E830A /* ExpandingTextEditor.swift */; };
-		2FC8EE6704061A9DD7D0F98F /* MessageBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016F9A3C4C24B6CB916FE913 /* MessageBridgeApp.swift */; };
-		3BB91DED4407337BBA526910 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9B46C60401F589EBF3BE74BC /* AppIcon.icns */; };
-		4303A216A3E99B50D2798D50 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A149B082B0838A9989D78608 /* ContentView.swift */; };
-		5A702A2C939C2CFF094B3A4D /* SendButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE0667877BD5816BB5FE3A8 /* SendButton.swift */; };
-		6B7E1354BB786F73ED15A2A0 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B33696328C61BF7344E77DA /* ConversationListView.swift */; };
-		803BFD217C8A8E3D349E0879 /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A9EEC86331702C79F5E674 /* ComposerView.swift */; };
-		8632136486D56B3C8DBCEB8D /* ContactDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00DC894DD6008B11C0C8EDFD /* ContactDetailsView.swift */; };
-		A01C6662BEFD9CF0ACFBD202 /* MessageThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B76EE25F4E1E111C61F9DD /* MessageThreadView.swift */; };
-		B26CFB38AFB3CB17844AFE90 /* LogViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75796E17EC64B93C4CB97DA0 /* LogViewerView.swift */; };
-		E4A70B04BFD8D0BDF3B51A93 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD9E719B9BF2034F33726D9 /* SettingsView.swift */; };
+		01B6AE31ED6884F0F6D4DB9C /* ComposerToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96B345581BD36BE289F568E /* ComposerToolbar.swift */; };
+		14E91DCC0B6570521EAC53D8 /* MessageBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016F9A3C4C24B6CB916FE913 /* MessageBridgeApp.swift */; };
+		4D6630B6D40C78D6B3A646BD /* SendButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE0667877BD5816BB5FE3A8 /* SendButton.swift */; };
+		54011C45907EABA450029BA5 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B33696328C61BF7344E77DA /* ConversationListView.swift */; };
+		75CD88679FC345CE7367313D /* MessageBridgeClientCore in Frameworks */ = {isa = PBXBuildFile; productRef = 03FA75FD450C11094ACA8D16 /* MessageBridgeClientCore */; };
+		929719A68629007F640BECC9 /* LogViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75796E17EC64B93C4CB97DA0 /* LogViewerView.swift */; };
+		9B8903F332AD53127B1F8FB0 /* MessageThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B76EE25F4E1E111C61F9DD /* MessageThreadView.swift */; };
+		9CE9B1BB99DFC0422866A39A /* AttachmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BAECDDD5E4DF7E9E7EFC59 /* AttachmentView.swift */; };
+		D56D3B11B7BE42CC23C0CCA2 /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A9EEC86331702C79F5E674 /* ComposerView.swift */; };
+		D6008E1D9FC8B9FF1D0F8D38 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A149B082B0838A9989D78608 /* ContentView.swift */; };
+		E31DD87CC57A28D8200122F2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9B46C60401F589EBF3BE74BC /* AppIcon.icns */; };
+		E835A191340C4635FA0992C9 /* ExpandingTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE3777583A04593187E830A /* ExpandingTextEditor.swift */; };
+		F5C58625F6897CEF53EE4E76 /* ContactDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00DC894DD6008B11C0C8EDFD /* ContactDetailsView.swift */; };
+		F80C3B2B084866C7D2230C02 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD9E719B9BF2034F33726D9 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		00DC894DD6008B11C0C8EDFD /* ContactDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactDetailsView.swift; sourceTree = "<group>"; };
 		016F9A3C4C24B6CB916FE913 /* MessageBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBridgeApp.swift; sourceTree = "<group>"; };
+		0316D447F12AB500D232F026 /* Client */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Client; path = .; sourceTree = SOURCE_ROOT; };
 		3BD9E719B9BF2034F33726D9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		45B76EE25F4E1E111C61F9DD /* MessageThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageThreadView.swift; sourceTree = "<group>"; };
 		4CE3777583A04593187E830A /* ExpandingTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpandingTextEditor.swift; sourceTree = "<group>"; };
 		6B33696328C61BF7344E77DA /* ConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListView.swift; sourceTree = "<group>"; };
 		75796E17EC64B93C4CB97DA0 /* LogViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewerView.swift; sourceTree = "<group>"; };
 		75BAECDDD5E4DF7E9E7EFC59 /* AttachmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentView.swift; sourceTree = "<group>"; };
-		7B47D43B26951E9A734CA707 /* MessageBridgeClient */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MessageBridgeClient; path = .; sourceTree = SOURCE_ROOT; };
 		9B46C60401F589EBF3BE74BC /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		A149B082B0838A9989D78608 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		D12BBCACEF74356DDDD5C473 /* MessageBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MessageBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D5A9EEC86331702C79F5E674 /* ComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerView.swift; sourceTree = "<group>"; };
 		D96B345581BD36BE289F568E /* ComposerToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerToolbar.swift; sourceTree = "<group>"; };
 		FAE0667877BD5816BB5FE3A8 /* SendButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendButton.swift; sourceTree = "<group>"; };
+		FE0CDE34054D48AA896F0AC2 /* MessageBridgeClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MessageBridgeClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		79FBFA87EE74E32303F503DC /* Frameworks */ = {
+		63EF2286B620B2754AA4233E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				23B81DFB52C465D2F9AA1429 /* MessageBridgeClientCore in Frameworks */,
+				75CD88679FC345CE7367313D /* MessageBridgeClientCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -56,7 +56,7 @@
 		08CF591EFAC727CA9D3D40C1 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				7B47D43B26951E9A734CA707 /* MessageBridgeClient */,
+				0316D447F12AB500D232F026 /* Client */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -126,7 +126,7 @@
 		F585FE9D2E5C422B5AF7F1A3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D12BBCACEF74356DDDD5C473 /* MessageBridge.app */,
+				FE0CDE34054D48AA896F0AC2 /* MessageBridgeClient.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -134,24 +134,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		8E417DE00E5B8488A1C0FD32 /* MessageBridge */ = {
+		87D2465142F3BDF91597BC6E /* MessageBridgeClient */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FBB4D29185A0E4E9816BB6B6 /* Build configuration list for PBXNativeTarget "MessageBridge" */;
+			buildConfigurationList = D9605C1E498DB84F31D1A4A7 /* Build configuration list for PBXNativeTarget "MessageBridgeClient" */;
 			buildPhases = (
-				C1CF32C0F3F2CF1A67B9091A /* Sources */,
-				7F52ED9538845FA2C6619991 /* Resources */,
-				79FBFA87EE74E32303F503DC /* Frameworks */,
+				E17E8466E61845C40B4B53B2 /* Sources */,
+				358461AA6B69B1E85F5DBF22 /* Resources */,
+				63EF2286B620B2754AA4233E /* Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = MessageBridge;
+			name = MessageBridgeClient;
 			packageProductDependencies = (
-				D1FD14E3F5D24716D8F3193A /* MessageBridgeClientCore */,
+				03FA75FD450C11094ACA8D16 /* MessageBridgeClientCore */,
 			);
-			productName = MessageBridge;
-			productReference = D12BBCACEF74356DDDD5C473 /* MessageBridge.app */;
+			productName = MessageBridgeClient;
+			productReference = FE0CDE34054D48AA896F0AC2 /* MessageBridgeClient.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -180,39 +180,39 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				8E417DE00E5B8488A1C0FD32 /* MessageBridge */,
+				87D2465142F3BDF91597BC6E /* MessageBridgeClient */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		7F52ED9538845FA2C6619991 /* Resources */ = {
+		358461AA6B69B1E85F5DBF22 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3BB91DED4407337BBA526910 /* AppIcon.icns in Resources */,
+				E31DD87CC57A28D8200122F2 /* AppIcon.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		C1CF32C0F3F2CF1A67B9091A /* Sources */ = {
+		E17E8466E61845C40B4B53B2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				05EBF7E9EB5CBF0B522F5405 /* AttachmentView.swift in Sources */,
-				196DAE2631700C90C1FB777C /* ComposerToolbar.swift in Sources */,
-				803BFD217C8A8E3D349E0879 /* ComposerView.swift in Sources */,
-				8632136486D56B3C8DBCEB8D /* ContactDetailsView.swift in Sources */,
-				4303A216A3E99B50D2798D50 /* ContentView.swift in Sources */,
-				6B7E1354BB786F73ED15A2A0 /* ConversationListView.swift in Sources */,
-				2589A533DFECD3A7BC3DA67A /* ExpandingTextEditor.swift in Sources */,
-				B26CFB38AFB3CB17844AFE90 /* LogViewerView.swift in Sources */,
-				2FC8EE6704061A9DD7D0F98F /* MessageBridgeApp.swift in Sources */,
-				A01C6662BEFD9CF0ACFBD202 /* MessageThreadView.swift in Sources */,
-				5A702A2C939C2CFF094B3A4D /* SendButton.swift in Sources */,
-				E4A70B04BFD8D0BDF3B51A93 /* SettingsView.swift in Sources */,
+				9CE9B1BB99DFC0422866A39A /* AttachmentView.swift in Sources */,
+				01B6AE31ED6884F0F6D4DB9C /* ComposerToolbar.swift in Sources */,
+				D56D3B11B7BE42CC23C0CCA2 /* ComposerView.swift in Sources */,
+				F5C58625F6897CEF53EE4E76 /* ContactDetailsView.swift in Sources */,
+				D6008E1D9FC8B9FF1D0F8D38 /* ContentView.swift in Sources */,
+				54011C45907EABA450029BA5 /* ConversationListView.swift in Sources */,
+				E835A191340C4635FA0992C9 /* ExpandingTextEditor.swift in Sources */,
+				929719A68629007F640BECC9 /* LogViewerView.swift in Sources */,
+				14E91DCC0B6570521EAC53D8 /* MessageBridgeApp.swift in Sources */,
+				9B8903F332AD53127B1F8FB0 /* MessageThreadView.swift in Sources */,
+				4D6630B6D40C78D6B3A646BD /* SendButton.swift in Sources */,
+				F80C3B2B084866C7D2230C02 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,11 +338,11 @@
 			};
 			name = Debug;
 		};
-		6F01176C00AA52D181FC184D /* Debug */ = {
+		629712F16A6DAF43EDF51F40 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = MessageBridge.entitlements;
+				CODE_SIGN_ENTITLEMENTS = MessageBridgeClient.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -353,34 +353,34 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.messagebridge.client;
-				PRODUCT_NAME = MessageBridge;
-				SDKROOT = macosx;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.9;
-			};
-			name = Debug;
-		};
-		E0B05BCC0FEA0F9445F5DDCE /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = MessageBridge.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = NO;
-				INFOPLIST_FILE = Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.messagebridge.client;
-				PRODUCT_NAME = MessageBridge;
+				PRODUCT_NAME = MessageBridgeClient;
 				SDKROOT = macosx;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.9;
 			};
 			name = Release;
+		};
+		843667D8D46BD3FDC10C4748 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = MessageBridgeClient.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.messagebridge.client;
+				PRODUCT_NAME = MessageBridgeClient;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
@@ -394,11 +394,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		FBB4D29185A0E4E9816BB6B6 /* Build configuration list for PBXNativeTarget "MessageBridge" */ = {
+		D9605C1E498DB84F31D1A4A7 /* Build configuration list for PBXNativeTarget "MessageBridgeClient" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				6F01176C00AA52D181FC184D /* Debug */,
-				E0B05BCC0FEA0F9445F5DDCE /* Release */,
+				843667D8D46BD3FDC10C4748 /* Debug */,
+				629712F16A6DAF43EDF51F40 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -413,7 +413,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		D1FD14E3F5D24716D8F3193A /* MessageBridgeClientCore */ = {
+		03FA75FD450C11094ACA8D16 /* MessageBridgeClientCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MessageBridgeClientCore;
 		};

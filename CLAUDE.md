@@ -37,16 +37,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Full verification - run before commits
-cd MessageBridgeServer && swift test && cd ../MessageBridgeClient && swift test
+cd Server && swift test && cd ../Client && swift test
 
 # Server only
-cd MessageBridgeServer && swift test
+cd Server && swift test
 
 # Client only
-cd MessageBridgeClient && swift test
+cd Client && swift test
 
 # Build both
-cd MessageBridgeServer && swift build && cd ../MessageBridgeClient && swift build
+cd Server && swift build && cd ../Client && swift build
 ```
 
 ---
@@ -55,8 +55,8 @@ cd MessageBridgeServer && swift build && cd ../MessageBridgeClient && swift buil
 
 iMessage Bridge is a self-hosted system for accessing iMessages/SMS on a work Mac (without iCloud) by relaying through a home Mac (with iCloud). Two components:
 
-- **MessageBridgeServer** - Swift/Vapor daemon on home Mac, reads from Messages database, exposes REST/WebSocket API
-- **MessageBridgeClient** - SwiftUI macOS app on work Mac, connects to server
+- **Server/** (`MessageBridgeServer`) - Swift/Vapor daemon on home Mac, reads from Messages database, exposes REST/WebSocket API
+- **Client/** (`MessageBridgeClient`) - SwiftUI macOS app on work Mac, connects to server
 
 ### Architecture Decisions
 

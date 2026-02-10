@@ -24,11 +24,11 @@
 		4ACF7A92A9D919B454525EE3 /* ServerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerApp.swift; sourceTree = "<group>"; };
 		58DA15F3E5A5DA4F6481B109 /* CloudflareSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareSettingsView.swift; sourceTree = "<group>"; };
 		5C7ED3AEEE92F1FB16B85F0B /* LogViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewerView.swift; sourceTree = "<group>"; };
+		7BFB4EF71C6A3E2C64A9DB71 /* Server */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Server; path = .; sourceTree = SOURCE_ROOT; };
 		83CCCEA3CA2069B001079654 /* ServerMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMenuView.swift; sourceTree = "<group>"; };
 		8B1B27A7AAF7F7116FAAA900 /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
 		ECF7F0DFF3F542BE67695DE7 /* MessageBridgeServer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MessageBridgeServer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5762F10FC7FA9771707492A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		F79D2253DE890DA2F4326391 /* MessageBridgeServer */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MessageBridgeServer; path = .; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,7 +55,7 @@
 		2A5A7EA2CACFD4922404134C /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				F79D2253DE890DA2F4326391 /* MessageBridgeServer */,
+				7BFB4EF71C6A3E2C64A9DB71 /* Server */,
 			);
 			name = Packages;
 			sourceTree = "<group>";

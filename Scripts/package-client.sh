@@ -15,10 +15,10 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-CLIENT_DIR="$PROJECT_DIR/MessageBridgeClient"
+CLIENT_DIR="$PROJECT_DIR/Client"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="MessageBridge"
-DMG_NAME="MessageBridge-Installer"
+APP_NAME="MessageBridgeClient"
+DMG_NAME="MessageBridgeClient-Installer"
 VERSION="${1:-1.0.0}"
 
 echo -e "${GREEN}================================${NC}"

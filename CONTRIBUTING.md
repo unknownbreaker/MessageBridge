@@ -24,12 +24,12 @@ Thank you for your interest in contributing to MessageBridge! This document prov
 
 ```bash
 # Server
-cd MessageBridgeServer
+cd Server
 swift build
 swift test
 
 # Client
-cd MessageBridgeClient
+cd Client
 swift build
 swift test
 ```

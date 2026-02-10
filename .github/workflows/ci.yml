@@ -28,28 +28,28 @@ jobs:
 
       - name: Build Server
         run: |
-          cd MessageBridgeServer
+          cd Server
           swift build -c release
 
       - name: Test Server
         run: |
-          cd MessageBridgeServer
+          cd Server
           swift test
 
       - name: Build Client
         run: |
-          cd MessageBridgeClient
+          cd Client
           swift build -c release
 
       - name: Test Client
         run: |
-          cd MessageBridgeClient
+          cd Client
           swift test
 
       - name: Verify apps build as bundles
         run: |
           # Build server app bundle
-          cd MessageBridgeServer
+          cd Server
           swift build -c release
 
           # Build client app bundle

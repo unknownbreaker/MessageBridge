@@ -81,12 +81,12 @@ iconutil -c icns "$CLIENT_ICONSET" -o "$ASSETS_DIR/AppIcon-Client.icns"
 echo "Copying icons to app targets..."
 
 # Copy to server app
-SERVER_RESOURCES="$PROJECT_DIR/MessageBridgeServer/Sources/MessageBridgeServer/Resources"
+SERVER_RESOURCES="$PROJECT_DIR/Server/Sources/MessageBridgeServer/Resources"
 mkdir -p "$SERVER_RESOURCES"
 cp "$ASSETS_DIR/AppIcon-Server.icns" "$SERVER_RESOURCES/AppIcon.icns"
 
 # Copy to client app
-CLIENT_RESOURCES="$PROJECT_DIR/MessageBridgeClient/Sources/MessageBridgeClient/Resources"
+CLIENT_RESOURCES="$PROJECT_DIR/Client/Sources/MessageBridgeClient/Resources"
 mkdir -p "$CLIENT_RESOURCES"
 cp "$ASSETS_DIR/AppIcon-Client.icns" "$CLIENT_RESOURCES/AppIcon.icns"
 

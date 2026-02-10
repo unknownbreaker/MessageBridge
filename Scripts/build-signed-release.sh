@@ -72,11 +72,11 @@ build_and_sign() {
 
     # Determine app path and version
     if [[ "$target" == "server" ]]; then
-        app_path="$PROJECT_DIR/build/MessageBridge Server.app"
-        version=$(cat "$PROJECT_DIR/MessageBridgeServer/VERSION" | tr -d '[:space:]')
+        app_path="$PROJECT_DIR/build/MessageBridgeServer.app"
+        version=$(cat "$PROJECT_DIR/Server/VERSION" | tr -d '[:space:]')
     else
-        app_path="$PROJECT_DIR/build/MessageBridge.app"
-        version=$(cat "$PROJECT_DIR/MessageBridgeClient/VERSION" | tr -d '[:space:]')
+        app_path="$PROJECT_DIR/build/MessageBridgeClient.app"
+        version=$(cat "$PROJECT_DIR/Client/VERSION" | tr -d '[:space:]')
     fi
 
     echo ""

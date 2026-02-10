@@ -20,7 +20,5 @@
 	<string>1</string>
 	<key>NSContactsUsageDescription</key>
 	<string>MessageBridge needs access to your contacts to display sender names.</string>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>MessageBridge needs to control Messages.app to send messages and manage conversations.</string>
 </dict>
 </plist>

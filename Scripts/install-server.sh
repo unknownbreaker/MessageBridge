@@ -49,7 +49,7 @@ echo -e "${GREEN}✓ Full Disk Access verified${NC}"
 # Build the server
 echo ""
 echo -e "${YELLOW}Building MessageBridge Server...${NC}"
-cd "$PROJECT_DIR/MessageBridgeServer"
+cd "$PROJECT_DIR/Server"
 
 if ! command -v swift &> /dev/null; then
     echo -e "${RED}Error: Swift is not installed${NC}"
