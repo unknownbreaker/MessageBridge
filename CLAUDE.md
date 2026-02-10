@@ -14,20 +14,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** CLAUDE.md Audit & Trim
-- Trimmed CLAUDE.md from 2,159 lines (79KB) to 351 lines (16KB) — 84% reduction
-- Moved aspirational architecture blueprints to spec.md (PresenceProvider, ComposerPlugin examples, EventBus, Cache, etc.)
-- Moved Milestone Audit Tracker to spec.md
-- Removed completed Migration Status table and maintenance-heavy File Structure tree
-- Fixed factual inaccuracies: protocol signatures, TapbackType values (2000-based not 0-based), API endpoints, model definitions
-- Added missing implementations to docs: ContactManager, PermissionsManager, HighlightedTextRenderer, CopyCodeAction
+**Last Session:** Reply-to-Message Feature
+- Added inline reply-to-message: display reply context (ReplyPreviewDecorator + ReplyQuoteBar) and compose replies (ReplyBanner above composer)
+- Server: read thread_originator_guid from chat.db, added replyToGuid to Message model and full send pipeline
+- Client: ReplyAction posts notification → MessageThreadView sets replyingTo → ComposerView shows banner → send includes replyToGuid
+- Scaffolded AppleScript UI automation for reply-send (buildReplyAppleScript) — not yet wired to live execution
+- Added Xcode project registration rule to CLAUDE.md Common Mistakes section
+- 26 files changed, 12 new tests
 
 **Known Blockers:** None
 
 **Next Steps:**
-1. M4.1 remaining: AppleScript bridge to actually send tapbacks through Messages.app (currently optimistic-only)
-2. Start new phase milestones (M4.3 Typing Indicators, M5.5 Search, etc.)
-3. Consider adding startIndex/endIndex character offsets to client TextHighlight for precise highlighting
+1. Wire up AppleScript reply-send (test buildReplyAppleScript against live Messages.app accessibility tree)
+2. Enhance ReplyQuoteBar to show original message text (requires adding messages to DecoratorContext)
+3. Add scroll-to-original on ReplyQuoteBar tap
+4. M4.1 remaining: AppleScript bridge to actually send tapbacks through Messages.app (currently optimistic-only)
+5. Start new phase milestones (M4.3 Typing Indicators, M5.5 Search, etc.)
 
 ---
 
