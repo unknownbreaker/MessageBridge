@@ -210,6 +210,14 @@ struct MessageBubble: View {
           conversationId: message.conversationId
         )
 
+
+        // Top-leading decorators (reply preview bar)
+        ForEach(
+          DecoratorRegistry.shared.decorators(
+            for: message, at: .topLeading, context: decoratorContext), id: \.id
+        ) { decorator in
+          decorator.decorate(message, context: decoratorContext)
+        }
         // Wrap content in ZStack so top decorators (tapback pills) overlay the bubble
         // isFromMe → top-leading (inner side), others → top-trailing (inner side)
         ZStack(alignment: message.isFromMe ? .topLeading : .topTrailing) {
