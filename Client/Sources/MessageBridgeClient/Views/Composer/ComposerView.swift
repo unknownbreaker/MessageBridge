@@ -3,26 +3,36 @@ import SwiftUI
 
 /// Main composer view replacing the old ComposeView.
 ///
-/// Layout: [Toolbar] [ExpandingTextEditor] [SendButton]
+/// Layout: [ReplyBanner?] [Toolbar] [ExpandingTextEditor] [SendButton]
 struct ComposerView: View {
   @Binding var text: String
   let onSend: () -> Void
+  @Binding var replyingTo: Message?
 
   var body: some View {
-    HStack(alignment: .bottom, spacing: 8) {
-      ComposerToolbar(context: composerContext)
-
-      ExpandingTextEditor(
-        text: $text,
-        onSubmit: handleSubmit
-      )
-
-      SendButton(enabled: canSend) {
-        onSend()
+    VStack(spacing: 0) {
+      if let replyMessage = replyingTo {
+        ReplyBanner(message: replyMessage) {
+          replyingTo = nil
+        }
+        Divider()
       }
+
+      HStack(alignment: .bottom, spacing: 8) {
+        ComposerToolbar(context: composerContext)
+
+        ExpandingTextEditor(
+          text: $text,
+          onSubmit: handleSubmit
+        )
+
+        SendButton(enabled: canSend) {
+          onSend()
+        }
+      }
+      .padding(.horizontal)
+      .padding(.vertical, 8)
     }
-    .padding(.horizontal)
-    .padding(.vertical, 8)
   }
 
   private var canSend: Bool {

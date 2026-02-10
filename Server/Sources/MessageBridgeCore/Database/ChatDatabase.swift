@@ -201,7 +201,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             m.is_from_me,
             m.handle_id,
             m.balloon_bundle_id,
-            m.payload_data
+            m.payload_data,
+            m.thread_originator_guid
         FROM message m
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
@@ -266,7 +267,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
           handleId: row["handle_id"],
           conversationId: conversationId,
           attachments: attachments,
-          linkPreview: linkPreview
+          linkPreview: linkPreview,
+          replyToGuid: row["thread_originator_guid"]
         )
       }
     }
@@ -290,6 +292,7 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             m.is_from_me,
             m.handle_id,
             c.chat_identifier,
+            m.thread_originator_guid,
             h.id as sender_address
         FROM message m
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
@@ -333,7 +336,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
           date: Message.dateFromAppleTimestamp(row["date"] ?? 0),
           isFromMe: (row["is_from_me"] as Int?) == 1,
           handleId: row["handle_id"],
-          conversationId: conversationId
+          conversationId: conversationId,
+          replyToGuid: row["thread_originator_guid"]
         )
 
         let senderAddress: String? = row["sender_address"]
@@ -450,7 +454,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
             m.date,
             m.is_from_me,
             m.handle_id,
-            c.chat_identifier as conversation_id
+            c.chat_identifier as conversation_id,
+            m.thread_originator_guid
         FROM message m
         JOIN chat_message_join cmj ON m.ROWID = cmj.message_id
         JOIN chat c ON cmj.chat_id = c.ROWID
@@ -487,7 +492,8 @@ public actor ChatDatabase: ChatDatabaseProtocol {
           date: Message.dateFromAppleTimestamp(row["date"]),
           isFromMe: (row["is_from_me"] as Int?) == 1,
           handleId: row["handle_id"],
-          conversationId: conversationId
+          conversationId: conversationId,
+          replyToGuid: row["thread_originator_guid"]
         )
       }
     }

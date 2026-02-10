@@ -16,6 +16,7 @@
 		9B8903F332AD53127B1F8FB0 /* MessageThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B76EE25F4E1E111C61F9DD /* MessageThreadView.swift */; };
 		9CE9B1BB99DFC0422866A39A /* AttachmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BAECDDD5E4DF7E9E7EFC59 /* AttachmentView.swift */; };
 		D56D3B11B7BE42CC23C0CCA2 /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A9EEC86331702C79F5E674 /* ComposerView.swift */; };
+		A1B2C3D4E5F60718192A3B4C /* ReplyBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6071819A2B3C4D5 /* ReplyBanner.swift */; };
 		D6008E1D9FC8B9FF1D0F8D38 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A149B082B0838A9989D78608 /* ContentView.swift */; };
 		E31DD87CC57A28D8200122F2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9B46C60401F589EBF3BE74BC /* AppIcon.icns */; };
 		E835A191340C4635FA0992C9 /* ExpandingTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE3777583A04593187E830A /* ExpandingTextEditor.swift */; };
@@ -37,6 +38,7 @@
 		A149B082B0838A9989D78608 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		D5A9EEC86331702C79F5E674 /* ComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerView.swift; sourceTree = "<group>"; };
 		D96B345581BD36BE289F568E /* ComposerToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerToolbar.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6071819A2B3C4D5 /* ReplyBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplyBanner.swift; sourceTree = "<group>"; };
 		FAE0667877BD5816BB5FE3A8 /* SendButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendButton.swift; sourceTree = "<group>"; };
 		FE0CDE34054D48AA896F0AC2 /* MessageBridgeClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MessageBridgeClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -91,6 +93,7 @@
 				D96B345581BD36BE289F568E /* ComposerToolbar.swift */,
 				D5A9EEC86331702C79F5E674 /* ComposerView.swift */,
 				4CE3777583A04593187E830A /* ExpandingTextEditor.swift */,
+				B2C3D4E5F6071819A2B3C4D5 /* ReplyBanner.swift */,
 				FAE0667877BD5816BB5FE3A8 /* SendButton.swift */,
 			);
 			path = Composer;
@@ -204,6 +207,7 @@
 				9CE9B1BB99DFC0422866A39A /* AttachmentView.swift in Sources */,
 				01B6AE31ED6884F0F6D4DB9C /* ComposerToolbar.swift in Sources */,
 				D56D3B11B7BE42CC23C0CCA2 /* ComposerView.swift in Sources */,
+				A1B2C3D4E5F60718192A3B4C /* ReplyBanner.swift in Sources */,
 				F5C58625F6897CEF53EE4E76 /* ContactDetailsView.swift in Sources */,
 				D6008E1D9FC8B9FF1D0F8D38 /* ContentView.swift in Sources */,
 				54011C45907EABA450029BA5 /* ConversationListView.swift in Sources */,

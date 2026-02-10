@@ -1,6 +1,6 @@
 import AppKit
 
-/// Begins a reply to a message. Currently shows a stub alert.
+/// Begins a reply to a message by posting a notification.
 public struct ReplyAction: MessageAction {
   public let id = "reply"
   public let title = "Reply"
@@ -14,6 +14,10 @@ public struct ReplyAction: MessageAction {
 
   @MainActor
   public func perform(on message: Message) async {
-    showStubAlert(title: title)
+    NotificationCenter.default.post(
+      name: .beginReply,
+      object: nil,
+      userInfo: ["message": message]
+    )
   }
 }

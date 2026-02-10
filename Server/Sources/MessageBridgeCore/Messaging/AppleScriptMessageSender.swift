@@ -6,7 +6,9 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
 
   public init() {}
 
-  public func sendMessage(to recipient: String, text: String, service: String?) async throws
+  public func sendMessage(
+    to recipient: String, text: String, service: String?, replyToGuid: String? = nil
+  ) async throws
     -> SendResult
   {
     guard !recipient.isEmpty else {
@@ -86,6 +88,93 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
         end tell
         """
     }
+  }
+
+  /// Build AppleScript that replies to a specific message via UI automation.
+  /// Uses System Events to right-click the target message and select Reply.
+  func buildReplyAppleScript(
+    recipient: String, text: String, replyToText: String, service: String
+  ) -> String {
+    let escapedText =
+      text
+      .replacingOccurrences(of: "\\", with: "\\\\")
+      .replacingOccurrences(of: "\"", with: "\\\"")
+    let escapedOriginal =
+      replyToText
+      .replacingOccurrences(of: "\\", with: "\\\\")
+      .replacingOccurrences(of: "\"", with: "\\\"")
+
+    return """
+      tell application "Messages"
+        activate
+      end tell
+
+      delay 0.3
+
+      tell application "System Events"
+        tell process "Messages"
+          -- Find the message containing the original text in the transcript
+          set transcriptGroup to missing value
+          try
+            set transcriptGroup to group 1 of splitter group 1 of window 1
+          end try
+
+          if transcriptGroup is missing value then
+            error "Could not find Messages transcript"
+          end if
+
+          -- Search through the accessibility tree for the message text
+          set foundElement to missing value
+          set allElements to entire contents of transcriptGroup
+          repeat with elem in allElements
+            try
+              if description of elem contains "\(escapedOriginal)" then
+                set foundElement to elem
+                exit repeat
+              end if
+            end try
+            try
+              if value of elem contains "\(escapedOriginal)" then
+                set foundElement to elem
+                exit repeat
+              end if
+            end try
+          end repeat
+
+          if foundElement is missing value then
+            error "Could not find message: \(escapedOriginal)"
+          end if
+
+          -- Right-click the found message element to show context menu
+          perform action "AXShowMenu" of foundElement
+
+          delay 0.3
+
+          -- Click "Reply" in context menu
+          set replyItem to missing value
+          repeat with menuItem in menu items of menu 1 of foundElement
+            try
+              if name of menuItem is "Reply" then
+                set replyItem to menuItem
+                exit repeat
+              end if
+            end try
+          end repeat
+
+          if replyItem is missing value then
+            error "Could not find Reply menu item"
+          end if
+
+          click replyItem
+          delay 0.3
+
+          -- Type the reply text and send
+          keystroke "\(escapedText)"
+          delay 0.1
+          keystroke return
+        end tell
+      end tell
+      """
   }
 
   private func executeAppleScript(_ source: String) async throws {
