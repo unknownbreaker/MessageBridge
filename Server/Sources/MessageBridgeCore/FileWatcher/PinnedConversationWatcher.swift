@@ -72,7 +72,7 @@ public actor PinnedConversationWatcher {
 
   /// Force an immediate poll (useful for testing)
   public func poll() async {
-    let displayNames = await pinDetector.detectPinnedDisplayNames()
+    var displayNames = await pinDetector.detectPinnedDisplayNames()
 
     if displayNames.isEmpty {
       // Messages.app might not be running or no pins — preserve last known state
@@ -83,11 +83,33 @@ public actor PinnedConversationWatcher {
     serverLog(
       "PinnedConversationWatcher: detected \(displayNames.count) pinned names: \(displayNames)")
 
-    let newPins = await matchDisplayNamesToConversations(displayNames)
+    var newPins = await matchDisplayNamesToConversations(displayNames)
 
     serverLog(
       "PinnedConversationWatcher: matched \(newPins.count)/\(displayNames.count) names to conversations"
     )
+
+    // Confirmation re-poll: if the matched pin count dropped, the accessibility tree
+    // may have been captured mid-animation (e.g. unpin + pin causes a transient partial
+    // state in Messages.app sidebar). Re-poll once after a short delay to confirm.
+    if newPins.count < cachedPins.count {
+      serverLog(
+        "PinnedConversationWatcher: pin count dropped (\(cachedPins.count) → \(newPins.count)), running confirmation re-poll"
+      )
+      try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5s for animation to settle
+
+      let confirmedNames = await pinDetector.detectPinnedDisplayNames()
+      if !confirmedNames.isEmpty {
+        serverLog(
+          "PinnedConversationWatcher: confirmation detected \(confirmedNames.count) pinned names: \(confirmedNames)"
+        )
+        displayNames = confirmedNames
+        newPins = await matchDisplayNamesToConversations(confirmedNames)
+        serverLog(
+          "PinnedConversationWatcher: confirmation matched \(newPins.count)/\(confirmedNames.count) names to conversations"
+        )
+      }
+    }
 
     if newPins != cachedPins {
       cachedPins = newPins

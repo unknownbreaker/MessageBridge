@@ -2,11 +2,20 @@ import XCTest
 
 @testable import MessageBridgeCore
 
-/// Mock pin detector that returns configurable display names
+/// Mock pin detector that returns configurable display names.
+/// Supports a queue of responses for testing multi-poll scenarios.
 final class MockPinDetector: PinDetector, @unchecked Sendable {
   var pinnedNames: [String] = []
+  /// When non-empty, each call to detectPinnedDisplayNames pops the first element.
+  /// When exhausted, falls back to `pinnedNames`.
+  var pinnedNamesQueue: [[String]] = []
+  var detectCallCount = 0
 
   func detectPinnedDisplayNames() async -> [String] {
+    detectCallCount += 1
+    if !pinnedNamesQueue.isEmpty {
+      return pinnedNamesQueue.removeFirst()
+    }
     return pinnedNames
   }
 }
@@ -597,5 +606,120 @@ final class PinnedConversationWatcherTests: XCTestCase {
     XCTAssertTrue(
       ids.contains("chat-saja") || ids.contains("chat-saja-2"),
       "Saja Boys sidebar should match one of the Saja Boys chats")
+  }
+
+  // MARK: - Confirmation poll: transient pin drop
+
+  func testTransientPinDrop_doesNotBroadcastUntilConfirmed() async {
+    // Scenario: 9 pins detected, then AppleScript captures mid-animation state (only 4 pins),
+    // then on confirmation re-poll the full 9 are back.
+    // The transient drop to 4 should NOT be broadcast.
+    let detector = MockPinDetector()
+    let db = MockPinDatabase()
+
+    let allConversations = (1...9).map { i in
+      makeConversation(id: "chat\(i)", displayName: "Chat \(i)", isGroup: true)
+    }
+    db.conversationsToReturn = allConversations
+
+    let watcher = PinnedConversationWatcher(
+      database: db, pinDetector: detector, pollIntervalSeconds: 3600)
+
+    // First poll: establish 9 pins as the baseline
+    var broadcastedPinCounts: [Int] = []
+    await watcher.startWatching { pins in
+      broadcastedPinCounts.append(pins.count)
+    }
+
+    detector.pinnedNames = (1...9).map { "Chat \($0)" }
+    await watcher.poll()
+
+    // Should have broadcast 9 pins initially
+    XCTAssertEqual(broadcastedPinCounts, [9])
+
+    // Second poll: AppleScript returns transient partial state (4 pins)
+    // followed by confirmation re-poll returning full 9
+    detector.pinnedNamesQueue = [
+      (1...4).map { "Chat \($0)" },  // Transient: only 4 visible during animation
+      (1...9).map { "Chat \($0)" },  // Confirmation: all 9 back
+    ]
+    await watcher.poll()
+
+    // The transient drop should NOT have been broadcast.
+    // The confirmation re-poll saw 9 pins (same as cached), so no change broadcast.
+    XCTAssertEqual(broadcastedPinCounts, [9], "Transient pin drop should not trigger a broadcast")
+    XCTAssertGreaterThanOrEqual(
+      detector.detectCallCount, 3,
+      "Should have done at least one confirmation re-poll")
+  }
+
+  func testConfirmationPoll_broadcastsWhenDropIsReal() async {
+    // If a user genuinely unpins conversations (e.g. goes from 9 to 7),
+    // the confirmation poll should also see 7, and the change should be broadcast.
+    let detector = MockPinDetector()
+    let db = MockPinDatabase()
+
+    let allConversations = (1...9).map { i in
+      makeConversation(id: "chat\(i)", displayName: "Chat \(i)", isGroup: true)
+    }
+    db.conversationsToReturn = allConversations
+
+    let watcher = PinnedConversationWatcher(
+      database: db, pinDetector: detector, pollIntervalSeconds: 3600)
+
+    var broadcastedPinCounts: [Int] = []
+    await watcher.startWatching { pins in
+      broadcastedPinCounts.append(pins.count)
+    }
+
+    // Establish baseline of 9 pins
+    detector.pinnedNames = (1...9).map { "Chat \($0)" }
+    await watcher.poll()
+    XCTAssertEqual(broadcastedPinCounts, [9])
+
+    // User genuinely unpins 2 chats → 7 pins
+    // Both initial and confirmation polls return 7
+    detector.pinnedNamesQueue = [
+      (1...7).map { "Chat \($0)" },  // Initial: 7
+      (1...7).map { "Chat \($0)" },  // Confirmation: still 7
+    ]
+    await watcher.poll()
+
+    XCTAssertEqual(
+      broadcastedPinCounts, [9, 7], "Real pin drop should be broadcast after confirmation")
+  }
+
+  func testConfirmationPoll_notTriggeredWhenPinCountIncreases() async {
+    // Adding pins should not require confirmation — only drops do.
+    let detector = MockPinDetector()
+    let db = MockPinDatabase()
+
+    let allConversations = (1...9).map { i in
+      makeConversation(id: "chat\(i)", displayName: "Chat \(i)", isGroup: true)
+    }
+    db.conversationsToReturn = allConversations
+
+    let watcher = PinnedConversationWatcher(
+      database: db, pinDetector: detector, pollIntervalSeconds: 3600)
+
+    var broadcastedPinCounts: [Int] = []
+    await watcher.startWatching { pins in
+      broadcastedPinCounts.append(pins.count)
+    }
+
+    // Establish baseline of 5 pins
+    detector.pinnedNames = (1...5).map { "Chat \($0)" }
+    await watcher.poll()
+    XCTAssertEqual(broadcastedPinCounts, [5])
+
+    // Add more pins → 8. No confirmation needed.
+    detector.pinnedNames = (1...8).map { "Chat \($0)" }
+    await watcher.poll()
+
+    XCTAssertEqual(
+      broadcastedPinCounts, [5, 8], "Pin increase should broadcast without confirmation")
+    // detectCallCount: 1 from startWatching's initial poll, +1 for baseline,
+    // +1 for the increase = 3. No extra confirmation poll.
+    XCTAssertEqual(detector.detectCallCount, 3, "No confirmation poll needed for pin increase")
   }
 }
