@@ -260,11 +260,14 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
   public let dateDelivered: Date?
   public let dateRead: Date?
   public let linkPreview: LinkPreview?
+  public let replyToGuid: String?
+  public let threadOriginatorGuid: String?
 
   enum CodingKeys: String, CodingKey {
     case id, guid, text, date, isFromMe, handleId, conversationId, attachments
     case detectedCodes, highlights, mentions, tapbacks
     case dateDelivered, dateRead, linkPreview
+    case replyToGuid, threadOriginatorGuid
   }
 
   public init(
@@ -276,7 +279,9 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     tapbacks: [Tapback]? = nil,
     dateDelivered: Date? = nil,
     dateRead: Date? = nil,
-    linkPreview: LinkPreview? = nil
+    linkPreview: LinkPreview? = nil,
+    replyToGuid: String? = nil,
+    threadOriginatorGuid: String? = nil
   ) {
     self.id = id
     self.guid = guid
@@ -293,6 +298,8 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     self.dateDelivered = dateDelivered
     self.dateRead = dateRead
     self.linkPreview = linkPreview
+    self.replyToGuid = replyToGuid
+    self.threadOriginatorGuid = threadOriginatorGuid
   }
 
   public init(from decoder: Decoder) throws {
@@ -312,6 +319,8 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
     dateDelivered = try container.decodeIfPresent(Date.self, forKey: .dateDelivered)
     dateRead = try container.decodeIfPresent(Date.self, forKey: .dateRead)
     linkPreview = try container.decodeIfPresent(LinkPreview.self, forKey: .linkPreview)
+    replyToGuid = try container.decodeIfPresent(String.self, forKey: .replyToGuid)
+    threadOriginatorGuid = try container.decodeIfPresent(String.self, forKey: .threadOriginatorGuid)
   }
 
   public var hasText: Bool {
