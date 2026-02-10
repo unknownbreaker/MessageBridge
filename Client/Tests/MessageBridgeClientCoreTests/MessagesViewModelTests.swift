@@ -50,7 +50,7 @@ actor MockBridgeService: BridgeServiceProtocol {
     return messagesToReturn
   }
 
-  func sendMessage(text: String, to recipient: String) async throws {
+  func sendMessage(text: String, to recipient: String, replyToGuid: String? = nil) async throws {
     sendMessageCalled = true
     lastRecipient = recipient
     lastMessageText = text

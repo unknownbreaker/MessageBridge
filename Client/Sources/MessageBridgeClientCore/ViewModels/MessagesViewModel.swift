@@ -508,7 +508,7 @@ public class MessagesViewModel: ObservableObject {
     messages[conversationId, default: []].insert(optimisticMessage, at: 0)
 
     do {
-      try await bridgeService.sendMessage(text: text, to: recipient)
+      try await bridgeService.sendMessage(text: text, to: recipient, replyToGuid: nil)
       // Send succeeded - keep the optimistic message
       // The real message will arrive via WebSocket and replace it
       logDebug("Message sent successfully to \(recipient)")

@@ -68,7 +68,7 @@ public protocol BridgeServiceProtocol: Sendable {
   func disconnect() async
   func fetchConversations(limit: Int, offset: Int) async throws -> [Conversation]
   func fetchMessages(conversationId: String, limit: Int, offset: Int) async throws -> [Message]
-  func sendMessage(text: String, to recipient: String) async throws
+  func sendMessage(text: String, to recipient: String, replyToGuid: String?) async throws
   func startWebSocket(
     onNewMessage: @escaping NewMessageHandler,
     onTapbackEvent: @escaping TapbackEventHandler,
@@ -348,7 +348,7 @@ public actor BridgeConnection: BridgeServiceProtocol {
     return messagesResponse.messages.map { $0.toMessage() }
   }
 
-  public func sendMessage(text: String, to recipient: String) async throws {
+  public func sendMessage(text: String, to recipient: String, replyToGuid: String? = nil) async throws {
     guard let serverURL, let apiKey else {
       throw BridgeError.notConnected
     }
@@ -358,7 +358,10 @@ public actor BridgeConnection: BridgeServiceProtocol {
     request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
     request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
-    let body = ["to": recipient, "text": text]
+    var body: [String: String] = ["to": recipient, "text": text]
+    if let replyToGuid {
+      body["replyToGuid"] = replyToGuid
+    }
 
     // Encrypt request body if E2E is enabled
     if e2eEnabled, let encryption {
