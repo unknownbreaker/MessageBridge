@@ -251,7 +251,8 @@ public func configureRoutes(
       let result = try await messageSender.sendMessage(
         to: sendRequest.to,
         text: sendRequest.text,
-        service: sendRequest.service
+        service: sendRequest.service,
+        replyToGuid: sendRequest.replyToGuid
       )
       return SendResponse(from: result)
     } catch {

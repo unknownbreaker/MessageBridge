@@ -6,7 +6,7 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
 
   public init() {}
 
-  public func sendMessage(to recipient: String, text: String, service: String?) async throws
+  public func sendMessage(to recipient: String, text: String, service: String?, replyToGuid: String? = nil) async throws
     -> SendResult
   {
     guard !recipient.isEmpty else {

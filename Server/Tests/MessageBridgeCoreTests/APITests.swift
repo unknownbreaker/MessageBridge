@@ -110,16 +110,18 @@ final class MockMessageSender: MessageSenderProtocol, @unchecked Sendable {
   var lastRecipient: String?
   var lastText: String?
   var lastService: String?
+  var lastReplyToGuid: String?
   var shouldThrowError = false
   var errorToThrow: MessageSendError = .scriptExecutionFailed("Test error")
   var resultToReturn: SendResult?
 
-  func sendMessage(to recipient: String, text: String, service: String?) async throws -> SendResult
+  func sendMessage(to recipient: String, text: String, service: String?, replyToGuid: String? = nil) async throws -> SendResult
   {
     sendMessageCalled = true
     lastRecipient = recipient
     lastText = text
     lastService = service
+    lastReplyToGuid = replyToGuid
 
     if shouldThrowError {
       throw errorToThrow

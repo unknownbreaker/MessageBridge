@@ -60,11 +60,13 @@ public struct SendMessageRequest: Content {
   public let to: String
   public let text: String
   public let service: String?
+  public let replyToGuid: String?
 
-  public init(to: String, text: String, service: String? = nil) {
+  public init(to: String, text: String, service: String? = nil, replyToGuid: String? = nil) {
     self.to = to
     self.text = text
     self.service = service
+    self.replyToGuid = replyToGuid
   }
 }
 
