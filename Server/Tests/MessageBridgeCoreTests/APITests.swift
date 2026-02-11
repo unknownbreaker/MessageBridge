@@ -98,6 +98,19 @@ final class MockChatDatabase: ChatDatabaseProtocol, @unchecked Sendable {
     }
     return newTapbacksToReturn
   }
+
+  var messageTextToReturn: String?
+  var fetchMessageTextCalled = false
+  var lastFetchMessageTextGuid: String?
+
+  func fetchMessageText(byGuid guid: String) async throws -> String? {
+    fetchMessageTextCalled = true
+    lastFetchMessageTextGuid = guid
+    if shouldThrowError {
+      throw DatabaseError.queryFailed
+    }
+    return messageTextToReturn
+  }
 }
 
 enum DatabaseError: Error {

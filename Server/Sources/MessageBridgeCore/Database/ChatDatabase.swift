@@ -422,6 +422,24 @@ public actor ChatDatabase: ChatDatabaseProtocol {
     }
   }
 
+  // MARK: - Message Text Lookup
+
+  /// Look up a message's text by its GUID (used by reply-send pipeline to find original message text).
+  public func fetchMessageText(byGuid guid: String) async throws -> String? {
+    return try await dbPool.read { db in
+      let sql = """
+        SELECT m.text
+        FROM message m
+        WHERE m.guid = ?
+        LIMIT 1
+        """
+      guard let row = try Row.fetchOne(db, sql: sql, arguments: [guid]) else {
+        return nil
+      }
+      return row["text"] as String?
+    }
+  }
+
   // MARK: - Search
 
   public func searchMessages(query: String, limit: Int = 50) async throws -> [Message] {

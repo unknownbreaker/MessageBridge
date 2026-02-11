@@ -118,4 +118,20 @@ final class AppleScriptReplyTests: XCTestCase {
     XCTAssertTrue(script.contains("C:\\\\Users"))
     XCTAssertTrue(script.contains("C:\\\\Temp"))
   }
+
+  // MARK: - fetchMessageText via MockChatDatabase
+
+  func testFetchMessageText_returnsTextForKnownGuid() async throws {
+    let mockDB = MockChatDatabase()
+    mockDB.messageTextToReturn = "Hello world"
+    let text = try await mockDB.fetchMessageText(byGuid: "msg-001")
+    XCTAssertEqual(text, "Hello world")
+  }
+
+  func testFetchMessageText_returnsNilForUnknownGuid() async throws {
+    let mockDB = MockChatDatabase()
+    mockDB.messageTextToReturn = nil
+    let text = try await mockDB.fetchMessageText(byGuid: "nonexistent")
+    XCTAssertNil(text)
+  }
 }

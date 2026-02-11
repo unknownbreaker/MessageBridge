@@ -16,4 +16,7 @@ public protocol ChatDatabaseProtocol: Sendable {
   func fetchTapbacksNewerThan(id: Int64, limit: Int) throws -> [(
     rowId: Int64, tapback: Tapback, conversationId: String, isRemoval: Bool
   )]
+
+  /// Look up a message's text by its GUID (used by reply-send pipeline to find original message text).
+  func fetchMessageText(byGuid guid: String) async throws -> String?
 }

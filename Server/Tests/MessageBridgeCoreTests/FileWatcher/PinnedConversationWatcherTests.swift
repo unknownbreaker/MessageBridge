@@ -51,6 +51,10 @@ final class MockPinDatabase: ChatDatabaseProtocol, @unchecked Sendable {
   )] {
     []
   }
+
+  func fetchMessageText(byGuid guid: String) async throws -> String? {
+    nil
+  }
 }
 
 final class PinnedConversationWatcherTests: XCTestCase {
