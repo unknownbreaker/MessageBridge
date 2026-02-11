@@ -113,30 +113,14 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
 
       tell application "System Events"
         tell process "Messages"
-          -- Find the message containing the original text in the transcript
-          set transcriptGroup to missing value
-          try
-            set transcriptGroup to group 1 of splitter group 1 of window 1
-          end try
-
-          if transcriptGroup is missing value then
-            error "Could not find Messages transcript"
-          end if
-
-          -- Search through the accessibility tree for the message text
+          -- Scan entire contents of group 1 for text areas containing the original message
+          -- Messages are AXTextArea elements whose value property holds the message text
           set foundElement to missing value
-          set allElements to entire contents of transcriptGroup
+          set allElements to entire contents of group 1 of window 1
           repeat with elem in allElements
-            try
-              if description of elem contains "\(escapedOriginal)" then
-                set foundElement to elem
-                exit repeat
-              end if
-            end try
             try
               if value of elem contains "\(escapedOriginal)" then
                 set foundElement to elem
-                exit repeat
               end if
             end try
           end repeat
@@ -145,28 +129,10 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
             error "Could not find message: \(escapedOriginal)"
           end if
 
-          -- Right-click the found message element to show context menu
-          perform action "AXShowMenu" of foundElement
+          -- Use the direct "Reply\u{2026}" action on the text area element
+          perform action "Reply\u{2026}" of foundElement
 
-          delay 0.3
-
-          -- Click "Reply" in context menu
-          set replyItem to missing value
-          repeat with menuItem in menu items of menu 1 of foundElement
-            try
-              if name of menuItem is "Reply" then
-                set replyItem to menuItem
-                exit repeat
-              end if
-            end try
-          end repeat
-
-          if replyItem is missing value then
-            error "Could not find Reply menu item"
-          end if
-
-          click replyItem
-          delay 0.3
+          delay 0.5
 
           -- Type the reply text and send
           keystroke "\(escapedText)"
