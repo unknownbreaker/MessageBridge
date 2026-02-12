@@ -119,7 +119,7 @@ struct MessageBridgeApp: App {
     await viewModel.connect(
       to: config.serverURL,
       apiKey: config.apiKey,
-      e2eEnabled: config.e2eEnabled
+      e2eEnabled: true
     )
   }
 }

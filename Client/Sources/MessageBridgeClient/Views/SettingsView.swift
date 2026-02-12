@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import MessageBridgeClientCore
 import SwiftUI
 
@@ -28,14 +29,12 @@ struct ConnectionSettingsView: View {
   @EnvironmentObject var viewModel: MessagesViewModel
   @State private var serverURLString: String = ""
   @State private var apiKey: String = ""
-  @State private var e2eEnabled: Bool = false
   @State private var showingAPIKey = false
   @State private var saveStatus: String?
 
   // Original values to track changes
   @State private var originalServerURLString: String = ""
   @State private var originalApiKey: String = ""
-  @State private var originalE2eEnabled: Bool = false
 
   private let keychainManager = KeychainManager()
 
@@ -71,7 +70,6 @@ struct ConnectionSettingsView: View {
 
   private var hasChanges: Bool {
     serverURLString != originalServerURLString || apiKey != originalApiKey
-      || e2eEnabled != originalE2eEnabled
   }
 
   private var canSave: Bool {
@@ -104,19 +102,6 @@ struct ConnectionSettingsView: View {
         .help("API key from your MessageBridge Server")
       } header: {
         Text("Server Connection")
-      }
-
-      Section {
-        Toggle("End-to-End Encryption", isOn: $e2eEnabled)
-          .help("Encrypt all data so relay servers cannot read your messages")
-
-        if e2eEnabled {
-          Text("Messages will be encrypted using your API key before leaving your device.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-      } header: {
-        Text("Security")
       }
 
       Section {
@@ -165,6 +150,7 @@ struct ConnectionSettingsView: View {
       }
     }
     .padding()
+    .selectAllOnFocus()
     .onAppear {
       loadSettings()
     }
@@ -174,12 +160,10 @@ struct ConnectionSettingsView: View {
     if let config = try? keychainManager.retrieveServerConfig() {
       serverURLString = config.serverURL.absoluteString
       apiKey = config.apiKey
-      e2eEnabled = config.e2eEnabled
 
       // Store original values to track changes
       originalServerURLString = serverURLString
       originalApiKey = apiKey
-      originalE2eEnabled = e2eEnabled
     }
   }
 
@@ -189,7 +173,7 @@ struct ConnectionSettingsView: View {
       return
     }
 
-    let config = ServerConfig(serverURL: url, apiKey: apiKey, e2eEnabled: e2eEnabled)
+    let config = ServerConfig(serverURL: url, apiKey: apiKey, e2eEnabled: true)
     do {
       try keychainManager.saveServerConfig(config)
       saveStatus = "Saved"
@@ -197,7 +181,6 @@ struct ConnectionSettingsView: View {
       // Update original values so button disables
       originalServerURLString = serverURLString
       originalApiKey = apiKey
-      originalE2eEnabled = e2eEnabled
 
       // Clear status after 2 seconds
       DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -236,6 +219,25 @@ struct AboutView: View {
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+}
+
+// MARK: - Select All on Focus
+
+extension View {
+  /// Selects all text in the focused text field when editing begins.
+  func selectAllOnFocus() -> some View {
+    onReceive(
+      NotificationCenter.default.publisher(for: NSTextField.textDidBeginEditingNotification)
+    ) {
+      notification in
+      if let textField = notification.object as? NSTextField {
+        // Delay to let SwiftUI finish setting up the field editor
+        DispatchQueue.main.async {
+          textField.currentEditor()?.selectAll(nil)
+        }
+      }
+    }
   }
 }
 

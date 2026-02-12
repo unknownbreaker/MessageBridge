@@ -325,7 +325,11 @@ public struct Message: Codable, Identifiable, Hashable, Sendable {
 
   public var hasText: Bool {
     guard let text = text else { return false }
-    return !text.isEmpty
+    // Strip Unicode Object Replacement Character (U+FFFC) — iMessage uses this
+    // as a placeholder in the text field for attachment-only messages
+    let cleaned = text.replacingOccurrences(of: "\u{FFFC}", with: "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return !cleaned.isEmpty
   }
 
   /// Whether this message has any attachments

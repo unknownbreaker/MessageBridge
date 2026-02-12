@@ -118,7 +118,7 @@ public class MessagesViewModel: ObservableObject {
       return
     }
 
-    await connect(to: config.serverURL, apiKey: config.apiKey, e2eEnabled: config.e2eEnabled)
+    await connect(to: config.serverURL, apiKey: config.apiKey, e2eEnabled: true)
   }
 
   // MARK: - Sync Warning Handling

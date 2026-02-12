@@ -90,7 +90,7 @@ struct LinkPreviewCard: View {
           Image(nsImage: nsImage)
             .resizable()
             .aspectRatio(contentMode: .fill)
-            .frame(maxWidth: 280, maxHeight: 200)
+            .frame(maxWidth: 360, maxHeight: 260)
             .clipped()
         }
 
@@ -128,7 +128,7 @@ struct LinkPreviewCard: View {
             .padding(.vertical, 8)
         }
       }
-      .frame(maxWidth: 280)
+      .frame(maxWidth: 360)
     }
     .buttonStyle(.plain)
   }
