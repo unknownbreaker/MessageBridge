@@ -14,9 +14,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Bugfixes — Vapor startup + pinned conversation parsing
-- Fixed Vapor crash on Xcode launch: strip `-NSDocumentRevisionsDebugMode` from environment arguments
-- Fixed pinned conversation name including message preview text: macOS 26.2 uses format `"Name, Unread, Preview, Pinned"` — now strips suffixes from the right instead of token-filtering
+**Last Session:** Client UI polish (v0.7.2)
+- Hide empty message bubble for attachment-only messages (strip U+FFFC placeholder)
+- Enlarge URL preview cards from 280×200 to 360×260
+- Auto-select text in Settings fields on focus
+- Always enable E2E encryption, removed toggle from settings
 
 **Known Blockers:** None
 
