@@ -14,12 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Vapor startup fix + Keychain/UI improvements
+**Last Session:** Bugfixes — Vapor startup + pinned conversation parsing
 - Fixed Vapor crash on Xcode launch: strip `-NSDocumentRevisionsDebugMode` from environment arguments
-- Added permissive Keychain ACL (`KeychainAccess`) to prevent password prompts after Xcode rebuilds
-- Wired up reply AppleScript execution with silent fallback to regular send (`replyToText` param)
-- Redesigned ngrok auth token settings UI (always-visible field, detect existing token, dirty-state save)
-- Improved ngrok tests to use temp files and backup/restore Keychain state
+- Fixed pinned conversation name including message preview text: macOS 26.2 uses format `"Name, Unread, Preview, Pinned"` — now strips suffixes from the right instead of token-filtering
 
 **Known Blockers:** None
 
