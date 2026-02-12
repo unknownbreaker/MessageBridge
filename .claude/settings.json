@@ -14,6 +14,8 @@
   },
   "permissions": {
     "allow": [
+      "Edit",
+      "Write",
       "Bash(swift build*)",
       "Bash(swift test*)",
       "Bash(swift-format *)",

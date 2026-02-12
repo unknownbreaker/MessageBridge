@@ -134,46 +134,45 @@ final class NgrokManagerTests: XCTestCase {
     XCTAssertTrue(hasToken == true || hasToken == false)
   }
 
-  func testNgrokManager_parseAuthTokenFromConfig_validYAML() async {
-    // Test config file parsing by saving and detecting round-trip through Keychain
+  func testNgrokManager_parseAuthTokenFromConfig_validYAML() throws {
+    // Use temp config file to avoid overwriting real ngrok.yml or Keychain
+    let tempDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("ngrok-test-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let tempConfigPath = tempDir.appendingPathComponent("ngrok.yml").path
+    try "authtoken: round-trip-test-token\n".write(
+      toFile: tempConfigPath, atomically: true, encoding: .utf8)
+
     let manager = NgrokManager()
-
-    // Clean up any existing token first
-    await manager.removeAuthToken()
-    let beforeToken = await manager.detectAuthToken()
-
-    // If no config file exists, token should come from Keychain only
-    // Save a test token to Keychain
-    let testToken = "test_token_\(UUID().uuidString)"
-    do {
-      try await manager.saveAuthToken(testToken)
-      let detected = await manager.detectAuthToken()
-      // Should find the token (either from config file ngrok wrote, or Keychain)
-      XCTAssertNotNil(detected)
-
-      // Clean up
-      await manager.removeAuthToken()
-    } catch {
-      // saveAuthToken may fail if ngrok binary isn't installed (config step fails)
-      // but the Keychain part should still work — skip if binary not available
-      if manager.isInstalled() {
-        XCTFail("saveAuthToken failed with ngrok installed: \(error)")
-      }
-      // Clean up regardless
-      await manager.removeAuthToken()
-    }
+    let detected = manager.detectAuthToken(configPaths: [tempConfigPath])
+    XCTAssertEqual(detected, "round-trip-test-token")
   }
 
   func testNgrokManager_removeAuthToken_cleansUp() async {
     let manager = NgrokManager()
+
+    // Back up existing Keychain token to avoid destroying real credentials
+    let originalToken = manager.detectAuthToken(configPaths: [])
+
     // Remove should not crash even if no token exists
     await manager.removeAuthToken()
-    // Verify Keychain entry is gone (config file may still have one)
-    // This at minimum verifies the method doesn't throw
+
+    // Restore original Keychain state
+    if let original = originalToken {
+      let restorePath = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ngrok-restore-\(UUID().uuidString).yml").path
+      try? await manager.saveAuthToken(original, configFilePath: restorePath)
+      try? FileManager.default.removeItem(atPath: restorePath)
+    }
   }
 
   func testNgrokManager_startTunnel_failsWithoutAuthToken() async {
     let manager = NgrokManager()
+
+    // Back up existing Keychain token to avoid destroying real credentials
+    let originalToken = manager.detectAuthToken(configPaths: [])
 
     // Remove any existing token
     await manager.removeAuthToken()
@@ -194,6 +193,14 @@ final class NgrokManagerTests: XCTestCase {
       }
     }
     // If hasToken is true (from config file), we can't test this case
+
+    // Restore original Keychain state
+    if let original = originalToken {
+      let restorePath = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ngrok-restore-\(UUID().uuidString).yml").path
+      try? await manager.saveAuthToken(original, configFilePath: restorePath)
+      try? FileManager.default.removeItem(atPath: restorePath)
+    }
   }
 
   // MARK: - Status Change Handler Tests

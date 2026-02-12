@@ -124,11 +124,15 @@ final class MockMessageSender: MessageSenderProtocol, @unchecked Sendable {
   var lastText: String?
   var lastService: String?
   var lastReplyToGuid: String?
+  var lastReplyToText: String?
   var shouldThrowError = false
   var errorToThrow: MessageSendError = .scriptExecutionFailed("Test error")
   var resultToReturn: SendResult?
 
-  func sendMessage(to recipient: String, text: String, service: String?, replyToGuid: String? = nil)
+  func sendMessage(
+    to recipient: String, text: String, service: String?, replyToGuid: String? = nil,
+    replyToText: String? = nil
+  )
     async throws -> SendResult
   {
     sendMessageCalled = true
@@ -136,6 +140,7 @@ final class MockMessageSender: MessageSenderProtocol, @unchecked Sendable {
     lastText = text
     lastService = service
     lastReplyToGuid = replyToGuid
+    lastReplyToText = replyToText
 
     if shouldThrowError {
       throw errorToThrow

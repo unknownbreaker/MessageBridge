@@ -663,26 +663,29 @@ public actor NgrokManager: TunnelProvider {
       throw TunnelError.connectionFailed("Invalid authtoken data")
     }
 
-    let query: [String: Any] = [
+    let baseAttributes: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: ngrokKeychainService,
       kSecAttrAccount as String: ngrokKeychainAccount,
-      kSecValueData as String: data,
-      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
     ]
 
-    var status = SecItemAdd(query as CFDictionary, nil)
+    var addQuery = baseAttributes
+    addQuery[kSecValueData as String] = data
+    if let access = KeychainAccess.createPermissive(label: "MessageBridge ngrok Auth Token") {
+      addQuery[kSecAttrAccess as String] = access
+    }
+
+    var status = SecItemAdd(addQuery as CFDictionary, nil)
 
     if status == errSecDuplicateItem {
-      let updateQuery: [String: Any] = [
-        kSecClass as String: kSecClassGenericPassword,
-        kSecAttrService as String: ngrokKeychainService,
-        kSecAttrAccount as String: ngrokKeychainAccount,
-      ]
-      let updateAttributes: [String: Any] = [
-        kSecValueData as String: data
-      ]
-      status = SecItemUpdate(updateQuery as CFDictionary, updateAttributes as CFDictionary)
+      let deleteStatus = SecItemDelete(baseAttributes as CFDictionary)
+      if deleteStatus == errSecSuccess {
+        status = SecItemAdd(addQuery as CFDictionary, nil)
+      } else {
+        status = SecItemUpdate(
+          baseAttributes as CFDictionary,
+          [kSecValueData as String: data] as CFDictionary)
+      }
     }
 
     guard status == errSecSuccess else {

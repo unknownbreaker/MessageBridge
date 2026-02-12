@@ -8,7 +8,9 @@ public protocol MessageSenderProtocol: Sendable {
   ///   - text: Message content
   ///   - service: Optional service type ("iMessage" or "SMS"). If nil, defaults to iMessage.
   /// - Returns: Result indicating success or failure with details
-  func sendMessage(to recipient: String, text: String, service: String?, replyToGuid: String?)
+  func sendMessage(
+    to recipient: String, text: String, service: String?, replyToGuid: String?, replyToText: String?
+  )
     async throws -> SendResult
 }
 

@@ -68,28 +68,32 @@ public struct KeychainManager: KeychainProtocol {
       throw KeychainError.invalidData
     }
 
-    let query: [String: Any] = [
+    let baseAttributes: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
       kSecAttrAccount as String: account,
-      kSecValueData as String: data,
-      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
     ]
 
-    // Try to add the item
-    var status = SecItemAdd(query as CFDictionary, nil)
+    var addQuery = baseAttributes
+    addQuery[kSecValueData as String] = data
+    if let access = KeychainAccess.createPermissive(label: "MessageBridge Client Config") {
+      addQuery[kSecAttrAccess as String] = access
+    }
 
-    // If it already exists, update it
+    var status = SecItemAdd(addQuery as CFDictionary, nil)
+
+    // If item exists, delete and re-add with permissive ACL so future
+    // rebuilds (new code signature) can access it without a prompt.
+    // Falls back to update if the delete is denied (old ACL restricts access).
     if status == errSecDuplicateItem {
-      let updateQuery: [String: Any] = [
-        kSecClass as String: kSecClassGenericPassword,
-        kSecAttrService as String: service,
-        kSecAttrAccount as String: account,
-      ]
-      let updateAttributes: [String: Any] = [
-        kSecValueData as String: data
-      ]
-      status = SecItemUpdate(updateQuery as CFDictionary, updateAttributes as CFDictionary)
+      let deleteStatus = SecItemDelete(baseAttributes as CFDictionary)
+      if deleteStatus == errSecSuccess {
+        status = SecItemAdd(addQuery as CFDictionary, nil)
+      } else {
+        status = SecItemUpdate(
+          baseAttributes as CFDictionary,
+          [kSecValueData as String: data] as CFDictionary)
+      }
     }
 
     guard status == errSecSuccess else {
@@ -152,5 +156,19 @@ public struct KeychainManager: KeychainProtocol {
     } catch {
       return false
     }
+  }
+}
+
+/// Creates a permissive SecAccess for legacy Keychain items so any application
+/// running as the current user can access them without a password prompt.
+/// This prevents repeated Keychain dialogs during Xcode debug rebuilds,
+/// which produce a new ad-hoc code signature each time.
+enum KeychainAccess {
+  static func createPermissive(label: String) -> SecAccess? {
+    var access: SecAccess?
+    // Empty trusted-application list = any application can access without prompt
+    let status = SecAccessCreate(label as CFString, [] as CFArray, &access)
+    guard status == errSecSuccess else { return nil }
+    return access
   }
 }

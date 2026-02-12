@@ -39,7 +39,7 @@ struct SettingsView: View {
         }
         .tag(SettingsTab.security)
 
-      TunnelSettingsView(autoShowTokenField: showAuthTokenField)
+      TunnelSettingsView()
         .environmentObject(appState)
         .tabItem {
           Label("Tunnel", systemImage: "network")

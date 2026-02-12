@@ -252,7 +252,8 @@ public func configureRoutes(
         to: sendRequest.to,
         text: sendRequest.text,
         service: sendRequest.service,
-        replyToGuid: sendRequest.replyToGuid
+        replyToGuid: sendRequest.replyToGuid,
+        replyToText: nil
       )
       return SendResponse(from: result)
     } catch {

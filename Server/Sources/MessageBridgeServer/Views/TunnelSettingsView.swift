@@ -8,15 +8,13 @@ struct TunnelSettingsView: View {
   @State private var isUpdating = false
   @State private var errorMessage: String?
   @State private var ngrokAuthToken = ""
+  @State private var originalNgrokAuthToken = ""
   @State private var isSavingToken = false
-  @State private var showTokenField: Bool
 
-  /// If true, auto-show the auth token input field on appear
-  let autoShowTokenField: Bool
-
-  init(autoShowTokenField: Bool = false) {
-    self.autoShowTokenField = autoShowTokenField
-    _showTokenField = State(initialValue: autoShowTokenField)
+  private var canSaveToken: Bool {
+    !ngrokAuthToken.isEmpty
+      && ngrokAuthToken != originalNgrokAuthToken
+      && !isSavingToken
   }
 
   var body: some View {
@@ -94,61 +92,54 @@ struct TunnelSettingsView: View {
       // ngrok Auth Token Section (only shown when ngrok is selected and installed)
       if appState.selectedTunnelProvider == .ngrok && isInstalled {
         Section {
-          if appState.ngrokAuthTokenConfigured && !showTokenField {
-            HStack {
-              Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-              Text("Authtoken configured")
-              Spacer()
-              Button("Change") {
-                showTokenField = true
+          if !appState.ngrokAuthTokenConfigured {
+            HStack(spacing: 8) {
+              Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.yellow)
+              Text("ngrok requires a free account to create tunnels.")
+                .font(.callout)
+            }
+
+            Text(
+              "[Sign up at dashboard.ngrok.com/signup](https://dashboard.ngrok.com/signup) to get your authtoken."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          }
+
+          SecureField("Paste authtoken here", text: $ngrokAuthToken)
+            .textFieldStyle(.roundedBorder)
+            .onTapGesture {
+              if !ngrokAuthToken.isEmpty {
+                DispatchQueue.main.async {
+                  NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                }
               }
+            }
+
+          HStack {
+            Button {
+              saveAuthToken()
+            } label: {
+              HStack {
+                if isSavingToken {
+                  ProgressView()
+                    .scaleEffect(0.7)
+                    .frame(width: 16, height: 16)
+                  Text("Saving...")
+                } else {
+                  Text("Save Token")
+                }
+              }
+            }
+            .disabled(!canSaveToken)
+
+            if appState.ngrokAuthTokenConfigured {
               Button("Remove", role: .destructive) {
                 Task {
                   await appState.removeNgrokAuthToken()
-                }
-              }
-            }
-          } else {
-            if !appState.ngrokAuthTokenConfigured {
-              HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                  .foregroundStyle(.yellow)
-                Text("ngrok requires a free account to create tunnels.")
-                  .font(.callout)
-              }
-
-              Text(
-                "[Sign up at dashboard.ngrok.com/signup](https://dashboard.ngrok.com/signup) to get your authtoken."
-              )
-              .font(.caption)
-              .foregroundStyle(.secondary)
-            }
-
-            SecureField("Paste authtoken here", text: $ngrokAuthToken)
-              .textFieldStyle(.roundedBorder)
-
-            HStack {
-              Button {
-                saveAuthToken()
-              } label: {
-                HStack {
-                  if isSavingToken {
-                    ProgressView()
-                      .scaleEffect(0.7)
-                      .frame(width: 16, height: 16)
-                    Text("Saving...")
-                  } else {
-                    Text("Save Token")
-                  }
-                }
-              }
-              .disabled(ngrokAuthToken.isEmpty || isSavingToken)
-
-              if showTokenField {
-                Button("Cancel") {
-                  showTokenField = false
                   ngrokAuthToken = ""
+                  originalNgrokAuthToken = ""
                 }
               }
             }
@@ -159,6 +150,12 @@ struct TunnelSettingsView: View {
           Text("Your authtoken is stored securely in Keychain.")
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+        .onAppear {
+          if let token = appState.ngrokManager.detectAuthToken() {
+            ngrokAuthToken = token
+            originalNgrokAuthToken = token
+          }
         }
       }
 
@@ -458,8 +455,7 @@ struct TunnelSettingsView: View {
     Task {
       do {
         try await appState.saveNgrokAuthToken(ngrokAuthToken)
-        ngrokAuthToken = ""
-        showTokenField = false
+        originalNgrokAuthToken = ngrokAuthToken
       } catch {
         errorMessage = error.localizedDescription
       }

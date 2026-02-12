@@ -77,7 +77,9 @@ public actor ServerManager {
       self.pinnedWatcher = pinnedWatcher
 
       // Create and configure Vapor application
-      let app = try await Application.make(.production)
+      var env = Environment.development
+      env.arguments = ["serve"]
+      let app = try await Application.make(env)
       app.http.server.configuration.port = port
       app.http.server.configuration.hostname = "0.0.0.0"
 
@@ -118,6 +120,7 @@ public actor ServerManager {
         do {
           try await app.execute()
         } catch {
+          print("[ServerManager] app.execute() failed: \(error)")
           await self.handleServerError(error)
         }
       }
@@ -165,8 +168,11 @@ public actor ServerManager {
   }
 
   /// Handle server errors
-  private func handleServerError(_ error: Error) {
+  private func handleServerError(_ error: Error) async {
     status = .error(error.localizedDescription)
+    if let app = application {
+      try? await app.asyncShutdown()
+    }
     application = nil
   }
 

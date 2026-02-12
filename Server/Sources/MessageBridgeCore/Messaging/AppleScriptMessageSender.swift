@@ -7,10 +7,9 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
   public init() {}
 
   public func sendMessage(
-    to recipient: String, text: String, service: String?, replyToGuid: String? = nil
-  ) async throws
-    -> SendResult
-  {
+    to recipient: String, text: String, service: String?,
+    replyToGuid: String? = nil, replyToText: String? = nil
+  ) async throws -> SendResult {
     guard !recipient.isEmpty else {
       throw MessageSendError.invalidRecipient(recipient)
     }
@@ -20,8 +19,26 @@ public final class AppleScriptMessageSender: MessageSenderProtocol, @unchecked S
     }
 
     let serviceType = service ?? "iMessage"
-    let script = buildAppleScript(recipient: recipient, text: text, service: serviceType)
 
+    // Use reply UI automation when we have the original message text
+    if replyToGuid != nil, let replyToText, !replyToText.isEmpty {
+      let replyScript = buildReplyAppleScript(
+        recipient: recipient, text: text,
+        replyToText: replyToText, service: serviceType
+      )
+      do {
+        try await executeAppleScript(replyScript)
+        return SendResult(
+          success: true, recipient: recipient,
+          service: serviceType, timestamp: Date()
+        )
+      } catch {
+        // Silent fallback to regular send on UI automation failure
+      }
+    }
+
+    // Regular send (no reply threading, or fallback)
+    let script = buildAppleScript(recipient: recipient, text: text, service: serviceType)
     try await executeAppleScript(script)
 
     return SendResult(
