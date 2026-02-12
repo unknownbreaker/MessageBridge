@@ -14,18 +14,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Reply-to-Message Feature
-- Added inline reply-to-message: display reply context (ReplyPreviewDecorator + ReplyQuoteBar) and compose replies (ReplyBanner above composer)
-- Server: read thread_originator_guid from chat.db, added replyToGuid to Message model and full send pipeline
-- Client: ReplyAction posts notification → MessageThreadView sets replyingTo → ComposerView shows banner → send includes replyToGuid
-- Scaffolded AppleScript UI automation for reply-send (buildReplyAppleScript) — not yet wired to live execution
-- Added Xcode project registration rule to CLAUDE.md Common Mistakes section
-- 26 files changed, 12 new tests
+**Last Session:** Vapor startup fix + Keychain/UI improvements
+- Fixed Vapor crash on Xcode launch: strip `-NSDocumentRevisionsDebugMode` from environment arguments
+- Added permissive Keychain ACL (`KeychainAccess`) to prevent password prompts after Xcode rebuilds
+- Wired up reply AppleScript execution with silent fallback to regular send (`replyToText` param)
+- Redesigned ngrok auth token settings UI (always-visible field, detect existing token, dirty-state save)
+- Improved ngrok tests to use temp files and backup/restore Keychain state
 
 **Known Blockers:** None
 
 **Next Steps:**
-1. Wire up AppleScript reply-send (test buildReplyAppleScript against live Messages.app accessibility tree)
+1. Test reply AppleScript against live Messages.app accessibility tree
 2. Enhance ReplyQuoteBar to show original message text (requires adding messages to DecoratorContext)
 3. Add scroll-to-original on ReplyQuoteBar tap
 4. M4.1 remaining: AppleScript bridge to actually send tapbacks through Messages.app (currently optimistic-only)

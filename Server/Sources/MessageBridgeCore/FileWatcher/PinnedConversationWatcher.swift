@@ -495,28 +495,22 @@ public struct AppleScriptPinDetector: PinDetector {
                   repeat with elem in allElements
                       try
                           set elemDesc to description of elem
-                          if elemDesc contains "Pinned" then
-                              -- Extract the display name by removing status tokens
-                              -- Description format: "Name, Pinned" or "Name, Unread, Pinned"
-                              set AppleScript's text item delimiters to ", "
-                              set nameParts to text items of elemDesc
-                              set AppleScript's text item delimiters to ""
-                              -- Remove trailing status tokens to get the name
-                              set nameTokens to {}
-                              repeat with i from 1 to count of nameParts
-                                  set part to item i of nameParts
-                                  if part is not "Pinned" and part is not "Unread" then
-                                      set end of nameTokens to part
-                                  end if
-                              end repeat
-                              if (count of nameTokens) > 0 then
-                                  set AppleScript's text item delimiters to ", "
-                                  set fullName to nameTokens as text
+                          if elemDesc ends with ", Pinned" then
+                              -- Strip ", Pinned" suffix (8 chars) to get name + optional status
+                              set nameAndStatus to text 1 thru ((length of elemDesc) - 8) of elemDesc
+                              -- macOS 26.2 format for unread pins: "Name, Unread, MessagePreview, Pinned"
+                              -- Strip message preview by splitting on first ", Unread, " occurrence
+                              if nameAndStatus contains ", Unread, " then
+                                  set AppleScript's text item delimiters to ", Unread, "
+                                  set fullName to text item 1 of nameAndStatus
                                   set AppleScript's text item delimiters to ""
-                                  -- Avoid duplicates (child elements may also contain "Pinned")
-                                  if pinnedNames does not contain fullName then
-                                      set end of pinnedNames to fullName
-                                  end if
+                              else if nameAndStatus ends with ", Unread" then
+                                  set fullName to text 1 thru ((length of nameAndStatus) - 8) of nameAndStatus
+                              else
+                                  set fullName to nameAndStatus
+                              end if
+                              if (length of fullName) > 0 and pinnedNames does not contain fullName then
+                                  set end of pinnedNames to fullName
                               end if
                           end if
                       end try
