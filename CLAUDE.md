@@ -14,13 +14,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Client UI polish + release (2026-02-12)
-- Hide empty message bubble for attachment-only messages (strip U+FFFC placeholder)
-- Enlarge URL preview cards from 280×200 to 360×260
-- Auto-select text in Settings fields on focus
-- Always enable E2E encryption, removed toggle from settings
-- Released as `release/2026-02-12` (Client v0.7.2, Server v0.7.3)
-- Documented release process in CLAUDE.md
+**Last Session:** Repo cleanup + sidebar first names (2026-02-13)
+- Untracked xcuserstate files and fixed gitignore patterns for nested paths
+- Added `.beads/` to gitignore
+- Show first names only in conversation sidebar (`shortDisplayName` on Handle and Conversation)
 
 **Known Blockers:** None
 
