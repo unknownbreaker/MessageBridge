@@ -4,9 +4,8 @@
 Package.resolved
 
 # Xcode
-*.xcodeproj/xcuserdata/
+**/xcuserdata/
 **/*.xcodeproj/xcshareddata/
-*.xcworkspace/xcuserdata/
 DerivedData/
 *.xccheckout
 *.moved-aside
@@ -36,3 +35,6 @@ build/
 
 # Diagnostic scripts
 Scripts/
+
+# Beads tracking
+.beads/
