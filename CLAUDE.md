@@ -49,6 +49,47 @@ cd Client && swift test
 cd Server && swift build && cd ../Client && swift build
 ```
 
+### Release Process
+
+Releases are date-based, not version-based. Client and Server have **independent version numbers** — only bump the app that actually changed.
+
+1. **Bump versions** in the changed app(s):
+   - Client: `Client/Sources/MessageBridgeClientCore/Version/Version.swift` → `appVersion`
+   - Server: `Server/Sources/MessageBridgeCore/Version/Version.swift` → `appVersion`
+2. **Commit and push** the version bump(s) to `main`
+3. **Tag** with date format: `git tag -a release/YYYY-MM-DD -m "Release YYYY-MM-DD"`
+4. **Build Release .app bundles** via Xcode:
+   ```bash
+   xcodebuild -project Client/MessageBridgeClient.xcodeproj -scheme MessageBridgeClient -configuration Release -derivedDataPath /tmp/MessageBridge-build/Client ONLY_ACTIVE_ARCH=NO
+   xcodebuild -project Server/MessageBridgeServer.xcodeproj -scheme MessageBridgeServer -configuration Release -derivedDataPath /tmp/MessageBridge-build/Server ONLY_ACTIVE_ARCH=NO
+   ```
+5. **Create DMGs** with version in filename:
+   ```bash
+   hdiutil create -volname "MessageBridgeClient" -srcfolder /tmp/MessageBridge-build/Client/Build/Products/Release/MessageBridgeClient.app -ov -format UDZO /tmp/MessageBridge-build/MessageBridgeClient-X.Y.Z.dmg
+   hdiutil create -volname "MessageBridgeServer" -srcfolder /tmp/MessageBridge-build/Server/Build/Products/Release/MessageBridgeServer.app -ov -format UDZO /tmp/MessageBridge-build/MessageBridgeServer-X.Y.Z.dmg
+   ```
+6. **Create GitHub release** with date title and per-app changelogs:
+   ```bash
+   gh release create release/YYYY-MM-DD --title "YYYY-MM-DD" --notes "..."
+   gh release upload release/YYYY-MM-DD MessageBridgeClient-X.Y.Z.dmg MessageBridgeServer-X.Y.Z.dmg
+   ```
+
+Release notes format — show version transitions and changes per app:
+```
+## Server (v0.7.2 -> v0.7.3)
+### Fixes
+- ...
+### Features
+- ...
+
+## Client (v0.7.1 -> v0.7.2)
+### Fixes
+- ...
+
+---
+Signed and notarized by Apple.
+```
+
 ---
 
 ## Project Overview
