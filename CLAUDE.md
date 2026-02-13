@@ -70,10 +70,17 @@ Releases are date-based, not version-based. Client and Server have **independent
    hdiutil create -volname "MessageBridgeClient" -srcfolder /tmp/MessageBridge-build/Client/Build/Products/Release/MessageBridgeClient.app -ov -format UDZO /tmp/MessageBridge-build/MessageBridgeClient-X.Y.Z.dmg
    hdiutil create -volname "MessageBridgeServer" -srcfolder /tmp/MessageBridge-build/Server/Build/Products/Release/MessageBridgeServer.app -ov -format UDZO /tmp/MessageBridge-build/MessageBridgeServer-X.Y.Z.dmg
    ```
-6. **Create GitHub release** with date title and per-app changelogs:
+6. **Notarize DMGs** (uses credentials stored in Keychain under profile `"MessageBridge Notarization"`):
+   ```bash
+   xcrun notarytool submit /tmp/MessageBridge-build/MessageBridgeClient-X.Y.Z.dmg --keychain-profile "MessageBridge Notarization" --wait
+   xcrun stapler staple /tmp/MessageBridge-build/MessageBridgeClient-X.Y.Z.dmg
+   xcrun notarytool submit /tmp/MessageBridge-build/MessageBridgeServer-X.Y.Z.dmg --keychain-profile "MessageBridge Notarization" --wait
+   xcrun stapler staple /tmp/MessageBridge-build/MessageBridgeServer-X.Y.Z.dmg
+   ```
+7. **Create GitHub release** with date title and per-app changelogs:
    ```bash
    gh release create release/YYYY-MM-DD --title "YYYY-MM-DD" --notes "..."
-   gh release upload release/YYYY-MM-DD MessageBridgeClient-X.Y.Z.dmg MessageBridgeServer-X.Y.Z.dmg
+   gh release upload release/YYYY-MM-DD /tmp/MessageBridge-build/MessageBridgeClient-X.Y.Z.dmg /tmp/MessageBridge-build/MessageBridgeServer-X.Y.Z.dmg
    ```
 
 Release notes format — show version transitions and changes per app:
