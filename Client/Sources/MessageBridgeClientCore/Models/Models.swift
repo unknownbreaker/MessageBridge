@@ -25,6 +25,12 @@ public struct Handle: Codable, Identifiable, Hashable, Sendable {
     contactName ?? address
   }
 
+  /// First name only - prefers first word of contact name, falls back to address
+  public var shortDisplayName: String {
+    guard let name = contactName else { return address }
+    return name.components(separatedBy: " ").first ?? name
+  }
+
   public var displayAddress: String {
     address
   }
@@ -399,6 +405,22 @@ public struct Conversation: Codable, Identifiable, Sendable {
       return "Unknown"
     }
     let names = participants.prefix(3).map { $0.displayName }
+    let suffix = participants.count > 3 ? " +\(participants.count - 3)" : ""
+    return names.joined(separator: ", ") + suffix
+  }
+
+  /// Short display name using first names only (for sidebar)
+  public var shortDisplayName: String {
+    if let name = _displayName, !name.isEmpty {
+      return name
+    }
+    if participants.count == 1 {
+      return participants[0].shortDisplayName
+    }
+    if participants.isEmpty {
+      return "Unknown"
+    }
+    let names = participants.prefix(3).map { $0.shortDisplayName }
     let suffix = participants.count > 3 ? " +\(participants.count - 3)" : ""
     return names.joined(separator: ", ") + suffix
   }

@@ -173,7 +173,7 @@ struct ConversationRow: View {
 
       VStack(alignment: .leading, spacing: 2) {
         HStack {
-          Text(conversation.displayName)
+          Text(conversation.shortDisplayName)
             .font(.headline)
             .fontWeight(conversation.hasUnread ? .bold : .regular)
             .lineLimit(1)
