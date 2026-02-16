@@ -39,6 +39,7 @@ struct ReplyBanner: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
+    .fixedSize(horizontal: false, vertical: true)
     .background(.bar)
   }
 }

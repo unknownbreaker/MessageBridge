@@ -123,7 +123,6 @@ struct LinkPreviewCard: View {
           Text(text)
             .font(.body)
             .foregroundStyle(isFromMe ? .white : .primary)
-            .textSelection(.enabled)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
         }

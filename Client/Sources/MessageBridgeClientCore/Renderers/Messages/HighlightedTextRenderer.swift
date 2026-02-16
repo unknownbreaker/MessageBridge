@@ -36,7 +36,6 @@ struct HighlightedTextView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(attributedText)
-        .textSelection(.enabled)
 
       if let code = codes.first {
         Button {

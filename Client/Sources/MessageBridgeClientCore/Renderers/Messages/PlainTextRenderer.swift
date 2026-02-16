@@ -18,7 +18,6 @@ public struct PlainTextRenderer: MessageRenderer {
   public func render(_ message: Message) -> AnyView {
     AnyView(
       Text(message.text ?? "")
-        .textSelection(.enabled)
     )
   }
 }

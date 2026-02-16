@@ -21,7 +21,6 @@ public struct LargeEmojiRenderer: MessageRenderer {
     AnyView(
       Text(message.text ?? "")
         .font(.system(size: 48))
-        .textSelection(.enabled)
     )
   }
 }
