@@ -8,6 +8,7 @@ struct ExpandingTextEditor: View {
   var maxLines: Int = 6
   var placeholder: String = "Message"
   var onSubmit: (SubmitEvent) -> Void
+  var autocompleteState: EmojiAutocompleteState?
   @FocusState private var isFocused: Bool
 
   var body: some View {
@@ -26,6 +27,12 @@ struct ExpandingTextEditor: View {
         .frame(minHeight: 36, maxHeight: maxHeight)
         .fixedSize(horizontal: false, vertical: true)
         .focused($isFocused)
+        .onKeyPress(phases: .down) { press in
+          if let ac = autocompleteState, ac.isVisible {
+            return handleAutocompleteKey(press, state: ac)
+          }
+          return .ignored
+        }
         .onKeyPress(.return, phases: .down) { press in
           if press.modifiers.contains(.command) {
             onSubmit(.commandEnter)
@@ -50,5 +57,26 @@ struct ExpandingTextEditor: View {
 
   private var maxHeight: CGFloat {
     CGFloat(maxLines) * 20 + 16
+  }
+
+  private func handleAutocompleteKey(
+    _ press: KeyPress, state: EmojiAutocompleteState
+  ) -> KeyPress.Result {
+    switch press.key {
+    case .upArrow:
+      state.moveSelectionUp()
+      return .handled
+    case .downArrow:
+      state.moveSelectionDown()
+      return .handled
+    case .return, .tab:
+      state.selectCurrent(in: &text)
+      return .handled
+    case .escape:
+      state.dismiss()
+      return .handled
+    default:
+      return .ignored
+    }
   }
 }

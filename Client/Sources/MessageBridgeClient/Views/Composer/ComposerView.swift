@@ -3,11 +3,12 @@ import SwiftUI
 
 /// Main composer view replacing the old ComposeView.
 ///
-/// Layout: [ReplyBanner?] [Toolbar] [ExpandingTextEditor] [SendButton]
+/// Layout: [ReplyBanner?] [Toolbar] [ExpandingTextEditor + Autocomplete] [SendButton]
 struct ComposerView: View {
   @Binding var text: String
   let onSend: () -> Void
   @Binding var replyingTo: Message?
+  @StateObject private var autocompleteState = EmojiAutocompleteState()
 
   var body: some View {
     VStack(spacing: 0) {
@@ -23,8 +24,14 @@ struct ComposerView: View {
 
         ExpandingTextEditor(
           text: $text,
-          onSubmit: handleSubmit
+          onSubmit: handleSubmit,
+          autocompleteState: autocompleteState
         )
+        .overlay(alignment: .topLeading) {
+          EmojiAutocompletePopover(state: autocompleteState, text: $text)
+            .offset(y: -6)
+            .alignmentGuide(.top) { d in d[.bottom] }
+        }
 
         SendButton(enabled: canSend) {
           onSend()
@@ -32,6 +39,11 @@ struct ComposerView: View {
       }
       .padding(.horizontal)
       .padding(.vertical, 8)
+    }
+    .onChange(of: text) { oldValue, newValue in
+      autocompleteState.handleTextChange(
+        oldValue: oldValue, newValue: newValue, text: &text
+      )
     }
   }
 
