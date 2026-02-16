@@ -204,13 +204,20 @@ public func configureRoutes(
     }
 
     // Validate tapback type
-    let validTypes = ["love", "like", "dislike", "laugh", "emphasis", "question"]
+    let validTypes = ["love", "like", "dislike", "laugh", "emphasis", "question", "customEmoji"]
     guard validTypes.contains(tapbackRequest.type) else {
       throw Abort(
         .badRequest,
         reason:
           "Invalid tapback type: \(tapbackRequest.type). Must be one of: \(validTypes.joined(separator: ", "))"
       )
+    }
+
+    // Validate emoji is present for customEmoji type
+    if tapbackRequest.type == "customEmoji" {
+      guard let emoji = tapbackRequest.emoji, !emoji.isEmpty else {
+        throw Abort(.badRequest, reason: "emoji field is required when type is 'customEmoji'")
+      }
     }
 
     // Validate action

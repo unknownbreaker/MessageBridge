@@ -111,12 +111,16 @@ actor MockBridgeService: BridgeServiceProtocol {
   var lastTapbackType: TapbackType?
   var lastTapbackMessageGUID: String?
   var lastTapbackAction: TapbackActionType?
+  var lastTapbackEmoji: String?
 
-  func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType) async throws {
+  func sendTapback(
+    type: TapbackType, messageGUID: String, action: TapbackActionType, emoji: String?
+  ) async throws {
     sendTapbackCalled = true
     lastTapbackType = type
     lastTapbackMessageGUID = messageGUID
     lastTapbackAction = action
+    lastTapbackEmoji = emoji
     if shouldThrowError {
       throw BridgeError.tapbackFailed
     }

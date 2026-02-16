@@ -94,14 +94,17 @@ public struct SendResponse: Content {
 
 /// Request body for POST /messages/:id/tapback
 public struct TapbackRequest: Content {
-  /// The tapback type: love, like, dislike, laugh, emphasis, question
+  /// The tapback type: love, like, dislike, laugh, emphasis, question, customEmoji
   public let type: String
   /// The action: "add" or "remove"
   public let action: String
+  /// The custom emoji character (required when type is "customEmoji")
+  public let emoji: String?
 
-  public init(type: String, action: String) {
+  public init(type: String, action: String, emoji: String? = nil) {
     self.type = type
     self.action = action
+    self.emoji = emoji
   }
 }
 

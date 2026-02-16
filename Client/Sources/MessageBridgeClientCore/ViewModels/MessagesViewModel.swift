@@ -530,7 +530,8 @@ public class MessagesViewModel: ObservableObject {
   ///   - action: Whether to add or remove the tapback
   ///   - conversationId: The conversation containing the message
   public func sendTapback(
-    type: TapbackType, messageGUID: String, action: TapbackActionType, conversationId: String
+    type: TapbackType, messageGUID: String, action: TapbackActionType, conversationId: String,
+    emoji: String? = nil
   ) async {
     // Find the message in local cache
     guard var conversationMessages = messages[conversationId],
@@ -538,7 +539,8 @@ public class MessagesViewModel: ObservableObject {
     else {
       // Message not in cache, fall through to server-only request
       do {
-        try await bridgeService.sendTapback(type: type, messageGUID: messageGUID, action: action)
+        try await bridgeService.sendTapback(
+          type: type, messageGUID: messageGUID, action: action, emoji: emoji)
         logDebug("Tapback \(action.rawValue) sent successfully for message \(messageGUID)")
       } catch {
         logError("Failed to send tapback", error: error)
@@ -560,7 +562,8 @@ public class MessagesViewModel: ObservableObject {
       tapbacks.removeAll { $0.isFromMe }
       tapbacks.append(
         Tapback(
-          type: type, sender: "me", isFromMe: true, date: Date(), messageGUID: messageGUID))
+          type: type, sender: "me", isFromMe: true, date: Date(), messageGUID: messageGUID,
+          emoji: emoji))
     }
 
     // Create updated message with new tapbacks
@@ -587,7 +590,8 @@ public class MessagesViewModel: ObservableObject {
 
     // Send request to server
     do {
-      try await bridgeService.sendTapback(type: type, messageGUID: messageGUID, action: action)
+      try await bridgeService.sendTapback(
+        type: type, messageGUID: messageGUID, action: action, emoji: emoji)
       logDebug("Tapback \(action.rawValue) sent successfully for message \(messageGUID)")
     } catch {
       // Rollback to previous tapbacks on failure

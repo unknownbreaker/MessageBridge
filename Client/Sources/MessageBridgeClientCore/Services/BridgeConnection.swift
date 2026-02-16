@@ -79,7 +79,8 @@ public protocol BridgeServiceProtocol: Sendable {
   func stopWebSocket() async
   func fetchAttachment(id: Int64) async throws -> Data
   func markConversationAsRead(_ conversationId: String) async throws
-  func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType) async throws
+  func sendTapback(
+    type: TapbackType, messageGUID: String, action: TapbackActionType, emoji: String?) async throws
 }
 
 /// Response wrapper for conversations endpoint
@@ -417,9 +418,9 @@ public actor BridgeConnection: BridgeServiceProtocol {
     }
   }
 
-  public func sendTapback(type: TapbackType, messageGUID: String, action: TapbackActionType)
-    async throws
-  {
+  public func sendTapback(
+    type: TapbackType, messageGUID: String, action: TapbackActionType, emoji: String? = nil
+  ) async throws {
     guard let serverURL, let apiKey else {
       throw BridgeError.notConnected
     }
@@ -438,10 +439,13 @@ public actor BridgeConnection: BridgeServiceProtocol {
     request.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
     request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
-    let body: [String: Any] = [
+    var body: [String: Any] = [
       "type": type.rawValue,
       "action": action.rawValue,
     ]
+    if let emoji {
+      body["emoji"] = emoji
+    }
     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
     let (_, response) = try await urlSession.data(for: request)
