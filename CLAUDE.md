@@ -14,10 +14,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Active Work:** None - ready for new work
 
-**Last Session:** Repo cleanup + sidebar first names (2026-02-13)
-- Untracked xcuserstate files and fixed gitignore patterns for nested paths
-- Added `.beads/` to gitignore
-- Show first names only in conversation sidebar (`shortDisplayName` on Handle and Conversation)
+**Last Session:** Emoji shortcode autocomplete + custom emoji tapback (2026-02-16)
+- Slack-style `:shortcode:` autocomplete in composer (`:fire:` → 🔥, `:thu` shows popover)
+- Custom emoji tapback via macOS Character Palette ("+" button in tapback picker)
+- Server API updated with `customEmoji` tapback type and emoji field validation
+- 124 new tests (including adversarial edge cases)
+- Released as Client v0.8.0, Server v0.7.4
 
 **Known Blockers:** None
 
