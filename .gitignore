@@ -35,6 +35,3 @@ build/
 
 # Diagnostic scripts
 Scripts/
-
-# Beads tracking
-.beads/
