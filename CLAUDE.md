@@ -4,8 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Important:** When making changes that affect how users interact with the app (UI, keyboard shortcuts, configuration, installation, etc.), update this document accordingly.
 
-**Required:** At the start of every session, activate the `superpowers:using-superpowers` skill before doing any other work.
-
 ---
 
 ## Current Focus
